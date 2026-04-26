@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/casjay-forks/caspaste/src/path"
+	pathutil "github.com/casjay-forks/caspaste/src/path"
 )
 
 // CertSource indicates where a certificate came from
@@ -52,7 +52,7 @@ type Manager struct {
 // NewManager creates a new SSL manager
 func NewManager(enabled, acmeEnabled bool) *Manager {
 	return &Manager{
-		sslDir:      path.SSLDir(),
+		sslDir:      pathutil.SSLDir(),
 		certs:       make(map[string]*Certificate),
 		enabled:     enabled,
 		acmeEnabled: acmeEnabled,

@@ -86,7 +86,7 @@ jobs:
 
           go build -trimpath \
             -tags netgo \
-            -ldflags "-w -s -X main.Version=${VERSION} -extldflags '-static'" \
+            -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=$(git rev-parse --short HEAD) -X 'main.BuildDate=$(date -u +"%Y-%m-%dT%H:%M:%SZ")' -X main.OfficialSite=https://lp.pste.us -extldflags '-static'" \
             -o "binaries/${OUTPUT}" \
             ./src/server
 
@@ -112,7 +112,7 @@ jobs:
 
           go build -trimpath \
             -tags netgo \
-            -ldflags "-w -s -X main.Version=${VERSION} -extldflags '-static'" \
+            -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=$(git rev-parse --short HEAD) -X 'main.BuildDate=$(date -u +"%Y-%m-%dT%H:%M:%SZ")' -X main.OfficialSite=https://lp.pste.us -extldflags '-static'" \
             -o "binaries/${OUTPUT}" \
             ./src/client
 

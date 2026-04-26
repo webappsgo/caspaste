@@ -6,56 +6,15 @@
 package web
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 )
 
-type healthzResponse struct {
-	Status    string `json:"status"`
-	Timestamp int64  `json:"timestamp"`
-	Version   string `json:"version"`
-	FQDN      string `json:"fqdn"`
-	Database  string `json:"database"`
-	Uptime    int64  `json:"uptime,omitempty"`
-}
-
 var startTime = time.Now()
 
-// Pattern: /api/healthz
-func (data *Data) handleAPIHealthz(rw http.ResponseWriter, req *http.Request) error {
-	resp := healthzResponse{
-		Status:    "healthy",
-		Timestamp: time.Now().Unix(),
-		Version:   data.Version,
-		FQDN:      data.FQDN,
-		Database:  "connected",
-		Uptime:    int64(time.Since(startTime).Seconds()),
-	}
-
-	// Try to ping database
-	_, err := data.DB.PasteDeleteExpired()
-	if err != nil {
-		resp.Status = "degraded"
-		resp.Database = "error"
-	}
-
-	// Set status code and return response per AI.md PART 14 (indented JSON with newline)
-	rw.Header().Set("Content-Type", "application/json")
-	if err != nil {
-		rw.WriteHeader(http.StatusServiceUnavailable)
-	} else {
-		rw.WriteHeader(http.StatusOK)
-	}
-	jsonData, _ := json.MarshalIndent(resp, "", "  ")
-	rw.Write(jsonData)
-	rw.Write([]byte("\n"))
-	return nil
-}
-
-// Pattern: /healthz
+// Pattern: /healthz - HTML health check page
 func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error {
 	uptime := int64(time.Since(startTime).Seconds())
 	uptimeStr := formatUptime(uptime)
@@ -185,8 +144,8 @@ func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error
 		</div>
 		<div class="footer">
 			<a href="/">← Back to CasPaste</a> |
-			<a href="/api/healthz">JSON API</a> |
-			<a href="/about">About</a>
+			<a href="/api/v1/healthz">JSON API</a> |
+			<a href="/server/about">About</a>
 		</div>
 	</div>
 </body>

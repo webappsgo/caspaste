@@ -247,3 +247,107 @@ func DetectForServer() Mode {
 
 	return ModeHeadless
 }
+
+// ColorMode represents the color output mode per AI.md PART 8
+type ColorMode string
+
+const (
+	// ColorAuto auto-detects based on TTY, NO_COLOR, TERM
+	ColorAuto ColorMode = "auto"
+	// ColorAlways forces colors on
+	ColorAlways ColorMode = "always"
+	// ColorNever forces colors off
+	ColorNever ColorMode = "never"
+)
+
+// colorOverride is set by --color flag
+var colorOverride ColorMode = ColorAuto
+
+// SetColorMode sets the color mode from --color flag per AI.md PART 8
+func SetColorMode(mode string) {
+	switch strings.ToLower(mode) {
+	case "always":
+		colorOverride = ColorAlways
+	case "never":
+		colorOverride = ColorNever
+	default:
+		colorOverride = ColorAuto
+	}
+}
+
+// GetColorMode returns the current color mode
+func GetColorMode() ColorMode {
+	return colorOverride
+}
+
+// IsDumbTerminal returns true if TERM=dumb per AI.md PART 7
+// When TERM=dumb, ALL ANSI escapes must be disabled
+func IsDumbTerminal() bool {
+	return os.Getenv("TERM") == "dumb"
+}
+
+// ColorEnabled returns whether colors should be used per AI.md PART 8
+// Priority order (highest to lowest):
+// 1. CLI flag (--color=always|never)
+// 2. NO_COLOR env var (non-empty = disable)
+// 3. Auto-detect (TTY check, TERM variable)
+func ColorEnabled() bool {
+	// 1. CLI flag takes highest priority
+	switch colorOverride {
+	case ColorAlways:
+		return true
+	case ColorNever:
+		return false
+	}
+
+	// 2. NO_COLOR env var (non-empty = disable)
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+
+	// 3. TERM=dumb disables colors
+	if IsDumbTerminal() {
+		return false
+	}
+
+	// 4. Auto-detect: only color if TTY
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
+
+// EmojiEnabled returns whether emojis should be used per AI.md PART 8
+// Priority order:
+// 1. CLI flag (--color=never disables emojis too)
+// 2. NO_COLOR env var (non-empty = disable emojis)
+// 3. TERM=dumb (disable emojis)
+// 4. Auto-detect (TTY check)
+func EmojiEnabled() bool {
+	// 1. CLI flag --color=never disables emojis
+	if colorOverride == ColorNever {
+		return false
+	}
+
+	// 2. NO_COLOR disables emojis (practical: users wanting plain output)
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+
+	// 3. TERM=dumb disables emojis
+	if IsDumbTerminal() {
+		return false
+	}
+
+	// 4. Auto-detect: only emojis if TTY
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
+
+// CanUseANSI returns true if ANSI escape codes can be used
+// per AI.md PART 7 - checks TERM=dumb and NO_COLOR
+func CanUseANSI() bool {
+	if IsDumbTerminal() {
+		return false
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}

@@ -10,6 +10,8 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/casjay-forks/caspaste/src/validation"
 )
 
 func GetHost(req *http.Request) string {
@@ -68,7 +70,7 @@ func GetProtocol(req *http.Request) string {
 
 	// X-Forwarded-Ssl (some proxies use this: on/off)
 	xSsl := req.Header.Get("X-Forwarded-Ssl")
-	if xSsl == "on" {
+	if validation.IsTruthy(xSsl) {
 		return "https"
 	}
 

@@ -29,17 +29,27 @@ import (
 
 // Build info - set via -ldflags at build time
 var (
-	Version   = "unknown"
-	CommitID  = "unknown"
-	BuildDate = "unknown"
+	Version      = "unknown"
+	CommitID     = "unknown"
+	BuildDate    = "unknown"
+	OfficialSite = ""
 )
 
-// Config represents the CLI configuration file
+// Config represents the CLI configuration file per AI.md PART 33
 type Config struct {
-	Server   string `yaml:"server"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Server    string `yaml:"server"`
+	Token     string `yaml:"token,omitempty"`
+	TokenFile string `yaml:"token_file,omitempty"`
+	Username  string `yaml:"username,omitempty"`
+	Password  string `yaml:"password,omitempty"`
 }
+
+// Runtime flags for token and user context override per AI.md PART 33
+var (
+	flagToken     string
+	flagTokenFile string
+	flagUser      string
+)
 
 // APIResponse is the unified response wrapper per AI.md PART 16
 type APIResponse struct {
@@ -126,11 +136,15 @@ func main() {
 		return
 	}
 
+	// Parse global flags before command processing per AI.md PART 33
+	// Global flags: --token, --token-file, --color
+	args := parseGlobalFlags(os.Args[1:])
+
 	// Detect display mode per AI.md PART 33
 	mode := display.DetectForCLI()
 
 	// No args - launch TUI if in TUI mode, otherwise show usage
-	if len(os.Args) < 2 {
+	if len(args) < 1 {
 		if mode == display.ModeTUI {
 			launchTUI()
 			return
@@ -139,13 +153,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	command := os.Args[1]
+	command := args[0]
+	// Update os.Args for subcommand parsing (remove global flags)
+	os.Args = append([]string{os.Args[0]}, args...)
 
 	switch command {
 	case "help", "--help", "-h":
 		printUsage()
 	case "version", "--version", "-v":
-		fmt.Printf("caspaste-cli v%s\n", Version)
+		fmt.Printf("%s v%s\n", filepath.Base(os.Args[0]), Version)
 	case "config":
 		handleConfig()
 	case "new", "create", "paste":
@@ -224,10 +240,18 @@ func launchSetupWizard() {
 }
 
 func printUsage() {
+	binName := filepath.Base(os.Args[0])
 	fmt.Printf(`CasPaste CLI v%s
 A command-line client for CasPaste pastebin servers.
 
-Usage: caspaste-cli <command> [options]
+Usage: %s [global options] <command> [options]
+
+Global Options:
+  --token TOKEN       API token for authentication
+  --token-file FILE   Read token from file
+  --user NAME         Target user or org context (server auto-detects)
+                      Use @NAME to force user, +NAME to force org
+  --color MODE        Color output: always, never, auto (default: auto)
 
 Commands:
   config              Show or edit configuration
@@ -248,33 +272,49 @@ Shell Completions:
   Supported shells: bash, zsh, fish, sh, dash, ksh, powershell, pwsh
   If SHELL is omitted, it is auto-detected from $SHELL.
 
-  Example: eval "$(caspaste-cli --shell init)"
+  Example: eval "$(%s --shell init)"
 
 Examples:
   # Configure server and credentials
-  caspaste-cli login
+  %s login
 
   # Create paste from stdin
-  echo "Hello World" | caspaste-cli new
+  echo "Hello World" | %s new
 
   # Create paste from file
-  caspaste-cli new -f script.py -s python
+  %s new -f script.py -s python
 
   # Get a paste
-  caspaste-cli get abc123
+  %s get abc123
 
   # List recent pastes
-  caspaste-cli list -n 10
+  %s list -n 10
+
+  # Use API token for authentication
+  %s --token usr_abc123 new -f file.txt
+
+  # Create paste in org context (PART 34/35)
+  %s --user myorg new -f file.txt
+
+  # Force user context with @ prefix
+  %s --user @alice list
 
 Configuration:
   Config file: ~/.config/casjay-forks/caspaste/cli.yml
 
+  Token priority (highest to lowest):
+    1. --token flag
+    2. --token-file flag
+    3. CASPASTE_TOKEN environment variable
+    4. Config file token field
+
   Or use environment variables:
     CASPASTE_SERVER=https://paste.example.com
+    CASPASTE_TOKEN=usr_abc123
     CASPASTE_USERNAME=admin
     CASPASTE_PASSWORD=secret
 
-`, Version)
+`, Version, binName, binName, binName, binName, binName, binName, binName, binName, binName, binName)
 }
 
 // getConfigPath returns the path to the config file
@@ -344,7 +384,115 @@ func saveConfig(cfg Config) error {
 	return nil
 }
 
-// makeRequest makes an HTTP request with optional basic auth
+// parseGlobalFlags extracts global flags before command processing per AI.md PART 33
+// Global flags: --token, --token-file, --user, --color
+// Returns remaining args after extracting global flags
+func parseGlobalFlags(args []string) []string {
+	var remaining []string
+	i := 0
+	for i < len(args) {
+		switch args[i] {
+		case "--token":
+			if i+1 < len(args) {
+				flagToken = args[i+1]
+				i += 2
+				continue
+			}
+			i++
+		case "--token-file":
+			if i+1 < len(args) {
+				flagTokenFile = args[i+1]
+				i += 2
+				continue
+			}
+			i++
+		case "--user":
+			// Per AI.md PART 33: --user NAME for user/org context
+			// Server auto-detects if NAME is user or org
+			// @NAME forces user context, +NAME forces org context
+			if i+1 < len(args) {
+				flagUser = args[i+1]
+				i += 2
+				continue
+			}
+			i++
+		case "--color":
+			if i+1 < len(args) {
+				display.SetColorMode(args[i+1])
+				i += 2
+				continue
+			}
+			i++
+		default:
+			// Check for --flag=VALUE format
+			if strings.HasPrefix(args[i], "--token=") {
+				flagToken = strings.TrimPrefix(args[i], "--token=")
+				i++
+				continue
+			}
+			if strings.HasPrefix(args[i], "--token-file=") {
+				flagTokenFile = strings.TrimPrefix(args[i], "--token-file=")
+				i++
+				continue
+			}
+			if strings.HasPrefix(args[i], "--user=") {
+				flagUser = strings.TrimPrefix(args[i], "--user=")
+				i++
+				continue
+			}
+			if strings.HasPrefix(args[i], "--color=") {
+				display.SetColorMode(strings.TrimPrefix(args[i], "--color="))
+				i++
+				continue
+			}
+			remaining = append(remaining, args[i])
+			i++
+		}
+	}
+	return remaining
+}
+
+// getToken returns the API token with proper priority per AI.md PART 33:
+// 1. --token flag (explicit)
+// 2. --token-file flag (file path)
+// 3. Environment variable: CASPASTE_TOKEN
+// 4. Config file: cli.yml -> token
+func getToken(cfg Config) string {
+	// 1. CLI flag --token takes highest priority
+	if flagToken != "" {
+		return flagToken
+	}
+
+	// 2. CLI flag --token-file
+	if flagTokenFile != "" {
+		data, err := os.ReadFile(flagTokenFile)
+		if err == nil {
+			return strings.TrimSpace(string(data))
+		}
+	}
+
+	// 3. Environment variable CASPASTE_TOKEN
+	if envToken := os.Getenv("CASPASTE_TOKEN"); envToken != "" {
+		return envToken
+	}
+
+	// 4. Config file token field
+	if cfg.Token != "" {
+		return cfg.Token
+	}
+
+	// 5. Config file token_file field
+	if cfg.TokenFile != "" {
+		data, err := os.ReadFile(cfg.TokenFile)
+		if err == nil {
+			return strings.TrimSpace(string(data))
+		}
+	}
+
+	return ""
+}
+
+// makeRequest makes an HTTP request with token or basic auth per AI.md PART 33
 func makeRequest(method, endpoint string, body io.Reader, contentType string, cfg Config) (*http.Response, error) {
 	if cfg.Server == "" {
 		return nil, fmt.Errorf("server not configured. Run 'caspaste-cli login' first")
@@ -358,15 +506,27 @@ func makeRequest(method, endpoint string, body io.Reader, contentType string, cf
 	}
 
 	// Set User-Agent per AI.md requirement
-	req.Header.Set("User-Agent", "caspaste-cli/"+Version)
+	req.Header.Set("User-Agent", filepath.Base(os.Args[0])+"/"+Version)
 
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
 
-	// Add basic auth if credentials are configured
-	if cfg.Username != "" && cfg.Password != "" {
+	// Auth priority per AI.md PART 33:
+	// 1. Token auth (if token available)
+	// 2. Basic auth (if username/password configured)
+	token := getToken(cfg)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	} else if cfg.Username != "" && cfg.Password != "" {
 		req.SetBasicAuth(cfg.Username, cfg.Password)
+	}
+
+	// User/Org context per AI.md PART 33
+	// --user NAME sets X-User-Context header for server-side smart detection
+	// @NAME = force user, +NAME = force org, NAME = server auto-detects
+	if flagUser != "" {
+		req.Header.Set("X-User-Context", flagUser)
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}

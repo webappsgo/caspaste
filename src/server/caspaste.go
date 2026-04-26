@@ -36,17 +36,20 @@ import (
 	"github.com/casjay-forks/caspaste/src/cli"
 	"github.com/casjay-forks/caspaste/src/completion"
 	"github.com/casjay-forks/caspaste/src/config"
+	"github.com/casjay-forks/caspaste/src/display"
+	"github.com/casjay-forks/caspaste/src/graphql"
 	"github.com/casjay-forks/caspaste/src/logger"
 	"github.com/casjay-forks/caspaste/src/metric"
 	"github.com/casjay-forks/caspaste/src/netshare"
 	"github.com/casjay-forks/caspaste/src/portutil"
 	"github.com/casjay-forks/caspaste/src/privilege"
 	"github.com/casjay-forks/caspaste/src/raw"
+	"github.com/casjay-forks/caspaste/src/scheduler"
 	"github.com/casjay-forks/caspaste/src/service"
 	"github.com/casjay-forks/caspaste/src/storage"
 	"github.com/casjay-forks/caspaste/src/swagger"
-	"github.com/casjay-forks/caspaste/src/graphql"
 	"github.com/casjay-forks/caspaste/src/template"
+	"github.com/casjay-forks/caspaste/src/tor"
 	"github.com/casjay-forks/caspaste/src/updater"
 	"github.com/casjay-forks/caspaste/src/validation"
 	"github.com/casjay-forks/caspaste/src/web"
@@ -54,9 +57,10 @@ import (
 
 // Build info - set via -ldflags at build time
 var (
-	Version   = "unknown"
-	CommitID  = "unknown"
-	BuildDate = "unknown"
+	Version      = "unknown"
+	CommitID     = "unknown"
+	BuildDate    = "unknown"
+	OfficialSite = ""
 )
 
 // getVersion reads version from release.txt or returns default
@@ -1290,8 +1294,15 @@ func main() {
 	flagPidFile := c.AddStringVar("pid", "", "PID file path. Default: /var/run/casjay-forks/caspaste.pid or ~/.local/share/casjay-forks/caspaste/caspaste.pid", nil)
 	flagMode := c.AddStringVar("mode", "", "Application mode: production or development (default: production)", nil)
 	flagUpdate := c.AddStringVar("update", "", "Update management: check, yes, branch {stable|beta|daily}, --help", nil)
+	// Color output flag per AI.md PART 8
+	flagColor := c.AddStringVar("color", "", "Color output: always, never, or auto (default: auto, respects NO_COLOR)", nil)
 
 	c.Parse()
+
+	// Apply --color flag immediately after parsing per AI.md PART 8
+	if *flagColor != "" {
+		display.SetColorMode(*flagColor)
+	}
 
 	// Handle --help first
 	if *flagHelp {
@@ -1302,6 +1313,7 @@ func main() {
 		fmt.Println("  --version           Show version information")
 		fmt.Println("  --daemon            Start in background (daemon mode)")
 		fmt.Println("  --debug             Enable debug logging")
+		fmt.Println("  --color MODE        Color output: always, never, auto (default: auto, respects NO_COLOR)")
 		fmt.Println("\nServer Configuration:")
 		fmt.Println("  --address ADDR      Listen address (default: :80)")
 		fmt.Println("  --port PORT         Listen port (alternative to --address)")
@@ -2491,24 +2503,84 @@ func main() {
 								web.CSRFMiddleware(csrfCfg)(
 									web.MaintenanceMiddleware(dataDirectory, mux)))))))))
 
-	// Run background job
-	go func(cleanJobPeriod time.Duration) {
-		for {
-			// Delete expired pastes
+	// Initialize built-in scheduler per AI.md PART 19
+	// ALL projects MUST have a built-in scheduler that is ALWAYS RUNNING
+	// NEVER use external schedulers (cron, systemd timers, etc.)
+	sched := scheduler.New(&scheduler.Config{
+		Timezone:      "America/New_York",
+		CatchUpWindow: time.Hour,
+	})
+
+	// Add paste cleanup task per AI.md PART 19
+	sched.AddTask(&scheduler.Task{
+		ID:          "paste_cleanup",
+		Name:        "Paste Cleanup",
+		Description: "Delete expired pastes from database",
+		Schedule:    "@every " + cleanupPeriod.String(),
+		Enabled:     true,
+		Skippable:   false,
+		Handler: func(ctx context.Context) error {
 			count, err := db.PasteDeleteExpired()
 			if err != nil {
 				log.Error(errors.New("Delete expired: " + err.Error()))
+				return err
 			}
-
-			// Only log if pastes were actually deleted
 			if count > 0 {
 				log.Info("Deleted " + strconv.FormatInt(count, 10) + " expired pastes")
 			}
+			return nil
+		},
+	})
 
-			// Wait
-			time.Sleep(cleanJobPeriod)
-		}
-	}(cleanupPeriod)
+	// Add session cleanup task per AI.md PART 19
+	sched.AddTask(&scheduler.Task{
+		ID:          "session_cleanup",
+		Name:        "Session Cleanup",
+		Description: "Remove expired user sessions",
+		Schedule:    "@every 15m",
+		Enabled:     true,
+		Skippable:   false,
+		Handler: func(ctx context.Context) error {
+			// Session cleanup - will be fully implemented with PART 34 integration
+			return nil
+		},
+	})
+
+	// Add token cleanup task per AI.md PART 19
+	sched.AddTask(&scheduler.Task{
+		ID:          "token_cleanup",
+		Name:        "Token Cleanup",
+		Description: "Remove expired API tokens",
+		Schedule:    "@every 15m",
+		Enabled:     true,
+		Skippable:   false,
+		Handler: func(ctx context.Context) error {
+			// Token cleanup - will be fully implemented with PART 34 integration
+			return nil
+		},
+	})
+
+	// Add self-health check task per AI.md PART 19
+	sched.AddTask(&scheduler.Task{
+		ID:          "healthcheck_self",
+		Name:        "Self Health Check",
+		Description: "Verify application health",
+		Schedule:    "@every 5m",
+		Enabled:     true,
+		Skippable:   false,
+		Handler: func(ctx context.Context) error {
+			// Simple health check - verify database is responsive
+			_, err := db.PasteDeleteExpired()
+			return err
+		},
+	})
+
+	// Start the scheduler per AI.md PART 19
+	if err := sched.Start(); err != nil {
+		log.Error(fmt.Errorf("failed to start scheduler: %w", err))
+	} else {
+		log.Info("Built-in scheduler started per AI.md PART 19")
+	}
 
 	// Determine ports (HTTP and optionally HTTPS)
 	var httpPort, httpsPort int
@@ -2636,6 +2708,66 @@ func main() {
 		httpErrors <- srv.Serve(httpListener)
 	}()
 
+	// Start Tor hidden service per AI.md PART 32
+	// Hidden service is auto-enabled when Tor binary is found
+	var torManager *tor.Manager
+	torCfg := &tor.Config{
+		Binary:                    yamlCfg.Server.Tor.Binary,
+		UseNetwork:                yamlCfg.Server.Tor.UseNetwork,
+		AllowUserPreference:       yamlCfg.Server.Tor.AllowUserPreference,
+		MaxCircuits:               yamlCfg.Server.Tor.MaxCircuits,
+		CircuitTimeout:            time.Duration(yamlCfg.Server.Tor.CircuitTimeout) * time.Second,
+		BootstrapTimeout:          time.Duration(yamlCfg.Server.Tor.BootstrapTimeout) * time.Second,
+		SafeLogging:               yamlCfg.Server.Tor.SafeLogging,
+		MaxStreamsPerCircuit:      yamlCfg.Server.Tor.MaxStreamsPerCircuit,
+		CloseCircuitOnStreamLimit: yamlCfg.Server.Tor.CloseCircuitOnStreamLimit,
+		BandwidthRate:             yamlCfg.Server.Tor.BandwidthRate,
+		BandwidthBurst:            yamlCfg.Server.Tor.BandwidthBurst,
+		MaxMonthlyBandwidth:       yamlCfg.Server.Tor.MaxMonthlyBandwidth,
+		NumIntroPoints:            yamlCfg.Server.Tor.NumIntroPoints,
+		VirtualPort:               yamlCfg.Server.Tor.VirtualPort,
+	}
+	// Apply defaults for zero values
+	if torCfg.MaxCircuits == 0 {
+		torCfg.MaxCircuits = 32
+	}
+	if torCfg.CircuitTimeout == 0 {
+		torCfg.CircuitTimeout = 60 * time.Second
+	}
+	if torCfg.BootstrapTimeout == 0 {
+		torCfg.BootstrapTimeout = 3 * time.Minute
+	}
+	if torCfg.MaxStreamsPerCircuit == 0 {
+		torCfg.MaxStreamsPerCircuit = 100
+	}
+	if torCfg.BandwidthRate == "" {
+		torCfg.BandwidthRate = "1 MB"
+	}
+	if torCfg.BandwidthBurst == "" {
+		torCfg.BandwidthBurst = "2 MB"
+	}
+	if torCfg.MaxMonthlyBandwidth == "" {
+		torCfg.MaxMonthlyBandwidth = "100 GB"
+	}
+	if torCfg.NumIntroPoints == 0 {
+		torCfg.NumIntroPoints = 3
+	}
+	if torCfg.VirtualPort == 0 {
+		torCfg.VirtualPort = 80
+	}
+	torManager = tor.NewManager(context.Background(), torCfg, configDir, dataDir, *flagLog, httpPort)
+	if err := torManager.Start(); err != nil {
+		log.Warn(fmt.Sprintf("Tor: %v", err))
+	} else {
+		// Log Tor status (only if enabled)
+		torStatus := torManager.GetStatus()
+		if torStatus.Enabled && torStatus.Running {
+			log.Info(fmt.Sprintf("Tor: %s", torStatus.Hostname))
+		} else if torStatus.Enabled && !torStatus.Running && torStatus.Error != "" {
+			log.Warn(fmt.Sprintf("Tor: %s", torStatus.Error))
+		}
+	}
+
 	// Start HTTPS server if configured and cert available
 	var httpsErrors chan error
 	var srvHTTPS *http.Server
@@ -2718,6 +2850,17 @@ func main() {
 				srvHTTPS.Close()
 			}
 		}
+
+		// Stop Tor hidden service per AI.md PART 32
+		if torManager != nil {
+			if err := torManager.Stop(); err != nil {
+				log.Error(fmt.Errorf("Tor shutdown error: %w", err))
+			}
+		}
+
+		// Stop built-in scheduler per AI.md PART 19
+		sched.Stop()
+		log.Info("Scheduler stopped")
 
 		log.Info("Server stopped")
 	}

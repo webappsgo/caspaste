@@ -17,6 +17,7 @@ import (
 
 	"github.com/casjay-forks/caspaste/src/lineend"
 	"github.com/casjay-forks/caspaste/src/storage"
+	"github.com/casjay-forks/caspaste/src/validation"
 )
 
 func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem, titleMaxLen int, bodyMaxLen int, maxLifeTime int64, lexerNames []string) (string, int64, int64, error) {
@@ -50,9 +51,9 @@ func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem
 		Author:      req.PostFormValue("author"),
 		AuthorEmail: req.PostFormValue("authorEmail"),
 		AuthorURL:   req.PostFormValue("authorURL"),
-		IsEditable:  req.PostFormValue("editable") == "true",
-		IsPrivate:   req.PostFormValue("private") == "true",
-		IsURL:       req.PostFormValue("url") == "true",
+		IsEditable:  validation.IsTruthy(req.PostFormValue("editable")),
+		IsPrivate:   validation.IsTruthy(req.PostFormValue("private")),
+		IsURL:       validation.IsTruthy(req.PostFormValue("url")),
 		OriginalURL: req.PostFormValue("originalURL"),
 	}
 
@@ -177,7 +178,7 @@ func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem
 	// Get "one use" (burn after reading) parameter
 	// Accepts "true" for backward compatibility or numeric values for view count
 	oneUseVal := req.PostForm.Get("oneUse")
-	if oneUseVal == "true" || oneUseVal == "1" {
+	if validation.IsTruthy(oneUseVal) {
 		paste.OneUse = true
 	} else if oneUseVal != "" && oneUseVal != "false" {
 		// Check if it's a numeric value > 0 (custom view count)

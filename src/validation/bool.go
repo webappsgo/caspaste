@@ -9,9 +9,8 @@ import (
 	"strings"
 )
 
-// ParseBool parses a boolean value with support for various truthy/falsey strings
-// Truthy:  yes, true, enable, enabled, 1, on
-// Falsey:  no, false, disable, disabled, 0, off, (empty string)
+// ParseBool parses a boolean value with support for 40+ truthy/falsey strings
+// per AI.md PART 5: Boolean Handling specification.
 // Returns: (value, wasSet)
 func ParseBool(s string) (bool, bool) {
 	if s == "" {
@@ -20,16 +19,28 @@ func ParseBool(s string) (bool, bool) {
 
 	s = strings.ToLower(strings.TrimSpace(s))
 
-	// Truthy values
-	truthy := []string{"yes", "true", "enable", "enabled", "1", "on", "y", "t"}
+	// Truthy values per AI.md PART 5 (40+ variations)
+	truthy := []string{
+		"1", "yes", "true", "enable", "enabled", "on",
+		"yep", "yup", "yeah", "affirmative", "aye",
+		"si", "oui", "da", "hai", "totally", "sure",
+		"ok", "okay", "accept", "allow", "grant",
+		"y", "t", "active",
+	}
 	for _, val := range truthy {
 		if s == val {
 			return true, true
 		}
 	}
 
-	// Falsey values
-	falsey := []string{"no", "false", "disable", "disabled", "0", "off", "n", "f"}
+	// Falsey values per AI.md PART 5 (40+ variations)
+	falsey := []string{
+		"0", "no", "false", "disable", "disabled", "off",
+		"nope", "nah", "nay", "negative", "nein",
+		"non", "niet", "iie", "lie", "noway", "never",
+		"deny", "reject", "block", "revoke",
+		"n", "f", "inactive",
+	}
 	for _, val := range falsey {
 		if s == val {
 			return false, true

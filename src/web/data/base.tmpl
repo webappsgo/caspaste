@@ -24,15 +24,6 @@
 	<meta name="apple-mobile-web-app-title" content="CasPaste">
 	
 	{{template "headAppend" .}}
-	
-	<!-- PWA Service Worker -->
-	<script>
-		if ('serviceWorker' in navigator) {
-			navigator.serviceWorker.register('/sw.js').catch(function(error) {
-				console.log('Service Worker registration failed:', error);
-			});
-		}
-	</script>
 </head>
 <body>
 	<a href="#main-content" class="skip-to-main">Skip to main content</a>
@@ -50,39 +41,6 @@
 
 	<script src="/history.js"></script>
 	<script src="/toast.js"></script>
-	<script>
-		// Mobile navigation toggle
-		(function() {
-			var navToggle = document.getElementById('js-nav-toggle');
-			var navLinks = document.getElementById('js-nav-links');
-
-			if (navToggle && navLinks) {
-				navToggle.addEventListener('click', function() {
-					var isOpen = navLinks.classList.toggle('open');
-					navToggle.classList.toggle('active');
-					navToggle.setAttribute('aria-expanded', isOpen);
-				});
-
-				// Close menu when clicking outside
-				document.addEventListener('click', function(e) {
-					if (!navToggle.contains(e.target) && !navLinks.contains(e.target)) {
-						navLinks.classList.remove('open');
-						navToggle.classList.remove('active');
-						navToggle.setAttribute('aria-expanded', 'false');
-					}
-				});
-
-				// Close menu when pressing Escape
-				document.addEventListener('keydown', function(e) {
-					if (e.key === 'Escape' && navLinks.classList.contains('open')) {
-						navLinks.classList.remove('open');
-						navToggle.classList.remove('active');
-						navToggle.setAttribute('aria-expanded', 'false');
-						navToggle.focus();
-					}
-				});
-			}
-		})();
-	</script>
+	<script src="/nav.js"></script>
 </body>
 </html>

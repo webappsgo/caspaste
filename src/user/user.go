@@ -7,7 +7,8 @@
 package user
 
 import (
-	"crypto/sha256"
+	"context"
+	cryptoRand "crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -17,6 +18,11 @@ import (
 	"time"
 
 	"golang.org/x/crypto/argon2"
+)
+
+// Query timeouts per AI.md PART 10
+const (
+	defaultQueryTimeout = 5 * time.Second
 )
 
 // User role constants
@@ -160,8 +166,12 @@ func (s *Service) Create(input CreateUserInput) (*User, error) {
 
 	now := time.Now().Unix()
 
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	// Insert user
-	result, err := s.db.Exec(`
+	result, err := s.db.ExecContext(ctx, `
 		INSERT INTO users (username, email, password_hash, display_name, role, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, strings.ToLower(input.Username), strings.ToLower(input.Email), passwordHash, input.DisplayName, role, now, now)
@@ -183,7 +193,11 @@ func (s *Service) GetByID(id int64) (*User, error) {
 	var orgVisibility int
 	var emailVerified, totpEnabled int
 
-	err := s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, username, email, password_hash, display_name, avatar_type, avatar_url,
 		       bio, location, website, visibility, org_visibility, timezone, language, role,
 		       email_verified, totp_enabled, totp_secret, last_login, failed_attempts,
@@ -217,7 +231,11 @@ func (s *Service) GetByUsername(username string) (*User, error) {
 	var orgVisibility int
 	var emailVerified, totpEnabled int
 
-	err := s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, username, email, password_hash, display_name, avatar_type, avatar_url,
 		       bio, location, website, visibility, org_visibility, timezone, language, role,
 		       email_verified, totp_enabled, totp_secret, last_login, failed_attempts,
@@ -251,7 +269,11 @@ func (s *Service) GetByEmail(email string) (*User, error) {
 	var orgVisibility int
 	var emailVerified, totpEnabled int
 
-	err := s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, username, email, password_hash, display_name, avatar_type, avatar_url,
 		       bio, location, website, visibility, org_visibility, timezone, language, role,
 		       email_verified, totp_enabled, totp_secret, last_login, failed_attempts,
@@ -295,76 +317,107 @@ func (s *Service) GetByIdentifier(identifier string) (*User, error) {
 	}
 }
 
-// Update updates a user's profile
+// Update updates a user's profile using individual parameterized queries
 func (s *Service) Update(id int64, input UpdateUserInput) error {
-	// Build update query dynamically
-	var updates []string
-	var args []interface{}
+	// Each field is updated with a fully parameterized query (no string concatenation)
+	type fieldUpdate struct {
+		query string
+		value interface{}
+	}
+
+	var fields []fieldUpdate
 
 	if input.DisplayName != nil {
-		updates = append(updates, "display_name = ?")
-		args = append(args, *input.DisplayName)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?",
+			value: *input.DisplayName,
+		})
 	}
 	if input.AvatarType != nil {
-		updates = append(updates, "avatar_type = ?")
-		args = append(args, *input.AvatarType)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET avatar_type = ?, updated_at = ? WHERE id = ?",
+			value: *input.AvatarType,
+		})
 	}
 	if input.AvatarURL != nil {
-		updates = append(updates, "avatar_url = ?")
-		args = append(args, *input.AvatarURL)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?",
+			value: *input.AvatarURL,
+		})
 	}
 	if input.Bio != nil {
-		updates = append(updates, "bio = ?")
-		args = append(args, *input.Bio)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET bio = ?, updated_at = ? WHERE id = ?",
+			value: *input.Bio,
+		})
 	}
 	if input.Location != nil {
-		updates = append(updates, "location = ?")
-		args = append(args, *input.Location)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET location = ?, updated_at = ? WHERE id = ?",
+			value: *input.Location,
+		})
 	}
 	if input.Website != nil {
-		updates = append(updates, "website = ?")
-		args = append(args, *input.Website)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET website = ?, updated_at = ? WHERE id = ?",
+			value: *input.Website,
+		})
 	}
 	if input.Visibility != nil {
-		updates = append(updates, "visibility = ?")
-		args = append(args, *input.Visibility)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET visibility = ?, updated_at = ? WHERE id = ?",
+			value: *input.Visibility,
+		})
 	}
 	if input.OrgVisibility != nil {
 		orgVis := 0
 		if *input.OrgVisibility {
 			orgVis = 1
 		}
-		updates = append(updates, "org_visibility = ?")
-		args = append(args, orgVis)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET org_visibility = ?, updated_at = ? WHERE id = ?",
+			value: orgVis,
+		})
 	}
 	if input.Timezone != nil {
-		updates = append(updates, "timezone = ?")
-		args = append(args, *input.Timezone)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET timezone = ?, updated_at = ? WHERE id = ?",
+			value: *input.Timezone,
+		})
 	}
 	if input.Language != nil {
-		updates = append(updates, "language = ?")
-		args = append(args, *input.Language)
+		fields = append(fields, fieldUpdate{
+			query: "UPDATE users SET language = ?, updated_at = ? WHERE id = ?",
+			value: *input.Language,
+		})
 	}
 
-	if len(updates) == 0 {
+	if len(fields) == 0 {
 		return nil
 	}
 
-	// Add updated_at
-	updates = append(updates, "updated_at = ?")
-	args = append(args, time.Now().Unix())
+	now := time.Now().Unix()
 
-	// Add ID
-	args = append(args, id)
+	for _, f := range fields {
+		// Query timeout per AI.md PART 10
+		ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+		_, err := s.db.ExecContext(ctx, f.query, f.value, now, id)
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
 
-	query := fmt.Sprintf("UPDATE users SET %s WHERE id = ?", strings.Join(updates, ", "))
-	_, err := s.db.Exec(query, args...)
-	return err
+	return nil
 }
 
 // Delete removes a user
 func (s *Service) Delete(id int64) error {
-	_, err := s.db.Exec("DELETE FROM users WHERE id = ?", id)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
 	return err
 }
 
@@ -375,7 +428,12 @@ func (s *Service) UpdatePassword(id int64, newPassword string) error {
 	}
 
 	passwordHash := HashPassword(newPassword)
-	_, err := s.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
 		passwordHash, time.Now().Unix(), id)
 	return err
 }
@@ -415,9 +473,13 @@ func (s *Service) Authenticate(identifier, password string) (*User, error) {
 
 // incrementFailedAttempts increases failed login counter and locks if needed
 func (s *Service) incrementFailedAttempts(userID int64) {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	// Get current failed attempts
 	var failedAttempts int
-	s.db.QueryRow("SELECT failed_attempts FROM users WHERE id = ?", userID).Scan(&failedAttempts)
+	s.db.QueryRowContext(ctx, "SELECT failed_attempts FROM users WHERE id = ?", userID).Scan(&failedAttempts)
 
 	failedAttempts++
 
@@ -427,18 +489,26 @@ func (s *Service) incrementFailedAttempts(userID int64) {
 		lockedUntil = time.Now().Add(15 * time.Minute).Unix()
 	}
 
-	s.db.Exec("UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?",
+	s.db.ExecContext(ctx, "UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?",
 		failedAttempts, lockedUntil, userID)
 }
 
 // resetFailedAttempts clears the failed attempts counter
 func (s *Service) resetFailedAttempts(userID int64) {
-	s.db.Exec("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?", userID)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	s.db.ExecContext(ctx, "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?", userID)
 }
 
 // updateLastLogin sets the last login timestamp
 func (s *Service) updateLastLogin(userID int64) {
-	s.db.Exec("UPDATE users SET last_login = ? WHERE id = ?", time.Now().Unix(), userID)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	s.db.ExecContext(ctx, "UPDATE users SET last_login = ? WHERE id = ?", time.Now().Unix(), userID)
 }
 
 // SetEmailVerified marks a user's email as verified
@@ -447,7 +517,12 @@ func (s *Service) SetEmailVerified(userID int64, verified bool) error {
 	if verified {
 		v = 1
 	}
-	_, err := s.db.Exec("UPDATE users SET email_verified = ?, updated_at = ? WHERE id = ?",
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET email_verified = ?, updated_at = ? WHERE id = ?",
 		v, time.Now().Unix(), userID)
 	return err
 }
@@ -458,7 +533,12 @@ func (s *Service) SetTOTPEnabled(userID int64, enabled bool, secret string) erro
 	if enabled {
 		v = 1
 	}
-	_, err := s.db.Exec("UPDATE users SET totp_enabled = ?, totp_secret = ?, updated_at = ? WHERE id = ?",
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET totp_enabled = ?, totp_secret = ?, updated_at = ? WHERE id = ?",
 		v, secret, time.Now().Unix(), userID)
 	return err
 }
@@ -547,12 +627,13 @@ func VerifyPassword(password, encodedHash string) bool {
 	return result == 0
 }
 
-// generateSalt generates a random salt
+// generateSalt generates a cryptographically secure random salt
 func generateSalt() []byte {
 	salt := make([]byte, 16)
-	// Use SHA256 of current time + random as simple salt
-	// In production, use crypto/rand
-	h := sha256.Sum256([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
-	copy(salt, h[:16])
+	// Use crypto/rand for cryptographically secure randomness per AI.md PART 11
+	if _, err := cryptoRand.Read(salt); err != nil {
+		// Fallback should never happen, but panic if it does - this is critical
+		panic(fmt.Sprintf("failed to generate secure salt: %v", err))
+	}
 	return salt
 }

@@ -315,6 +315,7 @@ func IsPublicPath(path string) bool {
 		"/style.css",
 		"/main.js",
 		"/toast.js",
+		"/nav.js",
 		"/history.js",
 		"/code.js",
 		"/paste.js",
@@ -336,9 +337,10 @@ func IsPublicPath(path string) bool {
 
 	// Prefix match paths - public info pages
 	publicPrefixes := []string{
-		"/about",  // /about, /about/authors, /about/license, /about/source_code
-		"/docs",   // /docs, /docs/apiv1, /docs/libraries, /docs/customize
-		"/terms",  // /terms
+		"/server/about", // /server/about, /server/about/authors, /server/about/license
+		"/about",        // Legacy redirect support
+		"/docs",         // /docs, /docs/apiv1, /docs/libraries, /docs/customize
+		"/terms",        // /terms
 	}
 
 	for _, prefix := range publicPrefixes {

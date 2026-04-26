@@ -38,7 +38,7 @@ COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Build flags
-LDFLAGS := -w -s -X main.Version=$(APP_VERSION) -X main.CommitID=$(COMMIT_ID) -X main.BuildDate=$(BUILD_DATE) -extldflags -static
+LDFLAGS := -w -s -X main.Version=$(APP_VERSION) -X main.CommitID=$(COMMIT_ID) -X main.BuildDate=$(BUILD_DATE) -X main.OfficialSite=https://lp.pste.us -extldflags -static
 STATIC_FLAGS := -tags netgo -ldflags "$(LDFLAGS)"
 
 # Docker build environment

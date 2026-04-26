@@ -336,7 +336,7 @@ func ApplyCriticalOverrides(cfg *YAMLConfig) {
 	// Server public mode - critical for enabling/disabling authentication
 	// PUBLIC=true (default) = open/public, PUBLIC=false = auth required
 	if val := getEnv("PUBLIC"); val != "" {
-		cfg.Server.Public = isTruthy(val)
+		cfg.Server.Public = validation.IsTruthy(val)
 	}
 
 	// Password file - for custom users (optional, auto-generated if not set)
@@ -351,10 +351,4 @@ func ApplyCriticalOverrides(cfg *YAMLConfig) {
 	if val := getEnv("TLS_MIN_VERSION"); val != "" {
 		cfg.Security.TLS.MinVersion = val
 	}
-}
-
-// isTruthy checks if a string value represents true
-func isTruthy(val string) bool {
-	val = strings.ToLower(strings.TrimSpace(val))
-	return val == "true" || val == "1" || val == "yes" || val == "on" || val == "enabled"
 }

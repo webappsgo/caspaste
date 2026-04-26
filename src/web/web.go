@@ -46,6 +46,7 @@ type Data struct {
 	MainJS         *[]byte
 	BurnAfterJS    *[]byte
 	ToastJS        *[]byte
+	NavJS          *[]byte
 	HistoryJS      *textTemplate.Template
 	CodeJS         *textTemplate.Template
 	PastePage      *template.Template
@@ -232,6 +233,13 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	}
 	data.ToastJS = &toastJS
 
+	// nav.js
+	navJS, err := embFS.ReadFile("data/nav.js")
+	if err != nil {
+		return nil, err
+	}
+	data.NavJS = &navJS
+
 	// history.js
 	data.HistoryJS, err = textTemplate.ParseFS(embFS, "data/history.js")
 	if err != nil {
@@ -391,6 +399,14 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 	// Security
 	case "/.well-known/security.txt":
 		err = data.handleSecurityTxt(rw, req)
+	case "/.well-known/change-password":
+		// Per AI.md PART 34 - redirect to password change page
+		if data.isAuthenticated(req) {
+			http.Redirect(rw, req, "/users/security", http.StatusFound)
+		} else {
+			http.Redirect(rw, req, "/auth/password/forgot", http.StatusFound)
+		}
+		return
 	// Resources
 	case "/style.css":
 		err = data.handleStyleCSS(rw, req)
@@ -400,6 +416,8 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleBurnAfterJS(rw, req)
 	case "/toast.js":
 		err = data.handleToastJS(rw, req)
+	case "/nav.js":
+		err = data.handleNavJS(rw, req)
 	case "/history.js":
 		err = data.handleHistoryJS(rw, req)
 	case "/code.js":
@@ -411,16 +429,30 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleManifest(rw, req)
 	case "/sw.js":
 		err = data.handleServiceWorker(rw, req)
-	case "/about":
+	// Server routes - Per AI.md PART 16
+	case "/server/about":
 		err = data.handleAbout(rw, req)
-	case "/about/authors":
+	case "/server/about/authors":
 		err = data.handleAuthors(rw, req)
-	case "/about/license":
+	case "/server/about/license":
 		err = data.handleLicense(rw, req)
-	case "/about/source_code":
+	case "/server/about/source_code":
 		err = data.handleSourceCodePage(rw, req)
-	case "/about/security":
+	case "/server/about/security":
 		err = data.handleSecurityPolicy(rw, req)
+	case "/server/help":
+		err = data.handleDocs(rw, req) // Help redirects to docs
+	// Legacy /about routes - 301 redirect to /server/about
+	case "/about":
+		http.Redirect(rw, req, "/server/about", http.StatusMovedPermanently)
+	case "/about/authors":
+		http.Redirect(rw, req, "/server/about/authors", http.StatusMovedPermanently)
+	case "/about/license":
+		http.Redirect(rw, req, "/server/about/license", http.StatusMovedPermanently)
+	case "/about/source_code":
+		http.Redirect(rw, req, "/server/about/source_code", http.StatusMovedPermanently)
+	case "/about/security":
+		http.Redirect(rw, req, "/server/about/security", http.StatusMovedPermanently)
 	case "/docs":
 		err = data.handleDocs(rw, req)
 	case "/docs/apiv1":
@@ -443,8 +475,16 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 	// User routes (PART 34)
 	case "/users":
 		err = data.handleUserDashboard(rw, req)
+	case "/users/notifications":
+		err = data.handleUserNotifications(rw, req)
 	case "/users/settings":
 		err = data.handleUserSettings(rw, req)
+	case "/users/settings/privacy":
+		err = data.handleUserSettingsPrivacy(rw, req)
+	case "/users/settings/notifications":
+		err = data.handleUserSettingsNotifications(rw, req)
+	case "/users/settings/appearance":
+		err = data.handleUserSettingsAppearance(rw, req)
 	case "/users/security":
 		err = data.handleUserSecurity(rw, req)
 	case "/users/tokens":

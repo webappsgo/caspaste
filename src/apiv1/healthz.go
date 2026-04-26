@@ -24,7 +24,7 @@ type healthzResponse struct {
 
 var startTime = time.Now()
 
-// GET /api/healthz - health check per AI.md PART 13
+// GET /api/v1/healthz - health check per AI.md PART 13
 // Supports content negotiation per AI.md PART 14:
 // - Default: JSON
 // - .txt extension or Accept: text/plain: plain text

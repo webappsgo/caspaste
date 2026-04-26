@@ -7,12 +7,19 @@
 package session
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"time"
+)
+
+// Query timeouts per AI.md PART 10
+const (
+	defaultQueryTimeout = 5 * time.Second
+	defaultListTimeout  = 10 * time.Second
 )
 
 // Common errors
@@ -70,7 +77,11 @@ func (s *Service) Create(userID int64, device, ipAddress, userAgent string) (str
 	now := time.Now().Unix()
 	expiresAt := time.Now().Add(s.duration).Unix()
 
-	_, err = s.db.Exec(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO user_sessions (user_id, token_hash, device, ip_address, user_agent, expires_at, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, userID, tokenHash, device, ipAddress, userAgent, expiresAt, now)
@@ -89,8 +100,12 @@ func (s *Service) Validate(token string) (*Session, error) {
 
 	tokenHash := hashToken(token)
 
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	session := &Session{}
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, user_id, token_hash, device, ip_address, user_agent, expires_at, created_at
 		FROM user_sessions WHERE token_hash = ?
 	`, tokenHash).Scan(
@@ -127,32 +142,54 @@ func (s *Service) GetUserID(token string) (int64, error) {
 // Delete deletes a session by token
 func (s *Service) Delete(token string) error {
 	tokenHash := hashToken(token)
-	_, err := s.db.Exec("DELETE FROM user_sessions WHERE token_hash = ?", tokenHash)
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM user_sessions WHERE token_hash = ?", tokenHash)
 	return err
 }
 
 // DeleteByID deletes a session by ID
 func (s *Service) DeleteByID(sessionID int64) error {
-	_, err := s.db.Exec("DELETE FROM user_sessions WHERE id = ?", sessionID)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM user_sessions WHERE id = ?", sessionID)
 	return err
 }
 
 // DeleteAllForUser deletes all sessions for a user
 func (s *Service) DeleteAllForUser(userID int64) error {
-	_, err := s.db.Exec("DELETE FROM user_sessions WHERE user_id = ?", userID)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM user_sessions WHERE user_id = ?", userID)
 	return err
 }
 
 // DeleteAllExcept deletes all sessions for a user except the current one
 func (s *Service) DeleteAllExcept(userID int64, currentToken string) error {
 	tokenHash := hashToken(currentToken)
-	_, err := s.db.Exec("DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?", userID, tokenHash)
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?", userID, tokenHash)
 	return err
 }
 
 // ListForUser returns all sessions for a user
 func (s *Service) ListForUser(userID int64) ([]Session, error) {
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, user_id, device, ip_address, user_agent, expires_at, created_at
 		FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC
 	`, userID)
@@ -179,7 +216,11 @@ func (s *Service) ListForUser(userID int64) ([]Session, error) {
 
 // CleanupExpired removes all expired sessions
 func (s *Service) CleanupExpired() (int64, error) {
-	result, err := s.db.Exec("DELETE FROM user_sessions WHERE expires_at < ?", time.Now().Unix())
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, "DELETE FROM user_sessions WHERE expires_at < ?", time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}
@@ -190,7 +231,12 @@ func (s *Service) CleanupExpired() (int64, error) {
 func (s *Service) Extend(token string) error {
 	tokenHash := hashToken(token)
 	expiresAt := time.Now().Add(s.duration).Unix()
-	_, err := s.db.Exec("UPDATE user_sessions SET expires_at = ? WHERE token_hash = ?", expiresAt, tokenHash)
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "UPDATE user_sessions SET expires_at = ? WHERE token_hash = ?", expiresAt, tokenHash)
 	return err
 }
 

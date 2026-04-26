@@ -46,8 +46,8 @@ func generateSecurityTxt(email, name, fqdn string) string {
 	expires := time.Now().AddDate(1, 0, 0).UTC().Format(time.RFC3339)
 
 	canonical := fmt.Sprintf("https://%s/.well-known/security.txt", fqdn)
-	acknowledgments := fmt.Sprintf("https://%s/about/authors", fqdn)
-	policy := fmt.Sprintf("https://%s/about/security", fqdn)
+	acknowledgments := fmt.Sprintf("https://%s/server/about/authors", fqdn)
+	policy := fmt.Sprintf("https://%s/server/about/security", fqdn)
 
 	// RFC 9116 specifies field order doesn't matter, but conventionally:
 	// Contact, Expires, then optional fields alphabetically

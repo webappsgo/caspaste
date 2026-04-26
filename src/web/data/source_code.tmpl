@@ -8,9 +8,9 @@
 {{define "titlePrefix"}}{{ call .Translate `sourceCode.Title` }} | {{end}}
 {{define "headAppend"}}{{end}}
 {{define "article"}}
-<h3><a href="/about">{{ call .Translate `about.Title` }}</a> / {{ call .Translate `sourceCode.Title` }}</h3>
+<h3><a href="/server/about">{{ call .Translate `about.Title` }}</a> / {{ call .Translate `sourceCode.Title` }}</h3>
 <p>{{ call .Translate `sourceCode.Message` }}
 <br/>
 <a href="https://github.com/casjay-forks/caspaste" target="_blank">https://github.com/casjay-forks/caspaste</a></p>
-<p>For original project information, see <a href="/about/license">LICENSE</a>.</p>
+<p>For original project information, see <a href="/server/about/license">LICENSE</a>.</p>
 {{end}}

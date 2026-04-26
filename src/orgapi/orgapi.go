@@ -8,6 +8,7 @@
 package orgapi
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,9 @@ import (
 	"github.com/casjay-forks/caspaste/src/user"
 	"github.com/casjay-forks/caspaste/src/web"
 )
+
+// Database query timeout
+const defaultQueryTimeout = 5 * time.Second
 
 // Service provides organization API operations
 type Service struct {
@@ -724,10 +728,13 @@ func (s *Service) HandleRevokeOrgToken(w http.ResponseWriter, r *http.Request, s
 // Helper functions
 
 func (s *Service) getOrgPreferences(orgID int64) (*OrgPreferences, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	prefs := &OrgPreferences{}
 	var require2fa, notifyJoin, notifyLeave, notifyRole, notifyToken int
 
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT default_role, require_2fa, notify_member_join, notify_member_leave,
 		       notify_role_change, notify_token_activity
 		FROM org_preferences WHERE org_id = ?
@@ -749,9 +756,12 @@ func (s *Service) getOrgPreferences(orgID int64) (*OrgPreferences, error) {
 }
 
 func (s *Service) updateOrgPreferences(orgID int64, prefs OrgPreferences) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	now := time.Now().Unix()
 
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO org_preferences (org_id, default_role, require_2fa,
 		                             notify_member_join, notify_member_leave,
 		                             notify_role_change, notify_token_activity,

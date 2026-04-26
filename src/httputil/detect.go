@@ -192,3 +192,57 @@ func StripTxtExtension(path string) string {
 	}
 	return path
 }
+
+// DetectClientType detects request type and returns "html", "text", or "json"
+// Per AI.md PART 16 Smart Content Detection specification
+func DetectClientType(r *http.Request) string {
+	// 1. Check Accept header first (explicit preference)
+	accept := r.Header.Get("Accept")
+
+	if strings.Contains(accept, "text/html") {
+		return "html"
+	}
+	if strings.Contains(accept, "text/plain") {
+		return "text"
+	}
+	if strings.Contains(accept, "application/json") {
+		// Rare for frontend, but support it
+		return "json"
+	}
+
+	// 2. Check User-Agent for browser detection
+	ua := r.Header.Get("User-Agent")
+
+	// Browser User-Agents (common patterns)
+	browsers := []string{
+		"Mozilla/", "Chrome/", "Safari/", "Edge/", "Firefox/",
+		"Opera/", "MSIE", "Trident/",
+	}
+
+	for _, browser := range browsers {
+		if strings.Contains(ua, browser) {
+			return "html"
+		}
+	}
+
+	// 3. CLI tools (curl, wget, httpie, etc.)
+	cliTools := []string{
+		"curl/", "Wget/", "HTTPie/", "python-requests/",
+		"Go-http-client/", "node-fetch/",
+	}
+
+	for _, tool := range cliTools {
+		if strings.Contains(ua, tool) {
+			return "text"
+		}
+	}
+
+	// 4. Empty or unknown User-Agent
+	if ua == "" {
+		// Default to text for programmatic access
+		return "text"
+	}
+
+	// 5. Default: HTML (safest fallback)
+	return "html"
+}

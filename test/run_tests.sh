@@ -1,7 +1,7 @@
 #!/bin/bash
 # CasPaste Comprehensive Test Suite
 # This script builds and tests all functionality using a temp directory
-# Usage: ./tests/run-tests.sh
+# Usage: ./test/run_tests.sh
 
 set -e
 

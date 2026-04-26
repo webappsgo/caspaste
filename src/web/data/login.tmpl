@@ -8,74 +8,7 @@
 */}}
 
 {{define "titlePrefix"}}Login | {{end}}
-{{define "headAppend"}}
-<style>
-.login-container {
-	max-width: 400px;
-	margin: 2rem auto;
-}
-
-.login-header {
-	text-align: center;
-	margin-bottom: 2rem;
-}
-
-.login-header h1 {
-	margin-bottom: 0.5rem;
-}
-
-.login-header p {
-	color: {{call .Theme `color.Grey`}};
-	margin: 0;
-}
-
-.login-form {
-	display: flex;
-	flex-direction: column;
-	gap: 1.25rem;
-}
-
-.login-form .form-group {
-	margin: 0;
-}
-
-.login-form input {
-	width: 100%;
-	padding: 1rem;
-	font-size: 1rem;
-}
-
-.login-form button {
-	width: 100%;
-	padding: 1rem;
-	font-size: 1.1rem;
-}
-
-.login-error {
-	background: {{call .Theme `color.Red`}}20;
-	border: 1px solid {{call .Theme `color.Red`}};
-	color: {{call .Theme `color.Red`}};
-	padding: 1rem;
-	border-radius: 8px;
-	text-align: center;
-	margin-bottom: 1rem;
-}
-
-.login-icon {
-	font-size: 3rem;
-	margin-bottom: 1rem;
-}
-
-.back-link {
-	text-align: center;
-	margin-top: 1.5rem;
-}
-
-.back-link a {
-	color: {{call .Theme `color.Link`}};
-}
-</style>
-{{end}}
+{{define "headAppend"}}{{end}}
 {{define "article"}}
 <div class="login-container">
 	<div class="login-header">
@@ -123,7 +56,7 @@
 	</form>
 
 	<div class="back-link">
-		<a href="/about">{{ call .Translate `login.BackToAbout` }}</a>
+		<a href="/server/about">{{ call .Translate `login.BackToAbout` }}</a>
 	</div>
 </div>
 {{end}}

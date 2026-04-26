@@ -26,7 +26,7 @@ func (data *Data) handleUserDashboard(rw http.ResponseWriter, req *http.Request)
 	return data.renderUserDashboard(rw, req, authUser)
 }
 
-// handleUserSettings handles GET/POST /users/settings
+// handleUserSettings handles GET/POST /users/settings - per AI.md PART 34
 func (data *Data) handleUserSettings(rw http.ResponseWriter, req *http.Request) error {
 	authUser := GetAuthUser(req.Context())
 	if authUser == nil {
@@ -34,9 +34,51 @@ func (data *Data) handleUserSettings(rw http.ResponseWriter, req *http.Request) 
 		return nil
 	}
 
-	// For now, redirect to existing settings page
-	http.Redirect(rw, req, "/settings", http.StatusFound)
-	return nil
+	return data.renderUserSettings(rw, req, authUser)
+}
+
+// handleUserNotifications handles GET /users/notifications - per AI.md PART 34
+func (data *Data) handleUserNotifications(rw http.ResponseWriter, req *http.Request) error {
+	authUser := GetAuthUser(req.Context())
+	if authUser == nil {
+		http.Redirect(rw, req, "/login", http.StatusFound)
+		return nil
+	}
+
+	return data.renderUserNotifications(rw, req, authUser)
+}
+
+// handleUserSettingsPrivacy handles GET/POST /users/settings/privacy - per AI.md PART 34
+func (data *Data) handleUserSettingsPrivacy(rw http.ResponseWriter, req *http.Request) error {
+	authUser := GetAuthUser(req.Context())
+	if authUser == nil {
+		http.Redirect(rw, req, "/login", http.StatusFound)
+		return nil
+	}
+
+	return data.renderUserSettingsPrivacy(rw, req, authUser)
+}
+
+// handleUserSettingsNotifications handles GET/POST /users/settings/notifications - per AI.md PART 34
+func (data *Data) handleUserSettingsNotifications(rw http.ResponseWriter, req *http.Request) error {
+	authUser := GetAuthUser(req.Context())
+	if authUser == nil {
+		http.Redirect(rw, req, "/login", http.StatusFound)
+		return nil
+	}
+
+	return data.renderUserSettingsNotifications(rw, req, authUser)
+}
+
+// handleUserSettingsAppearance handles GET/POST /users/settings/appearance - per AI.md PART 34
+func (data *Data) handleUserSettingsAppearance(rw http.ResponseWriter, req *http.Request) error {
+	authUser := GetAuthUser(req.Context())
+	if authUser == nil {
+		http.Redirect(rw, req, "/login", http.StatusFound)
+		return nil
+	}
+
+	return data.renderUserSettingsAppearance(rw, req, authUser)
 }
 
 // handleUserSecurity handles GET /users/security
@@ -224,6 +266,252 @@ func (data *Data) renderUserDomains(rw http.ResponseWriter, req *http.Request, u
 		<section>
 			<h2>Your Domains</h2>
 			<p>View and manage your domains via the API: GET /api/v1/users/domains</p>
+		</section>
+		<p><a href="/users">Back to Dashboard</a></p>
+	</div>
+</body>
+</html>`
+
+	_, err := rw.Write([]byte(html))
+	return err
+}
+
+func (data *Data) renderUserSettings(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
+	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	html := `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Account Settings - ` + data.ServerTitle + `</title>
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+	<div class="container">
+		<h1>Account Settings</h1>
+		<nav class="settings-nav">
+			<a href="/users/settings" class="active">Account</a>
+			<a href="/users/settings/privacy">Privacy</a>
+			<a href="/users/settings/notifications">Notifications</a>
+			<a href="/users/settings/appearance">Appearance</a>
+		</nav>
+		<section>
+			<h2>Profile Information</h2>
+			<form action="/api/v1/users" method="PATCH">
+				<div class="form-group">
+					<label for="display_name">Display Name</label>
+					<input type="text" id="display_name" name="display_name" value="` + user.Username + `">
+				</div>
+				<div class="form-group">
+					<label for="email">Email</label>
+					<input type="email" id="email" name="email" placeholder="your@email.com">
+				</div>
+				<div class="form-group">
+					<label for="bio">Bio</label>
+					<textarea id="bio" name="bio" rows="3"></textarea>
+				</div>
+				<button type="submit">Save Changes</button>
+			</form>
+		</section>
+		<p><a href="/users">Back to Dashboard</a></p>
+	</div>
+</body>
+</html>`
+
+	_, err := rw.Write([]byte(html))
+	return err
+}
+
+func (data *Data) renderUserNotifications(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
+	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	html := `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Notifications - ` + data.ServerTitle + `</title>
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+	<div class="container">
+		<h1>Notifications</h1>
+		<section>
+			<div class="empty-state">
+				<h3>No notifications</h3>
+				<p>You're all caught up!</p>
+			</div>
+		</section>
+		<p><a href="/users">Back to Dashboard</a></p>
+	</div>
+</body>
+</html>`
+
+	_, err := rw.Write([]byte(html))
+	return err
+}
+
+func (data *Data) renderUserSettingsPrivacy(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
+	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	html := `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Privacy Settings - ` + data.ServerTitle + `</title>
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+	<div class="container">
+		<h1>Privacy Settings</h1>
+		<nav class="settings-nav">
+			<a href="/users/settings">Account</a>
+			<a href="/users/settings/privacy" class="active">Privacy</a>
+			<a href="/users/settings/notifications">Notifications</a>
+			<a href="/users/settings/appearance">Appearance</a>
+		</nav>
+		<section>
+			<form action="/api/v1/users/settings" method="PATCH">
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="show_email">
+						Show email on profile
+					</label>
+				</div>
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="show_activity" checked>
+						Show activity on profile
+					</label>
+				</div>
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="show_orgs" checked>
+						Show organizations on profile
+					</label>
+				</div>
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="searchable" checked>
+						Allow profile to be found in search
+					</label>
+				</div>
+				<button type="submit">Save Privacy Settings</button>
+			</form>
+		</section>
+		<p><a href="/users">Back to Dashboard</a></p>
+	</div>
+</body>
+</html>`
+
+	_, err := rw.Write([]byte(html))
+	return err
+}
+
+func (data *Data) renderUserSettingsNotifications(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
+	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	html := `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Notification Settings - ` + data.ServerTitle + `</title>
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+	<div class="container">
+		<h1>Notification Settings</h1>
+		<nav class="settings-nav">
+			<a href="/users/settings">Account</a>
+			<a href="/users/settings/privacy">Privacy</a>
+			<a href="/users/settings/notifications" class="active">Notifications</a>
+			<a href="/users/settings/appearance">Appearance</a>
+		</nav>
+		<section>
+			<h2>Email Notifications</h2>
+			<form action="/api/v1/users/settings" method="PATCH">
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="email_security" checked>
+						Security alerts
+					</label>
+				</div>
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="email_mentions" checked>
+						Mentions and replies
+					</label>
+				</div>
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="email_updates">
+						Product updates
+					</label>
+				</div>
+				<div class="form-group">
+					<label for="email_digest">Email digest frequency</label>
+					<select id="email_digest" name="email_digest">
+						<option value="daily">Daily</option>
+						<option value="weekly" selected>Weekly</option>
+						<option value="never">Never</option>
+					</select>
+				</div>
+				<button type="submit">Save Notification Settings</button>
+			</form>
+		</section>
+		<p><a href="/users">Back to Dashboard</a></p>
+	</div>
+</body>
+</html>`
+
+	_, err := rw.Write([]byte(html))
+	return err
+}
+
+func (data *Data) renderUserSettingsAppearance(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
+	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	html := `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Appearance Settings - ` + data.ServerTitle + `</title>
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+	<div class="container">
+		<h1>Appearance Settings</h1>
+		<nav class="settings-nav">
+			<a href="/users/settings">Account</a>
+			<a href="/users/settings/privacy">Privacy</a>
+			<a href="/users/settings/notifications">Notifications</a>
+			<a href="/users/settings/appearance" class="active">Appearance</a>
+		</nav>
+		<section>
+			<form action="/api/v1/users/settings" method="PATCH">
+				<div class="form-group">
+					<label for="theme">Theme</label>
+					<select id="theme" name="theme">
+						<option value="dark">Dark</option>
+						<option value="light">Light</option>
+						<option value="system">System</option>
+					</select>
+				</div>
+				<div class="form-group">
+					<label for="font_size">Font Size</label>
+					<select id="font_size" name="font_size">
+						<option value="small">Small</option>
+						<option value="medium" selected>Medium</option>
+						<option value="large">Large</option>
+					</select>
+				</div>
+				<div class="form-group">
+					<label>
+						<input type="checkbox" name="reduce_motion">
+						Reduce motion
+					</label>
+				</div>
+				<button type="submit">Save Appearance Settings</button>
+			</form>
 		</section>
 		<p><a href="/users">Back to Dashboard</a></p>
 	</div>

@@ -24,7 +24,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write  # For provenance
+      # For provenance
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -115,7 +116,7 @@ jobs:
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
             BUILD_DATE=${{ steps.meta.outputs.build_date }}
-            VCS_REF=${{ steps.meta.outputs.vcs_ref }}
+            COMMIT_ID=${{ steps.meta.outputs.vcs_ref }}
             VCS_URL=https://github.com/${{ github.repository }}
           labels: |
             org.opencontainers.image.title=CasPaste

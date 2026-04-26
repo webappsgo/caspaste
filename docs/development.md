@@ -45,7 +45,7 @@ caspaste/
 │   ├── Dockerfile
 │   └── docker-compose*.yml
 ├── docs/                   # This documentation
-├── tests/                  # Test scripts
+├── test/                   # Test scripts
 ├── Makefile
 └── go.mod
 ```

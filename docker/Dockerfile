@@ -19,14 +19,14 @@ ARG COMMIT_ID
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -tags netgo \
-    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -extldflags '-static'" \
+    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://lp.pste.us -extldflags '-static'" \
     -o /caspaste \
     ./src/server
 
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -tags netgo \
-    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -extldflags '-static'" \
+    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://lp.pste.us -extldflags '-static'" \
     -o /caspaste-cli \
     ./src/client
 
@@ -38,18 +38,22 @@ ARG BUILD_DATE
 ARG COMMIT_ID
 
 # OCI Labels (required per AI.md PART 27)
-LABEL org.opencontainers.image.title="CasPaste" \
+LABEL maintainer="casjay-forks" \
+      org.opencontainers.image.title="caspaste" \
       org.opencontainers.image.description="A simple, fast, and secure self-hosted pastebin service" \
-      org.opencontainers.image.authors="CasjaysDev <docker-admin@casjaysdev.pro>" \
-      org.opencontainers.image.vendor="CasjaysDev" \
+      org.opencontainers.image.authors="casjay-forks" \
+      org.opencontainers.image.vendor="casjay-forks" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.url="https://github.com/casjay-forks/caspaste" \
       org.opencontainers.image.documentation="https://github.com/casjay-forks/caspaste/blob/main/README.md" \
       org.opencontainers.image.source="https://github.com/casjay-forks/caspaste" \
-      org.opencontainers.image.base.name="docker.io/library/alpine:latest" \
+      org.opencontainers.image.base.name="alpine:latest" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.revision="${COMMIT_ID}"
+      org.opencontainers.image.revision="${COMMIT_ID}" \
+      org.opencontainers.image.schema-version="${VERSION}" \
+      org.opencontainers.image.vcs-type="Git" \
+      com.github.containers.toolbox="false"
 
 # Required packages per AI.md PART 27
 RUN apk add --no-cache git curl bash tini tor ca-certificates tzdata

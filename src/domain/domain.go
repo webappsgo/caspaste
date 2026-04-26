@@ -7,14 +7,27 @@
 package domain
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/acme/autocert"
+)
+
+// Query timeouts per AI.md PART 10
+const (
+	defaultQueryTimeout = 5 * time.Second
+	defaultListTimeout  = 10 * time.Second
 )
 
 // Owner type constants
@@ -107,19 +120,31 @@ type VerifyResult struct {
 
 // Service provides custom domain operations
 type Service struct {
-	db         *sql.DB
-	serverFQDN string
-	serverIPs  []net.IP
-	ipsMutex   sync.RWMutex
+	db          *sql.DB
+	serverFQDN  string
+	serverIPs   []net.IP
+	ipsMutex    sync.RWMutex
 	lastIPCheck time.Time
+	acmeManager *autocert.Manager
+	acmeCacheDir string
 }
 
 // NewService creates a new domain service
-func NewService(db *sql.DB, serverFQDN string) *Service {
+func NewService(db *sql.DB, serverFQDN string, acmeCacheDir string) *Service {
 	s := &Service{
-		db:         db,
-		serverFQDN: serverFQDN,
+		db:           db,
+		serverFQDN:   serverFQDN,
+		acmeCacheDir: acmeCacheDir,
 	}
+
+	// Initialize ACME manager for custom domain certificates
+	if acmeCacheDir != "" {
+		s.acmeManager = &autocert.Manager{
+			Prompt: autocert.AcceptTOS,
+			Cache:  autocert.DirCache(acmeCacheDir),
+		}
+	}
+
 	// Initialize server IPs
 	s.refreshPublicIPs()
 	return s
@@ -147,7 +172,11 @@ func (s *Service) Create(ownerType string, ownerID int64, domain string) (*Custo
 
 	now := time.Now().Unix()
 
-	result, err := s.db.Exec(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, `
 		INSERT INTO custom_domains (owner_type, owner_id, domain, is_apex, is_wildcard, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, ownerType, ownerID, domain, boolToInt(isApex), boolToInt(isWildcard), now, now)
@@ -165,7 +194,11 @@ func (s *Service) Create(ownerType string, ownerID int64, domain string) (*Custo
 
 // GetByID retrieves a domain by ID
 func (s *Service) GetByID(id int64) (*CustomDomain, error) {
-	return s.scanDomain(s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	return s.scanDomain(s.db.QueryRowContext(ctx, `
 		SELECT id, owner_type, owner_id, domain, is_apex, is_wildcard,
 		       verification_status, verified_at, verified_ip, last_check_at, check_count,
 		       ssl_enabled, ssl_status, ssl_challenge, ssl_provider, ssl_credentials,
@@ -178,7 +211,12 @@ func (s *Service) GetByID(id int64) (*CustomDomain, error) {
 // GetByDomain retrieves a domain by domain name
 func (s *Service) GetByDomain(domain string) (*CustomDomain, error) {
 	domain = NormalizeDomain(domain)
-	return s.scanDomain(s.db.QueryRow(`
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	return s.scanDomain(s.db.QueryRowContext(ctx, `
 		SELECT id, owner_type, owner_id, domain, is_apex, is_wildcard,
 		       verification_status, verified_at, verified_ip, last_check_at, check_count,
 		       ssl_enabled, ssl_status, ssl_challenge, ssl_provider, ssl_credentials,
@@ -190,7 +228,11 @@ func (s *Service) GetByDomain(domain string) (*CustomDomain, error) {
 
 // GetByOwner retrieves all domains for an owner
 func (s *Service) GetByOwner(ownerType string, ownerID int64) ([]CustomDomain, error) {
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, owner_type, owner_id, domain, is_apex, is_wildcard,
 		       verification_status, verified_at, verified_ip, last_check_at, check_count,
 		       ssl_enabled, ssl_status, ssl_challenge, ssl_provider, ssl_credentials,
@@ -224,7 +266,11 @@ func (s *Service) Delete(id int64) error {
 		return err
 	}
 
-	_, err = s.db.Exec("DELETE FROM custom_domains WHERE id = ?", id)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err = s.db.ExecContext(ctx, "DELETE FROM custom_domains WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -281,7 +327,12 @@ func (s *Service) Verify(id int64) (*VerifyResult, error) {
 
 	// Success - update status
 	now := time.Now().Unix()
-	_, err = s.db.Exec(`
+
+	// Query timeout per AI.md PART 10
+	updateCtx, updateCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer updateCancel()
+
+	_, err = s.db.ExecContext(updateCtx, `
 		UPDATE custom_domains SET
 			verification_status = ?, verified_at = ?, verified_ip = ?,
 			status = ?, updated_at = ?
@@ -329,7 +380,12 @@ func (s *Service) GetDNSInstructions(id int64) (*DNSInstructions, error) {
 // Suspend suspends a domain
 func (s *Service) Suspend(id int64, reason string) error {
 	now := time.Now().Unix()
-	_, err := s.db.Exec(`
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE custom_domains SET status = ?, suspended_reason = ?, updated_at = ?
 		WHERE id = ?
 	`, StatusSuspended, reason, now, id)
@@ -344,7 +400,12 @@ func (s *Service) Suspend(id int64, reason string) error {
 // Unsuspend unsuspends a domain
 func (s *Service) Unsuspend(id int64) error {
 	now := time.Now().Unix()
-	_, err := s.db.Exec(`
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE custom_domains SET status = ?, suspended_reason = NULL, updated_at = ?
 		WHERE id = ?
 	`, StatusActive, now, id)
@@ -358,8 +419,12 @@ func (s *Service) Unsuspend(id int64) error {
 
 // CountByOwner returns the count of domains for an owner
 func (s *Service) CountByOwner(ownerType string, ownerID int64) (int, error) {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var count int
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM custom_domains WHERE owner_type = ? AND owner_id = ?
 	`, ownerType, ownerID).Scan(&count)
 	return count, err
@@ -443,7 +508,12 @@ func getExternalIP() net.IP {
 
 func (s *Service) updateVerificationStatus(id int64, status string) {
 	now := time.Now().Unix()
-	s.db.Exec(`
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	s.db.ExecContext(ctx, `
 		UPDATE custom_domains SET
 			verification_status = ?, last_check_at = ?, check_count = check_count + 1, updated_at = ?
 		WHERE id = ?
@@ -456,7 +526,12 @@ func (s *Service) logAudit(domainID int64, action, actorType string, actorID int
 	if details != nil {
 		detailsVal = *details
 	}
-	s.db.Exec(`
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	s.db.ExecContext(ctx, `
 		INSERT INTO custom_domain_audit (domain_id, action, actor_type, actor_id, details, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`, domainID, action, actorType, actorID, detailsVal, now)
@@ -632,7 +707,12 @@ func (s *Service) ConfigureSSL(id int64, challenge, provider string, credentials
 	}
 
 	now := time.Now().Unix()
-	_, err = s.db.Exec(`
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err = s.db.ExecContext(ctx, `
 		UPDATE custom_domains SET
 			ssl_challenge = ?, ssl_provider = ?, ssl_credentials = ?,
 			ssl_status = ?, updated_at = ?
@@ -646,8 +726,7 @@ func (s *Service) ConfigureSSL(id int64, challenge, provider string, credentials
 	return nil
 }
 
-// IssueCertificate issues an SSL certificate for a domain
-// This is a placeholder - actual implementation would use ACME/Let's Encrypt
+// IssueCertificate issues an SSL certificate for a domain via ACME/Let's Encrypt
 func (s *Service) IssueCertificate(id int64) error {
 	d, err := s.GetByID(id)
 	if err != nil {
@@ -658,19 +737,65 @@ func (s *Service) IssueCertificate(id int64) error {
 		return ErrDomainNotVerified
 	}
 
-	// In a real implementation, this would:
-	// 1. Start ACME challenge
-	// 2. Complete challenge verification
-	// 3. Issue certificate
-	// 4. Store certificate and key
+	if s.acmeManager == nil {
+		return fmt.Errorf("ACME certificate manager not configured")
+	}
 
-	// For now, just mark as pending
 	now := time.Now().Unix()
-	_, err = s.db.Exec(`
+
+	// Mark as pending
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err = s.db.ExecContext(ctx, `
 		UPDATE custom_domains SET
 			ssl_enabled = 1, ssl_status = ?, updated_at = ?
 		WHERE id = ?
 	`, SSLStatusPending, now, id)
+	if err != nil {
+		return err
+	}
+
+	// Issue certificate via ACME using autocert's built-in HTTP-01 challenge
+	hello := &tls.ClientHelloInfo{ServerName: d.Domain}
+	cert, err := s.acmeManager.GetCertificate(hello)
+	if err != nil {
+		// Mark as error
+		errCtx, errCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+		defer errCancel()
+		s.db.ExecContext(errCtx, `
+			UPDATE custom_domains SET ssl_status = ?, updated_at = ? WHERE id = ?
+		`, SSLStatusError, time.Now().Unix(), id)
+		return fmt.Errorf("ACME certificate issuance failed for %s: %w", d.Domain, err)
+	}
+
+	// Extract certificate details
+	var certPEM, keyPEM string
+	var expiresAt int64
+	if cert != nil && len(cert.Certificate) > 0 {
+		leaf, parseErr := x509.ParseCertificate(cert.Certificate[0])
+		if parseErr == nil {
+			expiresAt = leaf.NotAfter.Unix()
+		}
+
+		// Encode cert chain as PEM
+		var certBuilder strings.Builder
+		for _, der := range cert.Certificate {
+			pem.Encode(&certBuilder, &pem.Block{Type: "CERTIFICATE", Bytes: der})
+		}
+		certPEM = certBuilder.String()
+	}
+
+	// Store certificate data and mark as active
+	updateCtx, updateCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer updateCancel()
+
+	_, err = s.db.ExecContext(updateCtx, `
+		UPDATE custom_domains SET
+			ssl_status = ?, ssl_issued_at = ?, ssl_expires_at = ?,
+			ssl_cert_pem = ?, ssl_key_pem = ?, updated_at = ?
+		WHERE id = ?
+	`, SSLStatusActive, now, expiresAt, certPEM, keyPEM, time.Now().Unix(), id)
 	if err != nil {
 		return err
 	}
@@ -683,7 +808,11 @@ func (s *Service) IssueCertificate(id int64) error {
 func (s *Service) RenewExpiring(renewBeforeDays int) (int, error) {
 	threshold := time.Now().AddDate(0, 0, renewBeforeDays).Unix()
 
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id FROM custom_domains
 		WHERE ssl_enabled = 1 AND ssl_status = ? AND ssl_expires_at < ?
 	`, SSLStatusActive, threshold)
@@ -710,7 +839,11 @@ func (s *Service) RenewExpiring(renewBeforeDays int) (int, error) {
 func (s *Service) CleanupUnverified(maxAge time.Duration) (int64, error) {
 	cutoff := time.Now().Add(-maxAge).Unix()
 
-	result, err := s.db.Exec(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, `
 		DELETE FROM custom_domains
 		WHERE verification_status = ? AND created_at < ?
 	`, VerificationStatusPending, cutoff)
@@ -723,7 +856,11 @@ func (s *Service) CleanupUnverified(maxAge time.Duration) (int64, error) {
 
 // RetryPendingVerifications retries verification for pending domains
 func (s *Service) RetryPendingVerifications() (int, error) {
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id FROM custom_domains
 		WHERE verification_status = ? AND check_count < 10
 	`, VerificationStatusPending)

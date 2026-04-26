@@ -7,17 +7,22 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
+
+// Timeout for DDL operations during initialization (longer than query timeout)
+const initializationTimeout = 30 * time.Second
 
 var (
 	ErrNotFoundID = errors.New("db: could not find ID")
@@ -136,8 +141,12 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 	defer db.Close()
 
+	// Create context for all DDL operations
+	ctx, cancel := context.WithTimeout(context.Background(), initializationTimeout)
+	defer cancel()
+
 	// Create pastes table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS pastes (
 			id          TEXT    PRIMARY KEY,
 			title       TEXT    NOT NULL,
@@ -152,8 +161,52 @@ func InitDB(driverName string, dataSourceName string) error {
 		return err
 	}
 
+	// Create admins table (Server Admins - REQUIRED per AI.md PART 11)
+	_, err = db.pool.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS admins (
+			id              INTEGER PRIMARY KEY AUTOINCREMENT,
+			username        TEXT NOT NULL UNIQUE,
+			password_hash   TEXT NOT NULL,
+			email           TEXT,
+			role            TEXT NOT NULL DEFAULT 'admin',
+			enabled         INTEGER NOT NULL DEFAULT 1,
+			api_token_hash  TEXT,
+			created_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			updated_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			last_login      INTEGER,
+			failed_attempts INTEGER NOT NULL DEFAULT 0,
+			locked_until    INTEGER,
+			source          TEXT NOT NULL DEFAULT 'local',
+			external_id     TEXT,
+			groups          TEXT,
+			last_sync       INTEGER
+		);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create admin_preferences table
+	_, err = db.pool.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS admin_preferences (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			admin_id   INTEGER NOT NULL UNIQUE,
+			theme      TEXT DEFAULT 'dark',
+			language   TEXT DEFAULT 'en',
+			timezone   TEXT,
+			dashboard_layout TEXT,
+			notifications TEXT,
+			created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+		);
+	`)
+	if err != nil {
+		return err
+	}
+
 	// Create users table (PART 34: Multi-User)
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS users (
 			id              INTEGER PRIMARY KEY AUTOINCREMENT,
 			username        TEXT NOT NULL UNIQUE,
@@ -185,7 +238,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create user_sessions table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS user_sessions (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id     INTEGER NOT NULL,
@@ -203,7 +256,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create user_tokens table (API tokens with usr_ prefix)
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS user_tokens (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id      INTEGER NOT NULL,
@@ -222,7 +275,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create recovery_keys table (hashed, single use)
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS recovery_keys (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id    INTEGER NOT NULL,
@@ -237,7 +290,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create password_resets table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS password_resets (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id    INTEGER NOT NULL,
@@ -253,7 +306,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create email_verifications table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS email_verifications (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id     INTEGER NOT NULL,
@@ -270,7 +323,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create user_invites table (admin-generated)
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS user_invites (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			username   TEXT NOT NULL,
@@ -286,7 +339,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create user_preferences table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS user_preferences (
 			id               INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id          INTEGER NOT NULL UNIQUE,
@@ -313,7 +366,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create orgs table (PART 35: Organizations)
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS orgs (
 			id             INTEGER PRIMARY KEY AUTOINCREMENT,
 			slug           TEXT NOT NULL UNIQUE,
@@ -337,7 +390,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create org_members table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS org_members (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			org_id     INTEGER NOT NULL,
@@ -354,7 +407,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create org_tokens table (API tokens with org_ prefix)
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS org_tokens (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
 			org_id       INTEGER NOT NULL,
@@ -375,7 +428,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create org_preferences table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS org_preferences (
 			id                   INTEGER PRIMARY KEY AUTOINCREMENT,
 			org_id               INTEGER NOT NULL UNIQUE,
@@ -395,7 +448,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create custom_domains table (PART 36: Custom Domains)
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS custom_domains (
 			id                  INTEGER PRIMARY KEY AUTOINCREMENT,
 			owner_type          TEXT NOT NULL,
@@ -429,7 +482,7 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create custom_domain_audit table
-	_, err = db.pool.Exec(`
+	_, err = db.pool.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS custom_domain_audit (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			domain_id  INTEGER NOT NULL,
@@ -446,21 +499,23 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	// Create indexes
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token_hash);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_user_tokens_user ON user_tokens(user_id);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_recovery_keys_user ON recovery_keys(user_id);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_orgs_slug ON orgs(slug);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_orgs_owner ON orgs(owner_id);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_org_members_org ON org_members(org_id);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_org_members_user ON org_members(user_id);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_custom_domains_domain ON custom_domains(domain);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_custom_domains_owner ON custom_domains(owner_type, owner_id);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_custom_domains_status ON custom_domains(status);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_custom_domains_ssl_expires ON custom_domains(ssl_expires_at);`)
-	_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_domain_audit_domain ON custom_domain_audit(domain_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admins_token ON admins(api_token_hash);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token_hash);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_user_tokens_user ON user_tokens(user_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_recovery_keys_user ON recovery_keys(user_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_orgs_slug ON orgs(slug);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_orgs_owner ON orgs(owner_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_org_members_org ON org_members(org_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_org_members_user ON org_members(user_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_custom_domains_domain ON custom_domains(domain);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_custom_domains_owner ON custom_domains(owner_type, owner_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_custom_domains_status ON custom_domains(status);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_custom_domains_ssl_expires ON custom_domains(ssl_expires_at);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_domain_audit_domain ON custom_domain_audit(domain_id);`)
 
 	// Handle database-specific column additions for pastes table
 	// Define allowed columns with validation (prevents SQL injection)
@@ -488,7 +543,7 @@ func InitDB(driverName string, dataSourceName string) error {
 		}
 		for _, col := range columns {
 			// Using string formatting is safe here because column name is from hardcoded whitelist
-			_, err := db.pool.Exec(fmt.Sprintf(`ALTER TABLE pastes ADD COLUMN %s %s`, col.name, col.definition))
+			_, err := db.pool.ExecContext(ctx, fmt.Sprintf(`ALTER TABLE pastes ADD COLUMN %s %s`, col.name, col.definition))
 			// Ignore "duplicate column" errors
 			if err != nil && !strings.Contains(err.Error(), "duplicate column") {
 				return err
@@ -496,8 +551,8 @@ func InitDB(driverName string, dataSourceName string) error {
 		}
 
 		// Create indexes for pastes user/org columns
-		_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_pastes_user ON pastes(user_id);`)
-		_, _ = db.pool.Exec(`CREATE INDEX IF NOT EXISTS idx_pastes_org ON pastes(org_id);`)
+		_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_pastes_user ON pastes(user_id);`)
+		_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_pastes_org ON pastes(org_id);`)
 
 	} else if driverName == "mysql" || driverName == "mariadb" {
 		// MySQL/MariaDB: Use ALTER TABLE ADD COLUMN IF NOT EXISTS (MariaDB 10.0+)
@@ -517,7 +572,7 @@ func InitDB(driverName string, dataSourceName string) error {
 		}
 		for _, col := range columns {
 			// Using string formatting is safe here because column name is from hardcoded whitelist
-			_, err := db.pool.Exec(fmt.Sprintf(`ALTER TABLE pastes ADD COLUMN IF NOT EXISTS %s %s`, col.name, col.definition))
+			_, err := db.pool.ExecContext(ctx, fmt.Sprintf(`ALTER TABLE pastes ADD COLUMN IF NOT EXISTS %s %s`, col.name, col.definition))
 			if err != nil {
 				return err
 			}
@@ -525,7 +580,7 @@ func InitDB(driverName string, dataSourceName string) error {
 
 	} else {
 		// PostgreSQL: supports IF NOT EXISTS
-		_, err = db.pool.Exec(`
+		_, err = db.pool.ExecContext(ctx, `
 			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS author       TEXT NOT NULL DEFAULT '';
 			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS author_email TEXT NOT NULL DEFAULT '';
 			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS author_url   TEXT NOT NULL DEFAULT '';

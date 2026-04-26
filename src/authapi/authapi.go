@@ -8,6 +8,8 @@
 package authapi
 
 import (
+	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -19,6 +21,7 @@ import (
 	"time"
 
 	"github.com/casjay-forks/caspaste/src/config"
+	"github.com/casjay-forks/caspaste/src/email"
 	"github.com/casjay-forks/caspaste/src/httputil"
 	"github.com/casjay-forks/caspaste/src/recovery"
 	"github.com/casjay-forks/caspaste/src/session"
@@ -26,6 +29,9 @@ import (
 	"github.com/casjay-forks/caspaste/src/user"
 	"github.com/casjay-forks/caspaste/src/web"
 )
+
+// Database query timeout
+const defaultQueryTimeout = 5 * time.Second
 
 // Common errors
 var (
@@ -44,16 +50,20 @@ type Service struct {
 	sessionService  *session.Service
 	recoveryService *recovery.Service
 	config          *config.UsersConfig
+	emailClient     *email.Client
+	serverFQDN      string
 }
 
 // NewService creates a new auth API service
-func NewService(db *sql.DB, userSvc *user.Service, sessSvc *session.Service, recoverySvc *recovery.Service, cfg *config.UsersConfig) *Service {
+func NewService(db *sql.DB, userSvc *user.Service, sessSvc *session.Service, recoverySvc *recovery.Service, cfg *config.UsersConfig, emailCli *email.Client, fqdn string) *Service {
 	return &Service{
 		db:              db,
 		userService:     userSvc,
 		sessionService:  sessSvc,
 		recoveryService: recoverySvc,
 		config:          cfg,
+		emailClient:     emailCli,
+		serverFQDN:      fqdn,
 	}
 }
 
@@ -191,7 +201,26 @@ func (s *Service) HandleRegister(w http.ResponseWriter, r *http.Request) error {
 
 	// If email verification is required, don't create session yet
 	if s.config.Registration.RequireEmailVerification {
-		// TODO: Send verification email
+		// Generate verification token
+		tokenBytes := make([]byte, 32)
+		if _, err := rand.Read(tokenBytes); err == nil {
+			tokenHash := sha256.Sum256(tokenBytes)
+			verificationToken := hex.EncodeToString(tokenHash[:])
+
+			// Store token for the user
+			s.storeEmailVerificationToken(newUser.ID, verificationToken)
+
+			// Send verification email if email client is available
+			if s.emailClient != nil && s.emailClient.IsEnabled() {
+				verifyURL := fmt.Sprintf("https://%s/auth/verify-email?token=%s", s.serverFQDN, hex.EncodeToString(tokenBytes))
+				emailBody := fmt.Sprintf(
+					"Welcome to CasPaste!\n\nPlease verify your email address by visiting:\n%s\n\nIf you did not create this account, you can ignore this email.",
+					verifyURL,
+				)
+				s.emailClient.Send(newUser.Email, "Verify your email - CasPaste", emailBody)
+			}
+		}
+
 		return writeSuccess(w, r, map[string]interface{}{
 			"user":                  newUser,
 			"email_verification":    true,
@@ -332,8 +361,20 @@ func (s *Service) HandlePasswordForgot(w http.ResponseWriter, r *http.Request) e
 	go func() {
 		u, err := s.userService.GetByEmail(req.Email)
 		if err == nil && u != nil {
-			// TODO: Generate reset token and send email
-			s.createPasswordResetToken(u.ID)
+			token, err := s.createPasswordResetToken(u.ID)
+			if err != nil {
+				return
+			}
+
+			// Send password reset email if email client is available
+			if s.emailClient != nil && s.emailClient.IsEnabled() {
+				resetURL := fmt.Sprintf("https://%s/auth/password/reset?token=%s", s.serverFQDN, token)
+				emailBody := fmt.Sprintf(
+					"A password reset was requested for your CasPaste account.\n\nReset your password by visiting:\n%s\n\nThis link expires in 1 hour.\n\nIf you did not request this, you can ignore this email.",
+					resetURL,
+				)
+				s.emailClient.Send(u.Email, "Password Reset - CasPaste", emailBody)
+			}
 		}
 	}()
 
@@ -502,7 +543,10 @@ func (s *Service) verifyInvite(code string) (bool, error) {
 	var usedAt sql.NullInt64
 	var expiresAt int64
 
-	err := s.db.QueryRow(`
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT expires_at, used_at FROM user_invites WHERE token_hash = ?
 	`, hashToken(code)).Scan(&expiresAt, &usedAt)
 	if err == sql.ErrNoRows {
@@ -523,14 +567,19 @@ func (s *Service) verifyInvite(code string) (bool, error) {
 }
 
 func (s *Service) markInviteUsed(code string) {
-	s.db.Exec("UPDATE user_invites SET used_at = ? WHERE token_hash = ?", time.Now().Unix(), hashToken(code))
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+	s.db.ExecContext(ctx, "UPDATE user_invites SET used_at = ? WHERE token_hash = ?", time.Now().Unix(), hashToken(code))
 }
 
 func (s *Service) getInvite(token string) (*Invite, error) {
 	var invite Invite
 	var usedAt sql.NullInt64
 
-	err := s.db.QueryRow(`
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT username, expires_at, used_at FROM user_invites WHERE token_hash = ?
 	`, hashToken(token)).Scan(&invite.Username, &invite.ExpiresAt, &usedAt)
 	if err == sql.ErrNoRows {
@@ -555,7 +604,10 @@ func (s *Service) createPasswordResetToken(userID int64) (string, error) {
 	tokenHash := hashToken(token)
 	expiresAt := time.Now().Add(1 * time.Hour).Unix()
 
-	_, err := s.db.Exec(`
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO password_resets (user_id, token_hash, expires_at, created_at)
 		VALUES (?, ?, ?, ?)
 	`, userID, tokenHash, expiresAt, time.Now().Unix())
@@ -571,7 +623,10 @@ func (s *Service) verifyPasswordResetToken(token string) (int64, error) {
 	var usedAt sql.NullInt64
 	var expiresAt int64
 
-	err := s.db.QueryRow(`
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT user_id, expires_at, used_at FROM password_resets WHERE token_hash = ?
 	`, hashToken(token)).Scan(&userID, &expiresAt, &usedAt)
 	if err == sql.ErrNoRows {
@@ -592,7 +647,9 @@ func (s *Service) verifyPasswordResetToken(token string) (int64, error) {
 }
 
 func (s *Service) markPasswordResetUsed(token string) {
-	s.db.Exec("UPDATE password_resets SET used_at = ? WHERE token_hash = ?", time.Now().Unix(), hashToken(token))
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+	s.db.ExecContext(ctx, "UPDATE password_resets SET used_at = ? WHERE token_hash = ?", time.Now().Unix(), hashToken(token))
 }
 
 func (s *Service) verifyEmailToken(token string) (int64, error) {
@@ -600,7 +657,10 @@ func (s *Service) verifyEmailToken(token string) (int64, error) {
 	var verifiedAt sql.NullInt64
 	var expiresAt int64
 
-	err := s.db.QueryRow(`
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT user_id, expires_at, verified_at FROM email_verifications WHERE token_hash = ?
 	`, hashToken(token)).Scan(&userID, &expiresAt, &verifiedAt)
 	if err == sql.ErrNoRows {
@@ -621,7 +681,19 @@ func (s *Service) verifyEmailToken(token string) (int64, error) {
 }
 
 func (s *Service) markEmailVerificationUsed(token string) {
-	s.db.Exec("UPDATE email_verifications SET verified_at = ? WHERE token_hash = ?", time.Now().Unix(), hashToken(token))
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+	s.db.ExecContext(ctx, "UPDATE email_verifications SET verified_at = ? WHERE token_hash = ?", time.Now().Unix(), hashToken(token))
+}
+
+func (s *Service) storeEmailVerificationToken(userID int64, tokenHash string) {
+	expiresAt := time.Now().Add(24 * time.Hour).Unix()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+	s.db.ExecContext(ctx, `
+		INSERT INTO email_verifications (user_id, token_hash, expires_at, created_at)
+		VALUES (?, ?, ?, ?)
+	`, userID, tokenHash, expiresAt, time.Now().Unix())
 }
 
 // Response helpers

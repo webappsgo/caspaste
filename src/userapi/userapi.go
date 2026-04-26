@@ -8,6 +8,7 @@
 package userapi
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -25,6 +26,9 @@ import (
 	"github.com/casjay-forks/caspaste/src/user"
 	"github.com/casjay-forks/caspaste/src/web"
 )
+
+// Database query timeout
+const defaultQueryTimeout = 5 * time.Second
 
 // Service provides user API operations
 type Service struct {
@@ -594,11 +598,14 @@ func (s *Service) HandleRegenerateRecoveryKeys(w http.ResponseWriter, r *http.Re
 // Helper functions
 
 func (s *Service) getPreferences(userID int64) (*UserPreferences, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	prefs := &UserPreferences{}
 	var showEmail, showActivity, showOrgs, searchable int
 	var emailSecurity, emailMentions, emailUpdates, reduceMotion int
 
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT show_email, show_activity, show_orgs, searchable,
 		       email_security, email_mentions, email_updates, email_digest,
 		       theme, font_size, reduce_motion, date_format, time_format
@@ -625,10 +632,13 @@ func (s *Service) getPreferences(userID int64) (*UserPreferences, error) {
 }
 
 func (s *Service) updatePreferences(userID int64, prefs UserPreferences) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	now := time.Now().Unix()
 
 	// Upsert preferences
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO user_preferences (user_id, show_email, show_activity, show_orgs, searchable,
 		                              email_security, email_mentions, email_updates, email_digest,
 		                              theme, font_size, reduce_motion, date_format, time_format,

@@ -7,12 +7,16 @@
 package recovery
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
 
 	"github.com/casjay-forks/caspaste/src/totp"
 )
+
+// Database query timeout
+const defaultQueryTimeout = 5 * time.Second
 
 // Default number of recovery keys to generate
 const DefaultKeyCount = 10
@@ -47,8 +51,11 @@ func NewService(db *sql.DB) *Service {
 // GenerateKeys generates new recovery keys for a user
 // This invalidates all existing keys
 func (s *Service) GenerateKeys(userID int64) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	// Delete existing keys
-	_, err := s.db.Exec("DELETE FROM recovery_keys WHERE user_id = ?", userID)
+	_, err := s.db.ExecContext(ctx, "DELETE FROM recovery_keys WHERE user_id = ?", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +71,12 @@ func (s *Service) GenerateKeys(userID int64) ([]string, error) {
 	// Store hashed keys
 	for _, key := range keys {
 		keyHash := totp.HashRecoveryKey(key)
-		_, err = s.db.Exec(`
+		insertCtx, insertCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+		_, err = s.db.ExecContext(insertCtx, `
 			INSERT INTO recovery_keys (user_id, key_hash, created_at)
 			VALUES (?, ?, ?)
 		`, userID, keyHash, now)
+		insertCancel()
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +99,10 @@ func (s *Service) VerifyAndConsumeKey(userID int64, key string) error {
 	var keyID int64
 	var usedAt sql.NullInt64
 
-	err := s.db.QueryRow(`
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, used_at FROM recovery_keys
 		WHERE user_id = ? AND key_hash = ?
 	`, userID, keyHash).Scan(&keyID, &usedAt)
@@ -108,7 +120,10 @@ func (s *Service) VerifyAndConsumeKey(userID int64, key string) error {
 	}
 
 	// Mark as used
-	_, err = s.db.Exec("UPDATE recovery_keys SET used_at = ? WHERE id = ?",
+	updateCtx, updateCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer updateCancel()
+
+	_, err = s.db.ExecContext(updateCtx, "UPDATE recovery_keys SET used_at = ? WHERE id = ?",
 		time.Now().Unix(), keyID)
 	if err != nil {
 		return err
@@ -119,8 +134,11 @@ func (s *Service) VerifyAndConsumeKey(userID int64, key string) error {
 
 // CountRemainingKeys returns the number of unused recovery keys
 func (s *Service) CountRemainingKeys(userID int64) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var count int
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM recovery_keys
 		WHERE user_id = ? AND used_at IS NULL
 	`, userID).Scan(&count)
@@ -129,8 +147,11 @@ func (s *Service) CountRemainingKeys(userID int64) (int, error) {
 
 // HasKeys checks if a user has any recovery keys (used or unused)
 func (s *Service) HasKeys(userID int64) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var count int
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM recovery_keys WHERE user_id = ?
 	`, userID).Scan(&count)
 	return count > 0, err
@@ -138,14 +159,20 @@ func (s *Service) HasKeys(userID int64) (bool, error) {
 
 // DeleteAllKeys deletes all recovery keys for a user
 func (s *Service) DeleteAllKeys(userID int64) error {
-	_, err := s.db.Exec("DELETE FROM recovery_keys WHERE user_id = ?", userID)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM recovery_keys WHERE user_id = ?", userID)
 	return err
 }
 
 // ListKeys returns all recovery keys for a user (showing which are used)
 // Note: This does NOT return the actual key values (only hashed)
 func (s *Service) ListKeys(userID int64) ([]RecoveryKey, error) {
-	rows, err := s.db.Query(`
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, user_id, used_at, created_at
 		FROM recovery_keys WHERE user_id = ?
 		ORDER BY id
@@ -185,9 +212,12 @@ type KeysStatus struct {
 
 // GetKeysStatus returns the status of a user's recovery keys
 func (s *Service) GetKeysStatus(userID int64) (*KeysStatus, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var total, used int
 
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(*), SUM(CASE WHEN used_at IS NOT NULL THEN 1 ELSE 0 END)
 		FROM recovery_keys WHERE user_id = ?
 	`, userID).Scan(&total, &used)

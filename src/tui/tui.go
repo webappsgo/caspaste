@@ -8,8 +8,11 @@
 package tui
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -213,8 +216,31 @@ func (m SetupModel) testConnection() tea.Cmd {
 			return testResultMsg{err: fmt.Errorf("URL must start with http:// or https://")}
 		}
 
-		// In real implementation, would test connection to server here
-		return testResultMsg{result: "Connection successful!"}
+		// Test connection via health endpoint
+		client := &http.Client{Timeout: 10 * time.Second}
+		healthURL := strings.TrimRight(m.serverURL.Value, "/") + "/api/v1/healthz"
+		resp, err := client.Get(healthURL)
+		if err != nil {
+			return testResultMsg{err: fmt.Errorf("connection failed: %w", err)}
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return testResultMsg{err: fmt.Errorf("server returned status %d", resp.StatusCode)}
+		}
+
+		var healthResp struct {
+			Status  string `json:"status"`
+			Version string `json:"version"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&healthResp); err != nil {
+			return testResultMsg{result: "Connected (could not parse health response)"}
+		}
+
+		if healthResp.Version != "" {
+			return testResultMsg{result: fmt.Sprintf("Connected to CasPaste %s (status: %s)", healthResp.Version, healthResp.Status)}
+		}
+		return testResultMsg{result: fmt.Sprintf("Connected (status: %s)", healthResp.Status)}
 	}
 }
 

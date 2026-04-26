@@ -66,7 +66,7 @@ func (data *Data) handleSitemap(rw http.ResponseWriter, req *http.Request) error
 	sitemapXML := `<?xml version="1.0" encoding="UTF-8"?>`
 	sitemapXML = sitemapXML + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n"
 	sitemapXML = sitemapXML + "<url><loc>" + proto + "://" + host + "/" + "</loc></url>\n"
-	sitemapXML = sitemapXML + "<url><loc>" + proto + "://" + host + "/about" + "</loc></url>\n"
+	sitemapXML = sitemapXML + "<url><loc>" + proto + "://" + host + "/server/about" + "</loc></url>\n"
 	sitemapXML = sitemapXML + "<url><loc>" + proto + "://" + host + "/docs/apiv1" + "</loc></url>\n"
 	sitemapXML = sitemapXML + "<url><loc>" + proto + "://" + host + "/docs/libraries" + "</loc></url>\n"
 	sitemapXML = sitemapXML + "</urlset>\n"

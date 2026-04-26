@@ -73,6 +73,39 @@ type YAMLConfig struct {
 			// Histogram buckets for request/response size (bytes)
 			SizeBuckets []float64 `yaml:"size_buckets"`
 		} `yaml:"metrics"`
+
+		// Tor hidden service per AI.md PART 32
+		// Auto-enabled when Tor binary is found - no enable/disable toggle
+		Tor struct {
+			// Path to Tor binary (empty = auto-detect)
+			Binary string `yaml:"binary"`
+			// Use Tor network for outbound connections (server-wide default)
+			UseNetwork bool `yaml:"use_network"`
+			// Allow users to set their own Tor network preference
+			AllowUserPreference bool `yaml:"allow_user_preference"`
+			// Maximum circuits to keep open (1-128, default: 32)
+			MaxCircuits int `yaml:"max_circuits"`
+			// Circuit timeout in seconds (10-300, default: 60)
+			CircuitTimeout int `yaml:"circuit_timeout"`
+			// Bootstrap timeout in seconds (30-600, default: 180)
+			BootstrapTimeout int `yaml:"bootstrap_timeout"`
+			// Scrub sensitive info from Tor logs
+			SafeLogging bool `yaml:"safe_logging"`
+			// Maximum concurrent streams per circuit (10-500, default: 100)
+			MaxStreamsPerCircuit int `yaml:"max_streams_per_circuit"`
+			// Close circuit when stream limit exceeded
+			CloseCircuitOnStreamLimit bool `yaml:"close_circuit_on_stream_limit"`
+			// Bandwidth rate per second (e.g., "1 MB", "500 KB")
+			BandwidthRate string `yaml:"bandwidth_rate"`
+			// Bandwidth burst per second (e.g., "2 MB", "1 MB")
+			BandwidthBurst string `yaml:"bandwidth_burst"`
+			// Maximum monthly bandwidth (e.g., "100 GB", "unlimited")
+			MaxMonthlyBandwidth string `yaml:"max_monthly_bandwidth"`
+			// Number of introduction points (3-10, default: 3)
+			NumIntroPoints int `yaml:"num_intro_points"`
+			// Virtual port for hidden service (default: 80)
+			VirtualPort int `yaml:"virtual_port"`
+		} `yaml:"tor"`
 	} `yaml:"server"`
 
 	Database struct {
@@ -386,13 +419,20 @@ func ResolvePlaceholders(cfg *YAMLConfig, fqdn, dataDir, configDir string) {
 // These are always trusted for X-Forwarded-* headers
 func GetDefaultPrivateProxies() []string {
 	return []string{
-		"10.0.0.0/8",     // Private Class A
-		"172.16.0.0/12",  // Private Class B
-		"192.168.0.0/16", // Private Class C
-		"127.0.0.0/8",    // Loopback IPv4
-		"::1",            // Loopback IPv6
-		"fc00::/7",       // Unique Local IPv6
-		"fe80::/10",      // Link-Local IPv6
+		// Private Class A
+		"10.0.0.0/8",
+		// Private Class B
+		"172.16.0.0/12",
+		// Private Class C
+		"192.168.0.0/16",
+		// Loopback IPv4
+		"127.0.0.0/8",
+		// Loopback IPv6
+		"::1",
+		// Unique Local IPv6
+		"fc00::/7",
+		// Link-Local IPv6
+		"fe80::/10",
 	}
 }
 
@@ -410,10 +450,14 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// ============================================================================
 	// SERVER CONFIGURATION
 	// ============================================================================
-	defaultConfig.Server.Public = true  // Default: open/public instance (no auth required)
-	defaultConfig.Server.FQDN = ""      // Empty = auto-detect from X-Forwarded-Host (trusted proxies) or hostname; Set to override
-	defaultConfig.Server.Listen = "all" // Listen on all interfaces (IPv4 + IPv6)
-	defaultConfig.Server.Port = ""      // Empty = auto-detect available port at runtime
+	// Default: open/public instance (no auth required)
+	defaultConfig.Server.Public = true
+	// Empty = auto-detect from X-Forwarded-Host (trusted proxies) or hostname; Set to override
+	defaultConfig.Server.FQDN = ""
+	// Listen on all interfaces (IPv4 + IPv6)
+	defaultConfig.Server.Listen = "all"
+	// Empty = auto-detect available port at runtime
+	defaultConfig.Server.Port = ""
 	defaultConfig.Server.Title = "CasPaste"
 	defaultConfig.Server.TagLine = "A simple paste service"
 	defaultConfig.Server.Description = "CasPaste is a simple, fast, and secure paste service for sharing code snippets and text"
@@ -432,13 +476,46 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Server.Timeouts.Idle = 60
 
 	// Prometheus Metrics per AI.md PART 21 (INTERNAL ONLY - firewall /metrics)
-	defaultConfig.Server.Metrics.Enabled = false // Disabled by default, enable in production
+	// Disabled by default, enable in production
+	defaultConfig.Server.Metrics.Enabled = false
 	defaultConfig.Server.Metrics.Endpoint = "/metrics"
 	defaultConfig.Server.Metrics.IncludeSystem = true
 	defaultConfig.Server.Metrics.IncludeRuntime = true
-	defaultConfig.Server.Metrics.Token = "" // Empty = no auth (use firewall instead)
+	// Empty = no auth (use firewall instead)
+	defaultConfig.Server.Metrics.Token = ""
 	defaultConfig.Server.Metrics.DurationBuckets = []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 	defaultConfig.Server.Metrics.SizeBuckets = []float64{100, 1000, 10000, 100000, 1000000, 10000000}
+
+	// Tor Hidden Service per AI.md PART 32
+	// Auto-enabled when Tor binary is found - no enable/disable toggle
+	// Empty = auto-detect
+	defaultConfig.Server.Tor.Binary = ""
+	// Don't use Tor for outbound by default
+	defaultConfig.Server.Tor.UseNetwork = false
+	// Allow users to override
+	defaultConfig.Server.Tor.AllowUserPreference = true
+	// Keep 32 circuits open
+	defaultConfig.Server.Tor.MaxCircuits = 32
+	// 60 seconds
+	defaultConfig.Server.Tor.CircuitTimeout = 60
+	// 3 minutes
+	defaultConfig.Server.Tor.BootstrapTimeout = 180
+	// Scrub sensitive info
+	defaultConfig.Server.Tor.SafeLogging = true
+	// Max streams per circuit
+	defaultConfig.Server.Tor.MaxStreamsPerCircuit = 100
+	// Close circuit at limit
+	defaultConfig.Server.Tor.CloseCircuitOnStreamLimit = true
+	// 1 MB/s
+	defaultConfig.Server.Tor.BandwidthRate = "1 MB"
+	// 2 MB/s burst
+	defaultConfig.Server.Tor.BandwidthBurst = "2 MB"
+	// 100 GB per month
+	defaultConfig.Server.Tor.MaxMonthlyBandwidth = "100 GB"
+	// 3 introduction points
+	defaultConfig.Server.Tor.NumIntroPoints = 3
+	// Listen on port 80
+	defaultConfig.Server.Tor.VirtualPort = 80
 
 	// ============================================================================
 	// DATABASE CONFIGURATION
@@ -454,7 +531,8 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// ============================================================================
 	// SECURITY CONFIGURATION
 	// ============================================================================
-	defaultConfig.Security.PasswordFile = "" // Empty = auto-generate when server.public=false
+	// Empty = auto-generate when server.public=false
+	defaultConfig.Security.PasswordFile = ""
 	
 	// HTTP Security Headers per AI.md PART 11
 	defaultConfig.Security.Headers.XFrameOptions = "SAMEORIGIN"
@@ -474,11 +552,14 @@ func GenerateDefaultYAMLConfig(path string) error {
 		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 		"TLS_CHACHA20_POLY1305_SHA256",
 	}
-	defaultConfig.Security.TLS.CertFile = "/etc/casjay-forks/caspaste/tls/cert.pem" // Auto-detected from Let's Encrypt
-	defaultConfig.Security.TLS.KeyFile = "/etc/casjay-forks/caspaste/tls/key.pem"  // Auto-detected from Let's Encrypt
+	// Auto-detected from Let's Encrypt
+	defaultConfig.Security.TLS.CertFile = "/etc/casjay-forks/caspaste/tls/cert.pem"
+	// Auto-detected from Let's Encrypt
+	defaultConfig.Security.TLS.KeyFile = "/etc/casjay-forks/caspaste/tls/key.pem"
 	
 	// Upload Security
-	defaultConfig.Security.Upload.MaxFileSize = 52428800 // 50MB
+	// 50MB
+	defaultConfig.Security.Upload.MaxFileSize = 52428800
 	defaultConfig.Security.Upload.AllowedMIME = []string{
 		"text/plain",
 		"text/markdown",
@@ -500,7 +581,8 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Security.CORS.AllowedOrigins = []string{"*"}
 	defaultConfig.Security.CORS.AllowedMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"}
 	defaultConfig.Security.CORS.AllowedHeaders = []string{"Content-Type", "Authorization", "X-Requested-With"}
-	defaultConfig.Security.CORS.MaxAge = 86400 // 24 hours
+	// 24 hours
+	defaultConfig.Security.CORS.MaxAge = 86400
 
 	// CSRF Protection per AI.md PART 11
 	defaultConfig.Security.CSRF.Enabled = true
@@ -516,19 +598,27 @@ func GenerateDefaultYAMLConfig(path string) error {
 
 	// UI Settings
 	defaultConfig.Web.UI.DefaultLifetime = "never"
-	defaultConfig.Web.UI.DefaultTheme = "dark" // Accepts: "dark" (dracula), "light" (github), "auto", or full path like "dark/dracula"
-	defaultConfig.Web.UI.ThemesDir = ""        // Empty = {data_dir}/web/themes (resolved at runtime)
+	// Accepts: "dark" (dracula), "light" (github), "auto", or full path like "dark/dracula"
+	defaultConfig.Web.UI.DefaultTheme = "dark"
+	// Empty = {data_dir}/web/themes (resolved at runtime)
+	defaultConfig.Web.UI.ThemesDir = ""
 
 	// Content Pages - all empty = auto-generated from embedded defaults
 	// If set, paths are relative to {data_dir}/web/docs unless absolute
-	defaultConfig.Web.Content.About = ""    // Empty = auto-generated
-	defaultConfig.Web.Content.Rules = ""    // Empty = auto-generated
-	defaultConfig.Web.Content.Terms = ""    // Empty = auto-generated
-	defaultConfig.Web.Content.Security = "" // Empty = auto-generated security.txt
+	// Empty = auto-generated
+	defaultConfig.Web.Content.About = ""
+	// Empty = auto-generated
+	defaultConfig.Web.Content.Rules = ""
+	// Empty = auto-generated
+	defaultConfig.Web.Content.Terms = ""
+	// Empty = auto-generated security.txt
+	defaultConfig.Web.Content.Security = ""
 
 	// Branding - can be local paths or URLs
-	defaultConfig.Web.Branding.Logo = ""    // Empty = use embedded default
-	defaultConfig.Web.Branding.Favicon = "" // Empty = use embedded default
+	// Empty = use embedded default
+	defaultConfig.Web.Branding.Logo = ""
+	// Empty = use embedded default
+	defaultConfig.Web.Branding.Favicon = ""
 	
 	// Security Contact (for security.txt)
 	defaultConfig.Web.Security.Contact.Email = "security@{fqdn}"
@@ -554,7 +644,8 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// LIMITS & RATE LIMITING
 	// ============================================================================
 	defaultConfig.Limits.TitleMaxLength = 100
-	defaultConfig.Limits.BodyMaxLength = 52428800 // 50MB
+	// 50MB
+	defaultConfig.Limits.BodyMaxLength = 52428800
 	defaultConfig.Limits.MaxPasteLifetime = "never"
 	
 	// Rate limiting for GET requests
@@ -573,37 +664,46 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// Platform-specific defaults
 	defaultConfig.Directories.Data = "/var/lib/casjay-forks/caspaste"
 	defaultConfig.Directories.Config = "/etc/casjay-forks/caspaste"
-	defaultConfig.Directories.Db = "/var/lib/casjay-forks/caspaste/db"    // Database directory - if under data dir, included in data backup
+	// Database directory - if under data dir, included in data backup
+	defaultConfig.Directories.Db = "/var/lib/casjay-forks/caspaste/db"
 	defaultConfig.Directories.Cache = "/var/cache/caspaste"
 	defaultConfig.Directories.Logs = "/var/log/casjay-forks/caspaste"
 
 	// ============================================================================
 	// LOGGING
 	// ============================================================================
-	defaultConfig.Logging.Level = "info" // info, warn, error (default: info)
+	// info, warn, error (default: info)
+	defaultConfig.Logging.Level = "info"
 	
 	// Access Log (HTTP requests)
-	defaultConfig.Logging.Access.Stdout = false  // Don't clutter console with every request
+	// Don't clutter console with every request
+	defaultConfig.Logging.Access.Stdout = false
 	defaultConfig.Logging.Access.Stderr = false
-	defaultConfig.Logging.Access.Format = "apache" // apache (combined), nginx, text, json
+	// apache (combined), nginx, text, json
+	defaultConfig.Logging.Access.Format = "apache"
 	defaultConfig.Logging.Access.File = "access.log"
 	
 	// Error Log (ERROR messages)
 	defaultConfig.Logging.Error.Stdout = false
-	defaultConfig.Logging.Error.Stderr = true // Errors to stderr by default
-	defaultConfig.Logging.Error.Format = "text" // text, json
+	// Errors to stderr by default
+	defaultConfig.Logging.Error.Stderr = true
+	// text, json
+	defaultConfig.Logging.Error.Format = "text"
 	defaultConfig.Logging.Error.File = "error.log"
 	
 	// Server Log (INFO messages)
-	defaultConfig.Logging.Server.Stdout = true // Show info messages on console
+	// Show info messages on console
+	defaultConfig.Logging.Server.Stdout = true
 	defaultConfig.Logging.Server.Stderr = false
-	defaultConfig.Logging.Server.Format = "text" // text, json
+	// text, json
+	defaultConfig.Logging.Server.Format = "text"
 	defaultConfig.Logging.Server.File = "caspaste.log"
 	
 	// Debug Log (DEBUG messages, only with --debug flag)
 	defaultConfig.Logging.Debug.Stdout = true
 	defaultConfig.Logging.Debug.Stderr = false
-	defaultConfig.Logging.Debug.Format = "text" // text, json
+	// text, json
+	defaultConfig.Logging.Debug.Format = "text"
 	defaultConfig.Logging.Debug.File = "debug.log"
 
 	// Audit Log per AI.md PART 11 (security events in JSON Lines format)

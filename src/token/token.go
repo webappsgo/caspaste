@@ -7,6 +7,7 @@
 package token
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -14,6 +15,12 @@ import (
 	"errors"
 	"strings"
 	"time"
+)
+
+// Query timeouts per AI.md PART 10
+const (
+	defaultQueryTimeout = 5 * time.Second
+	defaultListTimeout  = 10 * time.Second
 )
 
 // Token prefix constants per PART 34
@@ -94,7 +101,11 @@ func (s *Service) CreateUserToken(userID int64, name string, scopes []string, ex
 
 	now := time.Now().Unix()
 
-	result, err := s.db.Exec(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, `
 		INSERT INTO user_tokens (user_id, name, token_prefix, token_hash, scopes, expires_at, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, userID, name, tokenPrefix, tokenHash, scopeStr, expiresAt, now)
@@ -139,7 +150,11 @@ func (s *Service) CreateOrgToken(orgID, createdBy int64, name string, scopes []s
 
 	now := time.Now().Unix()
 
-	result, err := s.db.Exec(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, `
 		INSERT INTO org_tokens (org_id, created_by, name, token_prefix, token_hash, scopes, expires_at, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`, orgID, createdBy, name, tokenPrefix, tokenHash, scopeStr, expiresAt, now)
@@ -189,8 +204,7 @@ func (s *Service) Validate(token string) (*TokenInfo, error) {
 	case "org":
 		return s.validateOrgToken(tokenHash)
 	case "admin":
-		// Admin tokens handled separately
-		return nil, ErrInvalidToken
+		return s.validateAdminToken(tokenHash)
 	}
 
 	return nil, ErrInvalidToken
@@ -201,7 +215,11 @@ func (s *Service) validateUserToken(tokenHash string) (*TokenInfo, error) {
 	var t Token
 	var expiresAt, lastUsedAt sql.NullInt64
 
-	err := s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, user_id, name, token_prefix, scopes, last_used_at, expires_at, created_at
 		FROM user_tokens WHERE token_hash = ?
 	`, tokenHash).Scan(
@@ -243,7 +261,11 @@ func (s *Service) validateOrgToken(tokenHash string) (*TokenInfo, error) {
 	var t Token
 	var expiresAt, lastUsedAt sql.NullInt64
 
-	err := s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, org_id, created_by, name, token_prefix, scopes, last_used_at, expires_at, created_at
 		FROM org_tokens WHERE token_hash = ?
 	`, tokenHash).Scan(
@@ -280,14 +302,151 @@ func (s *Service) validateOrgToken(tokenHash string) (*TokenInfo, error) {
 	}, nil
 }
 
+// validateAdminToken validates a server admin API token per AI.md PART 11
+// Admin tokens are stored in the admins table api_token_hash field
+func (s *Service) validateAdminToken(tokenHash string) (*TokenInfo, error) {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	var adminID int64
+	var username string
+	var role string
+	var enabled int
+	var lockedUntil sql.NullInt64
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, username, role, enabled, locked_until
+		FROM admins WHERE api_token_hash = ?
+	`, tokenHash).Scan(&adminID, &username, &role, &enabled, &lockedUntil)
+	if err == sql.ErrNoRows {
+		return nil, ErrTokenNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if admin is enabled
+	if enabled != 1 {
+		return nil, ErrTokenRevoked
+	}
+
+	// Check if account is locked
+	if lockedUntil.Valid && lockedUntil.Int64 > time.Now().Unix() {
+		return nil, ErrTokenRevoked
+	}
+
+	// Determine scopes based on admin role
+	var scopes []string
+	switch role {
+	case "superadmin":
+		scopes = []string{ScopeGlobal}
+	case "admin":
+		scopes = []string{ScopeGlobal}
+	case "readonly":
+		scopes = []string{ScopeRead}
+	default:
+		scopes = []string{ScopeGlobal}
+	}
+
+	return &TokenInfo{
+		Type:    "admin",
+		OwnerID: adminID,
+		UserID:  adminID,
+		Scopes:  scopes,
+		Token: &Token{
+			ID:       adminID,
+			OwnerID:  adminID,
+			Name:     username,
+			Scopes:   strings.Join(scopes, ","),
+		},
+	}, nil
+}
+
+// CreateAdminToken creates or updates an admin's API token per AI.md PART 11
+func (s *Service) CreateAdminToken(adminID int64) (string, error) {
+	// Generate token
+	rawToken, err := generateRawToken(32)
+	if err != nil {
+		return "", err
+	}
+
+	// Add prefix
+	fullToken := PrefixAdm + rawToken
+
+	// Hash for storage
+	tokenHash := hashToken(fullToken)
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	// Update admin's token hash
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE admins SET api_token_hash = ?, updated_at = ? WHERE id = ?
+	`, tokenHash, time.Now().Unix(), adminID)
+	if err != nil {
+		return "", err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return "", ErrTokenNotFound
+	}
+
+	return fullToken, nil
+}
+
+// RevokeAdminToken revokes an admin's API token per AI.md PART 11
+func (s *Service) RevokeAdminToken(adminID int64) error {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE admins SET api_token_hash = NULL, updated_at = ? WHERE id = ?
+	`, time.Now().Unix(), adminID)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrTokenNotFound
+	}
+
+	return nil
+}
+
 // updateLastUsed updates the last_used_at timestamp
+// Table name is validated against whitelist per AI.md PART 11 (no SQL injection)
 func (s *Service) updateLastUsed(table string, tokenID int64) {
-	s.db.Exec("UPDATE "+table+" SET last_used_at = ? WHERE id = ?", time.Now().Unix(), tokenID)
+	// Whitelist of allowed table names per AI.md PART 11
+	var query string
+	switch table {
+	case "user_tokens":
+		query = "UPDATE user_tokens SET last_used_at = ? WHERE id = ?"
+	case "org_tokens":
+		query = "UPDATE org_tokens SET last_used_at = ? WHERE id = ?"
+	default:
+		// Invalid table name - fail silently (don't expose error)
+		return
+	}
+
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	s.db.ExecContext(ctx, query, time.Now().Unix(), tokenID)
 }
 
 // RevokeUserToken revokes a user token
 func (s *Service) RevokeUserToken(tokenID, userID int64) error {
-	result, err := s.db.Exec("DELETE FROM user_tokens WHERE id = ? AND user_id = ?", tokenID, userID)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, "DELETE FROM user_tokens WHERE id = ? AND user_id = ?", tokenID, userID)
 	if err != nil {
 		return err
 	}
@@ -300,7 +459,11 @@ func (s *Service) RevokeUserToken(tokenID, userID int64) error {
 
 // RevokeOrgToken revokes an organization token
 func (s *Service) RevokeOrgToken(tokenID, orgID int64) error {
-	result, err := s.db.Exec("DELETE FROM org_tokens WHERE id = ? AND org_id = ?", tokenID, orgID)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, "DELETE FROM org_tokens WHERE id = ? AND org_id = ?", tokenID, orgID)
 	if err != nil {
 		return err
 	}
@@ -313,7 +476,11 @@ func (s *Service) RevokeOrgToken(tokenID, orgID int64) error {
 
 // ListUserTokens returns all tokens for a user
 func (s *Service) ListUserTokens(userID int64) ([]Token, error) {
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, user_id, name, token_prefix, scopes, last_used_at, expires_at, created_at
 		FROM user_tokens WHERE user_id = ? ORDER BY created_at DESC
 	`, userID)
@@ -350,7 +517,11 @@ func (s *Service) ListUserTokens(userID int64) ([]Token, error) {
 
 // ListOrgTokens returns all tokens for an organization
 func (s *Service) ListOrgTokens(orgID int64) ([]Token, error) {
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, org_id, created_by, name, token_prefix, scopes, last_used_at, expires_at, created_at
 		FROM org_tokens WHERE org_id = ? ORDER BY created_at DESC
 	`, orgID)
@@ -387,15 +558,23 @@ func (s *Service) ListOrgTokens(orgID int64) ([]Token, error) {
 
 // CountUserTokens returns the number of tokens a user has
 func (s *Service) CountUserTokens(userID int64) (int, error) {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM user_tokens WHERE user_id = ?", userID).Scan(&count)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM user_tokens WHERE user_id = ?", userID).Scan(&count)
 	return count, err
 }
 
 // CountOrgTokens returns the number of tokens an organization has
 func (s *Service) CountOrgTokens(orgID int64) (int, error) {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM org_tokens WHERE org_id = ?", orgID).Scan(&count)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM org_tokens WHERE org_id = ?", orgID).Scan(&count)
 	return count, err
 }
 

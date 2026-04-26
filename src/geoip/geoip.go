@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/oschwald/maxminddb-golang"
 )
 
 // Database URLs from ip-location-db (no API key required)
@@ -63,13 +65,28 @@ type Result struct {
 	Blocked     bool   `json:"blocked"`
 }
 
+// MMDB record types for deserialization
+type countryRecord struct {
+	Country struct {
+		ISOCode string            `maxminddb:"iso_code"`
+		Names   map[string]string `maxminddb:"names"`
+	} `maxminddb:"country"`
+}
+
+type asnRecord struct {
+	AutonomousSystemNumber       uint   `maxminddb:"autonomous_system_number"`
+	AutonomousSystemOrganization string `maxminddb:"autonomous_system_organization"`
+}
+
 // Client handles GeoIP lookups
 type Client struct {
-	config      *Config
-	enabled     bool
-	lastUpdate  time.Time
-	denySet     map[string]bool
-	mu          sync.RWMutex
+	config     *Config
+	enabled    bool
+	lastUpdate time.Time
+	denySet    map[string]bool
+	countryDB  *maxminddb.Reader
+	asnDB      *maxminddb.Reader
+	mu         sync.RWMutex
 }
 
 // NewClient creates a new GeoIP client
@@ -96,6 +113,66 @@ func (c *Client) IsEnabled() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.enabled
+}
+
+// LoadDatabase opens the MMDB database files
+func (c *Client) LoadDatabase() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.config.Dir == "" {
+		return fmt.Errorf("GeoIP directory not configured")
+	}
+
+	// Close existing readers
+	if c.countryDB != nil {
+		c.countryDB.Close()
+		c.countryDB = nil
+	}
+	if c.asnDB != nil {
+		c.asnDB.Close()
+		c.asnDB = nil
+	}
+
+	// Open country database
+	if c.config.CountryEnabled {
+		countryPath := filepath.Join(c.config.Dir, "country.mmdb")
+		if _, err := os.Stat(countryPath); err == nil {
+			db, err := maxminddb.Open(countryPath)
+			if err != nil {
+				return fmt.Errorf("failed to open country database: %w", err)
+			}
+			c.countryDB = db
+		}
+	}
+
+	// Open ASN database
+	if c.config.ASNEnabled {
+		asnPath := filepath.Join(c.config.Dir, "asn.mmdb")
+		if _, err := os.Stat(asnPath); err == nil {
+			db, err := maxminddb.Open(asnPath)
+			if err != nil {
+				return fmt.Errorf("failed to open ASN database: %w", err)
+			}
+			c.asnDB = db
+		}
+	}
+
+	return nil
+}
+
+// Close closes the MMDB database readers
+func (c *Client) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.countryDB != nil {
+		c.countryDB.Close()
+		c.countryDB = nil
+	}
+	if c.asnDB != nil {
+		c.asnDB.Close()
+		c.asnDB = nil
+	}
 }
 
 // SetEnabled enables or disables GeoIP
@@ -145,16 +222,39 @@ func (c *Client) Lookup(ipStr string) (*Result, error) {
 		return result, nil
 	}
 
-	// Note: Actual MMDB lookup would require oschwald/maxminddb-golang
-	// This is a placeholder that would be expanded with actual DB lookups
-	// For now, return a minimal result indicating lookup is available
-	result.CountryCode = "XX"
-	result.Country = "Unknown"
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// Country lookup
+	if c.countryDB != nil {
+		var record countryRecord
+		err := c.countryDB.Lookup(ip, &record)
+		if err == nil {
+			result.CountryCode = record.Country.ISOCode
+			if name, ok := record.Country.Names["en"]; ok {
+				result.Country = name
+			}
+		}
+	}
+
+	// ASN lookup
+	if c.asnDB != nil {
+		var record asnRecord
+		err := c.asnDB.Lookup(ip, &record)
+		if err == nil {
+			result.ASN = record.AutonomousSystemNumber
+			result.ASNOrg = record.AutonomousSystemOrganization
+		}
+	}
+
+	// Default if no database matched
+	if result.CountryCode == "" {
+		result.CountryCode = "XX"
+		result.Country = "Unknown"
+	}
 
 	// Check deny list
-	c.mu.RLock()
 	result.Blocked = c.denySet[result.CountryCode]
-	c.mu.RUnlock()
 
 	return result, nil
 }
@@ -233,7 +333,8 @@ func (c *Client) UpdateDatabases() error {
 	c.lastUpdate = time.Now()
 	c.mu.Unlock()
 
-	return nil
+	// Reload databases after update
+	return c.LoadDatabase()
 }
 
 // downloadFile downloads a file from URL to the specified path

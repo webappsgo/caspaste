@@ -7,11 +7,19 @@
 package org
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"regexp"
 	"strings"
 	"time"
+)
+
+// Query timeouts per AI.md PART 10
+const (
+	defaultQueryTimeout = 5 * time.Second
+	defaultListTimeout  = 10 * time.Second
+	transactionTimeout  = 30 * time.Second
 )
 
 // Role constants
@@ -139,15 +147,19 @@ func (s *Service) Create(input CreateOrgInput, ownerID int64) (*Org, error) {
 	now := time.Now().Unix()
 	slug := strings.ToLower(input.Slug)
 
+	// Transaction timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), transactionTimeout)
+	defer cancel()
+
 	// Start transaction
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
 	// Create organization
-	result, err := tx.Exec(`
+	result, err := tx.ExecContext(ctx, `
 		INSERT INTO orgs (slug, name, description, website, location, visibility, owner_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, slug, input.Name, input.Description, input.Website, input.Location, visibility, ownerID, now, now)
@@ -161,7 +173,7 @@ func (s *Service) Create(input CreateOrgInput, ownerID int64) (*Org, error) {
 	}
 
 	// Add owner as member with owner role
-	_, err = tx.Exec(`
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO org_members (org_id, user_id, role, created_at)
 		VALUES (?, ?, ?, ?)
 	`, orgID, ownerID, RoleOwner, now)
@@ -170,7 +182,7 @@ func (s *Service) Create(input CreateOrgInput, ownerID int64) (*Org, error) {
 	}
 
 	// Create default preferences
-	_, err = tx.Exec(`
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO org_preferences (org_id, created_at, updated_at)
 		VALUES (?, ?, ?)
 	`, orgID, now, now)
@@ -191,7 +203,11 @@ func (s *Service) GetByID(id int64) (*Org, error) {
 	org := &Org{}
 	var emailVerified int
 
-	err := s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, slug, name, description, avatar_type, avatar_url, website, location,
 		       visibility, owner_id, email, email_verified, created_at, updated_at
 		FROM orgs WHERE id = ?
@@ -217,7 +233,11 @@ func (s *Service) GetBySlug(slug string) (*Org, error) {
 	org := &Org{}
 	var emailVerified int
 
-	err := s.db.QueryRow(`
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	err := s.db.QueryRowContext(ctx, `
 		SELECT id, slug, name, description, avatar_type, avatar_url, website, location,
 		       visibility, owner_id, email, email_verified, created_at, updated_at
 		FROM orgs WHERE LOWER(slug) = LOWER(?)
@@ -284,14 +304,22 @@ func (s *Service) Update(id int64, input UpdateOrgInput) error {
 	args = append(args, time.Now().Unix())
 	args = append(args, id)
 
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	query := "UPDATE orgs SET " + strings.Join(updates, ", ") + " WHERE id = ?"
-	_, err := s.db.Exec(query, args...)
+	_, err := s.db.ExecContext(ctx, query, args...)
 	return err
 }
 
 // Delete removes an organization
 func (s *Service) Delete(id int64) error {
-	_, err := s.db.Exec("DELETE FROM orgs WHERE id = ?", id)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, "DELETE FROM orgs WHERE id = ?", id)
 	return err
 }
 
@@ -299,9 +327,13 @@ func (s *Service) Delete(id int64) error {
 func (s *Service) CheckSlugAvailable(slug string) error {
 	slug = strings.ToLower(slug)
 
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	// Check if org exists
 	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM orgs WHERE LOWER(slug) = ?", slug).Scan(&count)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM orgs WHERE LOWER(slug) = ?", slug).Scan(&count)
 	if err != nil {
 		return err
 	}
@@ -310,7 +342,7 @@ func (s *Service) CheckSlugAvailable(slug string) error {
 	}
 
 	// Check if username exists
-	err = s.db.QueryRow("SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", slug).Scan(&count)
+	err = s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE LOWER(username) = ?", slug).Scan(&count)
 	if err != nil {
 		return err
 	}
@@ -336,8 +368,12 @@ func (s *Service) AddMember(orgID, userID int64, role string) error {
 		return ErrAlreadyMember
 	}
 
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	now := time.Now().Unix()
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO org_members (org_id, user_id, role, created_at)
 		VALUES (?, ?, ?, ?)
 	`, orgID, userID, role, now)
@@ -355,7 +391,11 @@ func (s *Service) RemoveMember(orgID, userID int64) error {
 		return ErrCannotRemoveOwner
 	}
 
-	result, err := s.db.Exec("DELETE FROM org_members WHERE org_id = ? AND user_id = ?", orgID, userID)
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, "DELETE FROM org_members WHERE org_id = ? AND user_id = ?", orgID, userID)
 	if err != nil {
 		return err
 	}
@@ -382,7 +422,11 @@ func (s *Service) UpdateMemberRole(orgID, userID int64, role string) error {
 		return errors.New("cannot change owner's role, transfer ownership instead")
 	}
 
-	result, err := s.db.Exec("UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?",
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := s.db.ExecContext(ctx, "UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?",
 		role, orgID, userID)
 	if err != nil {
 		return err
@@ -396,7 +440,11 @@ func (s *Service) UpdateMemberRole(orgID, userID int64, role string) error {
 
 // GetMembers returns all members of an organization
 func (s *Service) GetMembers(orgID int64) ([]OrgMember, error) {
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT m.id, m.org_id, m.user_id, m.role, m.created_at,
 		       u.username, u.display_name, u.avatar_type, u.avatar_url
 		FROM org_members m
@@ -427,7 +475,11 @@ func (s *Service) GetMembers(orgID int64) ([]OrgMember, error) {
 
 // GetUserOrgs returns all organizations a user is a member of
 func (s *Service) GetUserOrgs(userID int64) ([]Org, error) {
-	rows, err := s.db.Query(`
+	// List timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultListTimeout)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT o.id, o.slug, o.name, o.description, o.avatar_type, o.avatar_url,
 		       o.website, o.location, o.visibility, o.owner_id, o.email,
 		       o.email_verified, o.created_at, o.updated_at
@@ -464,15 +516,23 @@ func (s *Service) GetUserOrgs(userID int64) ([]Org, error) {
 
 // IsMember checks if a user is a member of an organization
 func (s *Service) IsMember(orgID, userID int64) bool {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var count int
-	s.db.QueryRow("SELECT COUNT(*) FROM org_members WHERE org_id = ? AND user_id = ?", orgID, userID).Scan(&count)
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM org_members WHERE org_id = ? AND user_id = ?", orgID, userID).Scan(&count)
 	return count > 0
 }
 
 // GetMemberRole returns a user's role in an organization
 func (s *Service) GetMemberRole(orgID, userID int64) string {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var role string
-	err := s.db.QueryRow("SELECT role FROM org_members WHERE org_id = ? AND user_id = ?", orgID, userID).Scan(&role)
+	err := s.db.QueryRowContext(ctx, "SELECT role FROM org_members WHERE org_id = ? AND user_id = ?", orgID, userID).Scan(&role)
 	if err != nil {
 		return ""
 	}
@@ -495,28 +555,32 @@ func (s *Service) TransferOwnership(orgID, currentOwnerID, newOwnerID int64) err
 		return ErrNotMember
 	}
 
+	// Transaction timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), transactionTimeout)
+	defer cancel()
+
 	// Start transaction
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
 	// Update organization owner
-	_, err = tx.Exec("UPDATE orgs SET owner_id = ?, updated_at = ? WHERE id = ?",
+	_, err = tx.ExecContext(ctx, "UPDATE orgs SET owner_id = ?, updated_at = ? WHERE id = ?",
 		newOwnerID, time.Now().Unix(), orgID)
 	if err != nil {
 		return err
 	}
 
 	// Update member roles
-	_, err = tx.Exec("UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?",
+	_, err = tx.ExecContext(ctx, "UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?",
 		RoleAdmin, orgID, currentOwnerID)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.Exec("UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?",
+	_, err = tx.ExecContext(ctx, "UPDATE org_members SET role = ? WHERE org_id = ? AND user_id = ?",
 		RoleOwner, orgID, newOwnerID)
 	if err != nil {
 		return err
@@ -527,8 +591,12 @@ func (s *Service) TransferOwnership(orgID, currentOwnerID, newOwnerID int64) err
 
 // GetMemberCount returns the number of members in an organization
 func (s *Service) GetMemberCount(orgID int64) (int, error) {
+	// Query timeout per AI.md PART 10
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
 	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM org_members WHERE org_id = ?", orgID).Scan(&count)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM org_members WHERE org_id = ?", orgID).Scan(&count)
 	return count, err
 }
 

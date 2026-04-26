@@ -28,6 +28,7 @@ import (
 	"github.com/casjay-forks/caspaste/src/lineend"
 	"github.com/casjay-forks/caspaste/src/netshare"
 	"github.com/casjay-forks/caspaste/src/storage"
+	"github.com/casjay-forks/caspaste/src/validation"
 )
 
 // compatResponse holds paste creation response data
@@ -262,7 +263,8 @@ func (data *Data) handlePastebinCompat(rw http.ResponseWriter, req *http.Request
 		Title:     title,
 		Body:      lineend.UnknownToUnix(body),
 		Syntax:    normalizeSyntax(syntax, data.Lexers),
-		IsPrivate: private == "1" || private == "2",
+		// Pastebin.com uses 0=public, 1=unlisted, 2=private (both 1 and 2 are private)
+		IsPrivate: validation.IsTruthy(private) || private == "2",
 	}
 
 	// Parse expiration (pastebin format: N, 10M, 1H, 1D, 1W, 1M, 6M, 1Y)
@@ -404,8 +406,8 @@ func (data *Data) handleMicrobinCompat(rw http.ResponseWriter, req *http.Request
 		Title:     req.PostFormValue("title"),
 		Body:      lineend.UnknownToUnix(body),
 		Syntax:    normalizeSyntax(syntax, data.Lexers),
-		OneUse:    req.PostFormValue("burn") == "true" || req.PostFormValue("burn") == "on",
-		IsPrivate: req.PostFormValue("private") == "true" || req.PostFormValue("private") == "on",
+		OneUse:    validation.IsTruthy(req.PostFormValue("burn")),
+		IsPrivate: validation.IsTruthy(req.PostFormValue("private")),
 	}
 
 	// Parse expiration
@@ -453,7 +455,7 @@ func (data *Data) handleLenpasteCompat(rw http.ResponseWriter, req *http.Request
 
 	paste := storage.Paste{
 		Title:     req.PostFormValue("title"),
-		OneUse:    req.PostFormValue("oneUse") == "true",
+		OneUse:    validation.IsTruthy(req.PostFormValue("oneUse")),
 		Author:    req.PostFormValue("author"),
 		AuthorURL: req.PostFormValue("authorURL"),
 	}
@@ -652,7 +654,7 @@ func (data *Data) handleGenericCompat(rw http.ResponseWriter, req *http.Request)
 	burnNames := []string{"oneUse", "burn", "burnAfterReading", "once"}
 	for _, name := range burnNames {
 		val := req.PostFormValue(name)
-		if val == "true" || val == "1" || val == "on" {
+		if validation.IsTruthy(val) {
 			paste.OneUse = true
 			break
 		}
@@ -662,7 +664,7 @@ func (data *Data) handleGenericCompat(rw http.ResponseWriter, req *http.Request)
 	privateNames := []string{"private", "unlisted", "secret"}
 	for _, name := range privateNames {
 		val := req.PostFormValue(name)
-		if val == "true" || val == "1" || val == "on" {
+		if validation.IsTruthy(val) {
 			paste.IsPrivate = true
 			break
 		}

@@ -188,7 +188,8 @@
         // Pause progress animation
         const progress = toast.element.querySelector('.toast-progress');
         if (progress) {
-            progress.style.animationPlayState = 'paused';
+            progress.classList.add('toast-progress-paused');
+            progress.classList.remove('toast-progress-running');
         }
     }
 
@@ -208,7 +209,8 @@
         // Resume progress animation
         const progress = toast.element.querySelector('.toast-progress');
         if (progress) {
-            progress.style.animationPlayState = 'running';
+            progress.classList.remove('toast-progress-paused');
+            progress.classList.add('toast-progress-running');
         }
     }
 
@@ -228,7 +230,7 @@
         }
 
         // Animate out
-        toast.element.style.animation = 'slideOut 0.3s ease-in forwards';
+        toast.element.classList.add('toast-dismissing');
 
         setTimeout(function() {
             if (toast.element.parentNode) {
