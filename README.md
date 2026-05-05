@@ -39,9 +39,9 @@ CasPaste is a modern, secure pastebin service designed for self-hosting. It prio
 docker run -d \
   --name caspaste \
   -p 172.17.0.1:59093:80 \
-  -v ./rootfs/config:/config \
-  -v ./rootfs/data:/data \
-  -v ./rootfs/backups:/data/backups \
+  -v ./volumes/config:/config \
+  -v ./volumes/data:/data \
+  -v ./volumes/backups:/data/backups \
   ghcr.io/casjay-forks/caspaste:latest
 ```
 
@@ -57,9 +57,9 @@ services:
     ports:
       - "172.17.0.1:59093:80"
     volumes:
-      - ./rootfs/config:/config
-      - ./rootfs/data:/data
-      - ./rootfs/backups:/data/backups
+      - ./volumes/config:/config
+      - ./volumes/data:/data
+      - ./volumes/backups:/data/backups
     environment:
       - TZ=America/New_York
 ```
@@ -74,9 +74,9 @@ services:
     ports:
       - "172.17.0.1:59093:80"
     volumes:
-      - ./rootfs/config:/config
-      - ./rootfs/data:/data
-      - ./rootfs/backups:/data/backups
+      - ./volumes/config:/config
+      - ./volumes/data:/data
+      - ./volumes/backups:/data/backups
     environment:
       - CASPASTE_DB_DRIVER=postgres
       - CASPASTE_DB_SOURCE=postgres://caspaste:changeme@postgres:5432/caspaste?sslmode=disable
