@@ -1,8 +1,7 @@
-/**
- * This file is part of CasPaste.
- * CasPaste is free software released under the MIT License.
- * See LICENSE.md file for details.
- */
+// This file is part of CasPaste.
+
+// CasPaste is free software released under the MIT License.
+// See LICENSE.md file for details.
 
 function copyToClipboard(text) {
 	var tmp = document.createElement("textarea");
@@ -37,31 +36,6 @@ function copyButton(element) {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-	// Add CSS for copy button
-	var newStyleSheet = "\
-		pre {\
-			position: relative;\
-			overflow: auto;\
-		}\
-		pre button {\
-			visibility: hidden;\
-		}\
-		pre:hover > button {\
-			visibility: visible;\
-		}\
-		.copy-btn {\
-			position: absolute;\
-			top: 16px;\
-			right: 16px;\
-			margin: 0;\
-			animation: fadeout .2s both;\
-		}\
-	";
-
-	var styleSheet = document.createElement("style");
-	styleSheet.innerText = newStyleSheet;
-	document.head.appendChild(styleSheet);
-
 	// Add copy button to all pre tags
 	var preElements = document.getElementsByTagName("pre");
 

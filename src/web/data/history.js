@@ -1,8 +1,7 @@
-/**
- * This file is part of CasPaste.
- * CasPaste is free software released under the MIT License.
- * See LICENSE.md file for details.
- */
+// This file is part of CasPaste.
+
+// CasPaste is free software released under the MIT License.
+// See LICENSE.md file for details.
 
 function isLocalStoageSupported() {
 	if (typeof localStorage === 'object') {
@@ -58,18 +57,12 @@ function historyRefreshList() {
 }
 
 function historyPopUpShow() {
-	document.getElementById("js-history-popup").classList.remove("js-hidden");
-	document.getElementById("js-history-popup-background").classList.remove("js-hidden");
-	document.body.classList.add("overflow-hidden");
-	document.addEventListener("keydown", historyPopUpEscEvent);
+	document.getElementById('history-popup-state').checked = true;
 	historyRefreshList();
 }
 
 function historyPopUpHide() {
-	document.getElementById("js-history-popup").classList.add("js-hidden");
-	document.getElementById("js-history-popup-background").classList.add("js-hidden");
-	document.body.classList.remove("overflow-hidden");
-	document.removeEventListener("keydown", historyPopUpEscEvent);
+	document.getElementById('history-popup-state').checked = false;
 }
 
 function historyPopUpEscEvent(event) {
@@ -97,140 +90,26 @@ function historyClear() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-	// Edit CSS
-	let newStyleSheet = `
-.js-hidden {
-	visibility: hidden;
-}
-
-.overflow-hidden {
-	overflow: hidden;
-}
-
-.popup-title {
-	margin: 0;
-}
-
-#js-history-button:hover {
-	cursor: pointer;
-}
-
-#js-history-popup {
-	background: {{ call .Theme `color.Article` }};
-	padding: 20px;
-
-	position: fixed;
-	z-index: 2;
-	top: 15%;
-	bottom: 15%;
-	right: 20%;
-	left: 20%;
-
-	overflow: hidden;
-}
-
-@media all and (max-device-width: 640px), all and (orientation: portrait) {
-	#js-history-popup {
-		top: 5%;
-		bottom: 5%;
-		right: 0;
-		left: 0;
-	}
-}
-
-#js-history-popup-background {
-	width: 100%;
-	height: 100%;
-	position: fixed;
-	top: 0;
-	left: 0;
-	z-index: 1;
-	background-color: {{ call .Theme `color.BackgroundBlack` }};
-	opacity: 0.5; 
-}
-
-#js-history-popup-header div {
-	width: 50%;
-	display: inline-block;
-}
-
-#js-history-popup-close {
-	text-align: right;
-}
-
-#js-history-popup-close:hover {
-	cursor: pointer;
-}
-
-#js-history-popup-clear {
-	margin-right: 15px;
-}
-
-#js-history-popup-clear:hover {
-	cursor: pointer;
-}
-
-#js-history-popup-list-div {
-	font-family: monospace;
-
-	margin-top: 15px;
-	margin-bottom: 15px;
-
-	overflow: auto;
-	width: 100%;
-	height: 100%;
-}
-
-#js-history-popup-list {
-	margin: 0;
-	margin-bottom: 65px;
-}
-`;
-	let styleSheet = document.createElement("style")
-	styleSheet.innerText = newStyleSheet
-	document.head.appendChild(styleSheet)
-
-	// History button is now in base.tmpl, no need to inject it
-
-	// Add history pop-up background
-	document.body.insertAdjacentHTML("afterbegin", "<div class='js-hidden' id='js-history-popup-background'></div>");
-	document.getElementById("js-history-popup-background").addEventListener("click", historyPopUpHide);
-
-	// If local storage is not supported
-	if (isLocalStoageSupported() == false) {
-	document.body.insertAdjacentHTML("afterbegin", `<div class='js-hidden' id='js-history-popup'>
-<div id='js-history-popup-header'>
-	<div><h4 class='popup-title'>{{ call .Translate `historyJS.History` }}</h4></div
-	><div id='js-history-popup-close'>&times;</div>
-</div>
-<hr/>
-<p>{{ call .Translate `historyJS.LocalStorageNotSupported1` }}</p>
-<p>{{ call .Translate `historyJS.LocalStorageNotSupported2` }}</p>
-`);
-		document.getElementById("js-history-popup-close").addEventListener("click", historyPopUpHide);
-		return;
-	}
-
-	// Add history pop-up
-	document.body.insertAdjacentHTML("afterbegin", `<div class='js-hidden' id='js-history-popup'>
-<div id='js-history-popup-header'>
-	<div><h4 class='popup-title'>{{ call .Translate `historyJS.History` }}</h4></div
-	><div id='js-history-popup-close'>&times;</div>
-</div>
-<hr/>
-<div>
-	<label class='checkbox'><input id='js-history-popup-enable' type='checkbox'>{{ call .Translate `historyJS.EnableHistory` }}</label
-	><span id='js-history-popup-clear' class='text-red'>{{ call .Translate `historyJS.ClearHistory` }}</span>
-</div>
-<div id='js-history-popup-list-div'><ul id='js-history-popup-list'></ul></div>`);
-
-	// Attach event listeners
-	document.getElementById("js-history-popup-close").addEventListener("click", historyPopUpHide);
+	// Attach event listeners to server-rendered popup elements
 	document.getElementById("js-history-popup-enable").addEventListener("change", historyEnable);
 	document.getElementById("js-history-popup-clear").addEventListener("click", historyClear);
 
 	// Set "Remember history" checkbox state
 	document.getElementById("js-history-popup-enable").checked = !localStorage.getItem("DisableHistory");
+
+	// Refresh list when popup is opened via checkbox
+	document.getElementById('history-popup-state').addEventListener('change', function() {
+		if (this.checked) {
+			historyRefreshList();
+		}
+	});
+
+	// Add ESC key handler when popup is open
+	document.addEventListener("keydown", function(event) {
+		if (event.keyCode == 27 && document.getElementById('history-popup-state').checked) {
+			historyPopUpHide();
+		}
+	});
 
 	// If exist "create paste" form path it
 	let createPasteForm = document.getElementById("create-paste-form");
@@ -300,58 +179,18 @@ document.addEventListener("DOMContentLoaded", () => {
 					if (historyJSON != null) {
 						history = JSON.parse(historyJSON);
 					}
-					
+
 					history.splice(0, 0, {id: xhr.response.id, createTime: xhr.response.createTime, deleteTime: xhr.response.deleteTime, title: title});
-					localStorage.setItem("history", JSON.stringify(history));	
+					localStorage.setItem("history", JSON.stringify(history));
 				}
 
 				// Redirect
 				window.location = window.location + xhr.response.id;
 			};
-			
+
 			xhr.send(data);
-			
+
 			return false;
-		});
-	}
-});
-
-// Attach history button click handler
-document.addEventListener('DOMContentLoaded', function() {
-	var historyButton = document.getElementById('js-history-button');
-	if (historyButton) {
-		historyButton.addEventListener('click', function(e) {
-			e.preventDefault();
-			historyPopUpShow();
-			return false;
-		});
-	}
-});
-
-// Mobile hamburger menu toggle
-document.addEventListener('DOMContentLoaded', function() {
-	var navToggle = document.getElementById('js-nav-toggle');
-	var navLinks = document.getElementById('js-nav-links');
-
-	if (navToggle && navLinks) {
-		navToggle.addEventListener('click', function() {
-			navToggle.classList.toggle('active');
-			navLinks.classList.toggle('open');
-
-			// Update aria-expanded for accessibility
-			var isExpanded = navLinks.classList.contains('open');
-			navToggle.setAttribute('aria-expanded', isExpanded);
-		});
-
-		// Close menu when clicking a link (mobile UX)
-		navLinks.querySelectorAll('a').forEach(function(link) {
-			link.addEventListener('click', function() {
-				if (window.innerWidth <= 720) {
-					navToggle.classList.remove('active');
-					navLinks.classList.remove('open');
-					navToggle.setAttribute('aria-expanded', 'false');
-				}
-			});
 		});
 	}
 });

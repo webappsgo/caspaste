@@ -44,7 +44,6 @@ type Data struct {
 	ErrorPage      *template.Template
 	Main           *template.Template
 	MainJS         *[]byte
-	BurnAfterJS    *[]byte
 	ToastJS        *[]byte
 	NavJS          *[]byte
 	HistoryJS      *textTemplate.Template
@@ -218,13 +217,6 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 		return nil, err
 	}
 	data.MainJS = &mainJS
-
-	// burn-after.js
-	burnAfterJS, err := embFS.ReadFile("data/burn-after.js")
-	if err != nil {
-		return nil, err
-	}
-	data.BurnAfterJS = &burnAfterJS
 
 	// toast.js per AI.md PART 16
 	toastJS, err := embFS.ReadFile("data/toast.js")
@@ -412,8 +404,6 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleStyleCSS(rw, req)
 	case "/main.js":
 		err = data.handleMainJS(rw, req)
-	case "/burn-after.js":
-		err = data.handleBurnAfterJS(rw, req)
 	case "/toast.js":
 		err = data.handleToastJS(rw, req)
 	case "/nav.js":

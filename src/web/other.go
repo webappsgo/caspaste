@@ -32,12 +32,6 @@ func (data *Data) handleMainJS(rw http.ResponseWriter, req *http.Request) error 
 	return nil
 }
 
-func (data *Data) handleBurnAfterJS(rw http.ResponseWriter, req *http.Request) error {
-	// Serve with ETag and cache headers per AI.md PART 9
-	ServeWithETag(rw, req, *data.BurnAfterJS, "application/javascript; charset=utf-8", "static")
-	return nil
-}
-
 func (data *Data) handleToastJS(rw http.ResponseWriter, req *http.Request) error {
 	// Toast notifications per AI.md PART 16
 	ServeWithETag(rw, req, *data.ToastJS, "application/javascript; charset=utf-8", "static")

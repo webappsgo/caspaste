@@ -39,6 +39,25 @@
 	<!-- Toast notification container per AI.md PART 16 -->
 	<div id="toast-container" aria-label="Notifications"></div>
 
+	<!-- History popup - CSS-driven open/close via #history-popup-state checkbox -->
+	<div class="history-popup" id="history-popup" role="dialog" aria-modal="true" aria-labelledby="history-popup-title">
+		<label for="history-popup-state" class="history-popup-backdrop" aria-hidden="true"></label>
+		<div class="history-popup-dialog">
+			<div class="history-popup-header">
+				<h4 class="popup-title" id="history-popup-title">{{ call .Translate `historyJS.History` }}</h4>
+				<label for="history-popup-state" class="history-popup-close" aria-label="Close">&times;</label>
+			</div>
+			<hr>
+			<div class="history-popup-controls" id="history-popup-controls">
+				<label class="checkbox"><input id="js-history-popup-enable" type="checkbox">{{ call .Translate `historyJS.EnableHistory` }}</label>
+				<span id="js-history-popup-clear" class="text-red">{{ call .Translate `historyJS.ClearHistory` }}</span>
+			</div>
+			<div class="history-popup-list-container" id="js-history-popup-list-div">
+				<ul id="js-history-popup-list"></ul>
+				<noscript><p>{{ call .Translate `historyJS.LocalStorageNotSupported1` }}</p></noscript>
+			</div>
+		</div>
+	</div>
 	<script src="/history.js"></script>
 	<script src="/toast.js"></script>
 	<script src="/nav.js"></script>

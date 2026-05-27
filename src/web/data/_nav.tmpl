@@ -16,7 +16,8 @@
 				<a href="/list" aria-label="View paste list">{{ call .Translate `base.List` }}</a>
 				<a href="/server/about" aria-label="About CasPaste">{{ call .Translate `base.About` }}</a>
 				<a href="/docs" aria-label="Documentation">{{ call .Translate `base.Docs` }}</a>
-				<button type="button" class="nav-button" id="js-history-button" aria-label="View paste history">{{ call .Translate `base.History` }}</button>
+				<input type="checkbox" id="history-popup-state" class="history-popup-checkbox" aria-hidden="true">
+				<label for="history-popup-state" class="nav-button" aria-label="View paste history">{{ call .Translate `base.History` }}</label>
 				<a href="/settings" aria-label="Settings">{{ call .Translate `base.Settings` }}</a>
 			</div>
 

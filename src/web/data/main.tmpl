@@ -8,7 +8,7 @@
 */}}
 
 {{define "titlePrefix"}}{{end}}
-{{define "headAppend"}}<script src="/main.js"></script><script src="/burn-after.js"></script>{{end}}
+{{define "headAppend"}}<script src="/main.js"></script>{{end}}
 {{define "article"}}
 {{if ne .TitleMaxLen 0}}<h1>{{call .Translate `main.CreatePaste`}}</h1>{{end}}
 <form id="create-paste-form" action="/" method="post" enctype="multipart/form-data" aria-label="Create new paste">
@@ -101,15 +101,16 @@
 				<option value="100">100 {{ call .Translate `main.Views` }}</option>
 				<option value="custom">{{ call .Translate `main.Custom` }}</option>
 			</select>
-			<input 
-				type="number" 
-				id="burn-custom" 
+			<input
+				type="number"
+				id="burn-custom"
 				class="burn-custom-input"
-				name="oneUseCustom" 
-				min="1" 
-				max="9999" 
+				name="oneUseCustom"
+				min="1"
+				max="9999"
 				placeholder="Max 9999"
 				aria-label="Custom number of views (1-9999)"
+				required
 			>
 		</div>
 		
