@@ -10,9 +10,9 @@ import (
 	"strings"
 )
 
-// DetectDriver auto-detects database driver from connection string
-// Supports: sqlite:///path, postgres://..., mysql://..., mariadb://...
-// Returns normalized driver name (mariadb → mysql, sqlite3 → sqlite)
+// DetectDriver auto-detects database driver from connection string.
+// Supports: sqlite:///path, postgres://..., mysql://..., mariadb://..., libsql://...
+// Returns normalized driver name (mariadb → mysql, sqlite3 → sqlite).
 func DetectDriver(source string) (string, error) {
 	source = strings.ToLower(strings.TrimSpace(source))
 
@@ -39,6 +39,11 @@ func DetectDriver(source string) (string, error) {
 		return "mysql", nil
 	}
 
+	// libSQL (Turso) — local file or remote
+	if strings.HasPrefix(source, "libsql://") || strings.HasPrefix(source, "file:") {
+		return "libsql", nil
+	}
+
 	// If no scheme, check if it looks like a file path (SQLite)
 	if strings.Contains(source, "/") || strings.HasSuffix(source, ".db") {
 		return "sqlite", nil
@@ -47,8 +52,8 @@ func DetectDriver(source string) (string, error) {
 	return "", fmt.Errorf("could not detect database driver from source: %s", source)
 }
 
-// NormalizeDriver normalizes driver names
-// mariadb → mysql, sqlite3 → sqlite
+// NormalizeDriver normalizes driver names.
+// mariadb → mysql, sqlite3 → sqlite, postgresql → postgres.
 func NormalizeDriver(driver string) string {
 	driver = strings.ToLower(driver)
 	if driver == "mariadb" || driver == "maria" {
@@ -60,14 +65,23 @@ func NormalizeDriver(driver string) string {
 	if driver == "postgresql" {
 		return "postgres"
 	}
+	if driver == "turso" {
+		return "libsql"
+	}
 	return driver
 }
 
-// NormalizeConnectionString normalizes connection strings to driver-specific format
+// NormalizeConnectionString normalizes connection strings to driver-specific format.
 // - sqlite://path → /path
 // - mysql://user:pass@host:port/db → user:pass@tcp(host:port)/db
-// - postgres://... stays as-is (pq driver supports it)
+// - postgres://... stays as-is (pgx driver supports it)
+// - libsql://... stays as-is (libsql driver handles its own URL parsing)
 func NormalizeConnectionString(driver, source string) string {
+	// libSQL: pass through; the driver parses libsql:// and file: URLs natively
+	if driver == "libsql" {
+		return source
+	}
+
 	// SQLite: Remove sqlite:// prefix
 	if driver == "sqlite" {
 		if strings.HasPrefix(source, "sqlite://") {

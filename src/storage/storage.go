@@ -18,6 +18,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	_ "modernc.org/sqlite"
 )
 
@@ -56,9 +57,8 @@ func NewPool(driverName string, dataSourceName string, maxOpenConns int, maxIdle
 	db.pool.SetConnMaxLifetime(3600 * 1000000000) // 1 hour in nanoseconds
 	db.pool.SetConnMaxIdleTime(600 * 1000000000)  // 10 minutes in nanoseconds
 
-	// If using postgres/mysql, also open SQLite backup/cache
-	// SQLite cache is ALWAYS required for local operations
-	if driverName == "postgres" || driverName == "mysql" || driverName == "mariadb" {
+	// If using a remote driver, also open SQLite backup/cache for local operations
+	if driverName == "postgres" || driverName == "mysql" || driverName == "mariadb" || driverName == "libsql" {
 		// Determine SQLite cache path - check env var first, then use standard path
 		backupPath := getSQLiteCachePath(dataDir)
 
@@ -530,8 +530,9 @@ func InitDB(driverName string, dataSourceName string) error {
 	}
 
 	var columns []columnDef
-	if driverName == "sqlite3" || driverName == "sqlite" {
-		// SQLite: ALTER TABLE ADD COLUMN (ignores duplicate errors)
+	// libsql is SQLite-compatible; use the same ALTER TABLE path
+	if driverName == "sqlite3" || driverName == "sqlite" || driverName == "libsql" {
+		// SQLite/libSQL: ALTER TABLE ADD COLUMN (ignores duplicate errors)
 		columns = []columnDef{
 			{"author", "TEXT NOT NULL DEFAULT ''"},
 			{"author_email", "TEXT NOT NULL DEFAULT ''"},
