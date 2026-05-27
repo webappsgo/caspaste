@@ -39,7 +39,12 @@ func NewPool(driverName string, dataSourceName string, maxOpenConns int, maxIdle
 	var err error
 
 	db.driver = driverName
-	db.pool, err = sql.Open(driverName, dataSourceName)
+	// pgx/v5/stdlib registers itself as "pgx", not "postgres"
+	sqlDriverName := driverName
+	if driverName == "postgres" {
+		sqlDriverName = "pgx"
+	}
+	db.pool, err = sql.Open(sqlDriverName, dataSourceName)
 	if err != nil {
 		return db, err
 	}
