@@ -122,6 +122,25 @@ var ErrNotFoundID = errors.New("db: could not find ID")
 
 Token bucket system with configurable per-endpoint limits (5min, 15min, 1hour windows).
 
+## UI / JavaScript Policy
+
+**Always prefer CSS over JavaScript.** JS may be disabled (Tor Browser, NoScript, privacy-hardened clients). Every interactive UI feature must be fully functional without JS.
+
+Mandatory CSS-first patterns:
+- Navigation toggles → hidden `<input type="checkbox">` + `<label>`, `:checked ~` / `:checked +` sibling selectors
+- Dropdowns / accordions → `<details>`/`<summary>` or the checkbox hack above
+- Show/hide → `:checked`, `:target`, `:focus-within`, or `@media` queries
+- Animations / transitions → `@keyframes`, `transition`, CSS custom properties
+- Theme switching → `<html data-theme="…">` + CSS `[data-theme]` attribute selectors
+
+JS is permitted **only** for progressive enhancement on top of a working CSS baseline:
+- Close-on-outside-click
+- Escape-key dismissal
+- AJAX / fetch (non-critical path; page must work without it)
+- Clipboard copy buttons (degrade gracefully)
+
+Never gate core functionality (navigation, forms, content display) behind JS.
+
 ## Code Style Guidelines
 
 ### File Headers

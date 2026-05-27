@@ -8,10 +8,11 @@
 {{define "nav"}}
 		<nav role="navigation" aria-label="Main navigation">
 			<a href="/" class="site-title" aria-label="CasPaste home">{{ call .Translate `base.CasPaste` }}</a>
-			<button type="button" class="nav-toggle" id="js-nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+			<input type="checkbox" id="nav-toggle-state" class="nav-toggle-checkbox" aria-hidden="true">
+			<label for="nav-toggle-state" class="nav-toggle" aria-label="Toggle navigation menu">
 				<span class="nav-toggle-icon"></span>
-			</button>
-			<div class="nav-links" id="js-nav-links">
+			</label>
+			<div class="nav-links">
 				<a href="/list" aria-label="View paste list">{{ call .Translate `base.List` }}</a>
 				<a href="/server/about" aria-label="About CasPaste">{{ call .Translate `base.About` }}</a>
 				<a href="/docs" aria-label="Documentation">{{ call .Translate `base.Docs` }}</a>

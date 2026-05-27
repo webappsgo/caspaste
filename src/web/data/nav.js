@@ -3,35 +3,35 @@
 // CasPaste is free software released under the MIT License.
 // See LICENSE.md file for details.
 
-// Mobile navigation toggle
+// Mobile navigation - optional JS enhancements (close-on-outside-click, Escape).
+// The toggle itself is pure CSS via the #nav-toggle-state checkbox.
 (function() {
-	var navToggle = document.getElementById('js-nav-toggle');
-	var navLinks = document.getElementById('js-nav-links');
+	var navCheckbox = document.getElementById('nav-toggle-state');
+	var navLabel = document.querySelector('label[for="nav-toggle-state"]');
 
-	if (navToggle && navLinks) {
-		navToggle.addEventListener('click', function() {
-			var isOpen = navLinks.classList.toggle('open');
-			navToggle.classList.toggle('active');
-			navToggle.setAttribute('aria-expanded', isOpen);
-		});
-
-		// Close menu when clicking outside
+	if (navCheckbox) {
+		// Close menu when clicking outside the nav
 		document.addEventListener('click', function(e) {
-			if (!navToggle.contains(e.target) && !navLinks.contains(e.target)) {
-				navLinks.classList.remove('open');
-				navToggle.classList.remove('active');
-				navToggle.setAttribute('aria-expanded', 'false');
+			if (navCheckbox.checked && !e.target.closest('header nav')) {
+				navCheckbox.checked = false;
 			}
 		});
 
-		// Close menu when pressing Escape
+		// Close menu on Escape key and return focus to the toggle label
 		document.addEventListener('keydown', function(e) {
-			if (e.key === 'Escape' && navLinks.classList.contains('open')) {
-				navLinks.classList.remove('open');
-				navToggle.classList.remove('active');
-				navToggle.setAttribute('aria-expanded', 'false');
-				navToggle.focus();
+			if (e.key === 'Escape' && navCheckbox.checked) {
+				navCheckbox.checked = false;
+				if (navLabel) {
+					navLabel.focus();
+				}
 			}
+		});
+
+		// Close menu when a nav link is activated
+		document.querySelectorAll('.nav-links a, .nav-links button').forEach(function(el) {
+			el.addEventListener('click', function() {
+				navCheckbox.checked = false;
+			});
 		});
 	}
 
