@@ -83,7 +83,7 @@ func MigrateDatabase(sourceDriver, sourceSource, destDriver, destSource string) 
 
 		// Insert into destination database with timeout
 		insertCtx, insertCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
-		_, err = destDB.pool.ExecContext(insertCtx, `
+		_, err = destDB.execSQL(insertCtx, `
 			INSERT INTO pastes (id, title, body, syntax, create_time, delete_time, one_use,
 			                    author, author_email, author_url,
 			                    is_file, file_name, mime_type, is_editable, is_private, is_url, original_url)

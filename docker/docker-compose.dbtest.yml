@@ -1,0 +1,128 @@
+# Temporary DB integration test compose — not for production
+# Tests sqlite, postgres, and mariadb backends simultaneously
+# Usage: docker compose -f docker/docker-compose.dbtest.yml up
+# Cleanup: docker compose -f docker/docker-compose.dbtest.yml down -v
+name: caspaste-dbtest
+
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+x-app-base: &app-base
+  image: ghcr.io/casjay-forks/caspaste:latest
+  pull_policy: never
+  restart: "no"
+  logging: *default-logging
+  environment:
+    - TZ=UTC
+    - CASPASTE_DB_CLEANUP_PERIOD=1m
+  healthcheck:
+    test: ["CMD", "caspaste", "--status"]
+    interval: 15s
+    timeout: 12s
+    retries: 6
+    start_period: 30s
+
+services:
+  # ── SQLite (default) ──────────────────────────────────────────────────────
+  app-sqlite:
+    <<: *app-base
+    container_name: caspaste-dbtest-sqlite
+    ports:
+      - "18081:80"
+    environment:
+      - TZ=UTC
+      - PORT=80
+      - CASPASTE_DB_CLEANUP_PERIOD=1m
+      - CASPASTE_DB_DRIVER=sqlite
+    volumes:
+      - sqlite-data:/data
+    networks:
+      - caspaste-dbtest
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: caspaste-dbtest-postgres
+    restart: "no"
+    logging: *default-logging
+    environment:
+      - POSTGRES_USER=caspaste
+      - POSTGRES_PASSWORD=caspaste
+      - POSTGRES_DB=caspaste
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - caspaste-dbtest
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caspaste"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app-postgres:
+    <<: *app-base
+    container_name: caspaste-dbtest-app-postgres
+    ports:
+      - "18082:80"
+    environment:
+      - TZ=UTC
+      - PORT=80
+      - CASPASTE_DB_CLEANUP_PERIOD=1m
+      - CASPASTE_DB_DRIVER=postgres
+      - CASPASTE_DB_SOURCE=postgres://caspaste:caspaste@postgres:5432/caspaste?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - caspaste-dbtest
+
+  # ── MariaDB ───────────────────────────────────────────────────────────────
+  mariadb:
+    image: mariadb:11
+    container_name: caspaste-dbtest-mariadb
+    restart: "no"
+    logging: *default-logging
+    environment:
+      - MARIADB_USER=caspaste
+      - MARIADB_PASSWORD=caspaste
+      - MARIADB_DATABASE=caspaste
+      - MARIADB_ROOT_PASSWORD=rootpassword
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    networks:
+      - caspaste-dbtest
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app-mariadb:
+    <<: *app-base
+    container_name: caspaste-dbtest-app-mariadb
+    ports:
+      - "18083:80"
+    environment:
+      - TZ=UTC
+      - PORT=80
+      - CASPASTE_DB_CLEANUP_PERIOD=1m
+      - CASPASTE_DB_DRIVER=mysql
+      - CASPASTE_DB_SOURCE=mariadb://caspaste:caspaste@mariadb:3306/caspaste
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - caspaste-dbtest
+
+volumes:
+  sqlite-data:
+  postgres-data:
+  mariadb-data:
+
+networks:
+  caspaste-dbtest:
+    name: caspaste-dbtest
+    external: false

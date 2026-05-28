@@ -1446,6 +1446,7 @@ func main() {
 		// Apply env overrides and normalize
 		config.ApplyEnvironmentOverrides(cfg)
 		cfg.Database.Driver = validation.NormalizeDriver(cfg.Database.Driver)
+		cfg.Database.Source = validation.NormalizeConnectionString(cfg.Database.Driver, cfg.Database.Source)
 
 		// Process SQLite path
 		dataDir := *flagDataDir

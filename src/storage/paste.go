@@ -77,7 +77,7 @@ func (db DB) PasteAdd(paste Paste) (string, int64, int64, error) {
 	defer cancel()
 
 	// Add to primary database
-	_, err = db.pool.ExecContext(ctx,
+	_, err = db.execSQL(ctx,
 		`INSERT INTO pastes (id, title, body, syntax, create_time, delete_time, one_use, author, author_email, author_url, is_file, file_name, mime_type, is_editable, is_private, is_url, original_url)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
 		paste.ID, paste.Title, paste.Body, paste.Syntax, paste.CreateTime, paste.DeleteTime, paste.OneUse,
@@ -116,7 +116,7 @@ func (db DB) PasteUpdate(paste Paste) error {
 	defer cancel()
 
 	// Update in primary database
-	result, err := db.pool.ExecContext(ctx,
+	result, err := db.execSQL(ctx,
 		`UPDATE pastes SET title = $2, body = $3, syntax = $4, delete_time = $5, one_use = $6,
 		author = $7, author_email = $8, author_url = $9,
 		is_file = $10, file_name = $11, mime_type = $12, is_editable = $13, is_private = $14, is_url = $15, original_url = $16
@@ -168,7 +168,7 @@ func (db DB) PasteDelete(id string) error {
 	defer cancel()
 
 	// Delete from primary database
-	result, err := db.pool.ExecContext(ctx,
+	result, err := db.execSQL(ctx,
 		`DELETE FROM pastes WHERE id = $1`,
 		id,
 	)
@@ -208,7 +208,7 @@ func (db DB) PasteGet(id string) (Paste, error) {
 	defer cancel()
 
 	// Make query
-	row := db.pool.QueryRowContext(ctx,
+	row := db.queryRowSQL(ctx,
 		`SELECT id, title, body, syntax, create_time, delete_time, one_use, author, author_email, author_url,
 		is_file, file_name, mime_type, is_editable, is_private, is_url, original_url
 		FROM pastes WHERE id = $1`,
@@ -232,7 +232,7 @@ func (db DB) PasteGet(id string) (Paste, error) {
 		// Delete expired paste with timeout
 		delCtx, delCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
 		defer delCancel()
-		_, err = db.pool.ExecContext(delCtx,
+		_, err = db.execSQL(delCtx,
 			`DELETE FROM pastes WHERE id = $1`,
 			paste.ID,
 		)
@@ -253,7 +253,7 @@ func (db DB) PasteDeleteExpired() (int64, error) {
 	defer cancel()
 
 	// Delete from primary database
-	result, err := db.pool.ExecContext(ctx,
+	result, err := db.execSQL(ctx,
 		`DELETE FROM pastes WHERE (delete_time < $1) AND (delete_time > 0)`,
 		time.Now().Unix(),
 	)
@@ -305,11 +305,11 @@ func (db DB) PasteList(limit int, offset int) ([]PasteListItem, error) {
 	defer cancel()
 
 	// Query pastes (exclude expired, one-use, and private pastes)
-	rows, err := db.pool.QueryContext(ctx,
+	rows, err := db.querySQL(ctx,
 		`SELECT id, title, syntax, create_time, delete_time
 		FROM pastes
 		WHERE (delete_time > $1 OR delete_time = 0)
-		AND is_private = false
+		AND is_private = FALSE
 		ORDER BY create_time DESC
 		LIMIT $2 OFFSET $3`,
 		time.Now().Unix(),

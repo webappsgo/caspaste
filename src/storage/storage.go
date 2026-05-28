@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,6 +62,11 @@ func NewPool(driverName string, dataSourceName string, maxOpenConns int, maxIdle
 	if driverName == "postgres" || driverName == "mysql" || driverName == "mariadb" || driverName == "libsql" {
 		// Determine SQLite cache path - check env var first, then use standard path
 		backupPath := getSQLiteCachePath(dataDir)
+
+		// Ensure parent directory exists before opening the SQLite file
+		if dir := backupPath[:strings.LastIndex(backupPath, "/")]; dir != "" {
+			_ = os.MkdirAll(dir, 0o755)
+		}
 
 		db.backupPool, err = sql.Open("sqlite", backupPath)
 		if err != nil {
@@ -138,6 +144,113 @@ func (db DB) Close() error {
 	return db.pool.Close()
 }
 
+// normSQL rewrites a PostgreSQL-style $N query and reorders its args for MySQL/MariaDB.
+// MySQL uses ? placeholders consumed left-to-right; $N args may be in any order.
+// For all other drivers the inputs are returned unchanged.
+func normSQL(driver, query string, args []interface{}) (string, []interface{}) {
+	if driver != "mysql" && driver != "mariadb" {
+		return query, args
+	}
+	var sb strings.Builder
+	var order []int
+	i := 0
+	for i < len(query) {
+		if query[i] == '$' && i+1 < len(query) && query[i+1] >= '1' && query[i+1] <= '9' {
+			j := i + 1
+			for j < len(query) && query[j] >= '0' && query[j] <= '9' {
+				j++
+			}
+			n, _ := strconv.Atoi(query[i+1 : j])
+			order = append(order, n-1)
+			sb.WriteByte('?')
+			i = j
+		} else {
+			sb.WriteByte(query[i])
+			i++
+		}
+	}
+	if len(order) == 0 {
+		return sb.String(), args
+	}
+	reordered := make([]interface{}, len(order))
+	for pos, idx := range order {
+		if idx < len(args) {
+			reordered[pos] = args[idx]
+		}
+	}
+	return sb.String(), reordered
+}
+
+// execSQL wraps ExecContext with $N → ? placeholder normalization for MySQL.
+func (db DB) execSQL(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	q, a := normSQL(db.driver, query, args)
+	return db.pool.ExecContext(ctx, q, a...)
+}
+
+// querySQL wraps QueryContext with $N → ? placeholder normalization for MySQL.
+func (db DB) querySQL(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	q, a := normSQL(db.driver, query, args)
+	return db.pool.QueryContext(ctx, q, a...)
+}
+
+// queryRowSQL wraps QueryRowContext with $N → ? placeholder normalization for MySQL.
+func (db DB) queryRowSQL(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	q, a := normSQL(db.driver, query, args)
+	return db.pool.QueryRowContext(ctx, q, a...)
+}
+
+// sqlFrags holds driver-specific DDL fragments
+type sqlFrags struct {
+	AutoIncPK   string // full "id" column type+constraints
+	NowDefault  string // DEFAULT expression for unix-timestamp columns (with parens)
+	TableSuffix string // appended after closing ) of CREATE TABLE, before ;
+}
+
+// sqlFragsFor returns DDL fragments for the given driver.
+func sqlFragsFor(driver string) sqlFrags {
+	switch driver {
+	case "postgres":
+		return sqlFrags{
+			AutoIncPK:   "SERIAL PRIMARY KEY",
+			NowDefault:  "(EXTRACT(EPOCH FROM NOW())::BIGINT)",
+			TableSuffix: "",
+		}
+	case "mysql", "mariadb":
+		return sqlFrags{
+			AutoIncPK:   "INT AUTO_INCREMENT PRIMARY KEY",
+			NowDefault:  "(UNIX_TIMESTAMP())",
+			TableSuffix: " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+		}
+	default: // sqlite, libsql
+		return sqlFrags{
+			AutoIncPK:   "INTEGER PRIMARY KEY AUTOINCREMENT",
+			NowDefault:  "(strftime('%s', 'now'))",
+			TableSuffix: "",
+		}
+	}
+}
+
+// execCreate runs a CREATE TABLE statement with driver-specific DDL substitutions applied.
+func execCreate(ctx context.Context, pool *sql.DB, stmt string, f sqlFrags) error {
+	stmt = strings.ReplaceAll(stmt, "INTEGER PRIMARY KEY AUTOINCREMENT", f.AutoIncPK)
+	stmt = strings.ReplaceAll(stmt, "(strftime('%s', 'now'))", f.NowDefault)
+	if f.TableSuffix != "" {
+		// MySQL/MariaDB: TEXT columns cannot be used in PRIMARY KEY or UNIQUE indexes
+		// without an explicit key length; map them to VARCHAR(512) which is safe with
+		// utf8mb4 and the modern innodb_large_prefix default (3072-byte limit).
+		stmt = strings.ReplaceAll(stmt, "TEXT    PRIMARY KEY", "VARCHAR(512) PRIMARY KEY")
+		stmt = strings.ReplaceAll(stmt, "TEXT PRIMARY KEY", "VARCHAR(512) PRIMARY KEY")
+		stmt = strings.ReplaceAll(stmt, "TEXT NOT NULL UNIQUE", "VARCHAR(512) NOT NULL UNIQUE")
+		stmt = strings.ReplaceAll(stmt, "TEXT UNIQUE", "VARCHAR(512) UNIQUE")
+		// Insert the engine suffix between the final ) and the trailing ;
+		if idx := strings.LastIndex(stmt, ");"); idx >= 0 {
+			stmt = stmt[:idx] + ")" + f.TableSuffix + ";"
+		}
+	}
+	_, err := pool.ExecContext(ctx, stmt)
+	return err
+}
+
 func InitDB(driverName string, dataSourceName string) error {
 	// Open DB
 	db, err := NewPool(driverName, dataSourceName, 1, 0, "")
@@ -150,8 +263,10 @@ func InitDB(driverName string, dataSourceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), initializationTimeout)
 	defer cancel()
 
+	f := sqlFragsFor(driverName)
+
 	// Create pastes table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS pastes (
 			id          TEXT    PRIMARY KEY,
 			title       TEXT    NOT NULL,
@@ -161,13 +276,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			delete_time INTEGER NOT NULL,
 			one_use     BOOL    NOT NULL
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create admins table (Server Admins - REQUIRED per AI.md PART 11)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS admins (
 			id              INTEGER PRIMARY KEY AUTOINCREMENT,
 			username        TEXT NOT NULL UNIQUE,
@@ -186,13 +301,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			groups          TEXT,
 			last_sync       INTEGER
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create admin_preferences table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS admin_preferences (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			admin_id   INTEGER NOT NULL UNIQUE,
@@ -205,13 +320,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create users table (PART 34: Multi-User)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS users (
 			id              INTEGER PRIMARY KEY AUTOINCREMENT,
 			username        TEXT NOT NULL UNIQUE,
@@ -237,13 +352,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			updated_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create user_sessions table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS user_sessions (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id     INTEGER NOT NULL,
@@ -255,13 +370,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create user_tokens table (API tokens with usr_ prefix)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS user_tokens (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id      INTEGER NOT NULL,
@@ -274,13 +389,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at   INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create recovery_keys table (hashed, single use)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS recovery_keys (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id    INTEGER NOT NULL,
@@ -289,13 +404,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create password_resets table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS password_resets (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id    INTEGER NOT NULL,
@@ -305,13 +420,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create email_verifications table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS email_verifications (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id     INTEGER NOT NULL,
@@ -322,13 +437,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create user_invites table (admin-generated)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS user_invites (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			username   TEXT NOT NULL,
@@ -338,13 +453,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			used_at    INTEGER,
 			created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create user_preferences table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS user_preferences (
 			id               INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id          INTEGER NOT NULL UNIQUE,
@@ -365,13 +480,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			updated_at       INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create orgs table (PART 35: Organizations)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS orgs (
 			id             INTEGER PRIMARY KEY AUTOINCREMENT,
 			slug           TEXT NOT NULL UNIQUE,
@@ -389,13 +504,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			updated_at     INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (owner_id) REFERENCES users(id)
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create org_members table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS org_members (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			org_id     INTEGER NOT NULL,
@@ -406,13 +521,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			FOREIGN KEY (org_id) REFERENCES orgs(id) ON DELETE CASCADE,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create org_tokens table (API tokens with org_ prefix)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS org_tokens (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
 			org_id       INTEGER NOT NULL,
@@ -427,13 +542,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			FOREIGN KEY (org_id) REFERENCES orgs(id) ON DELETE CASCADE,
 			FOREIGN KEY (created_by) REFERENCES users(id)
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create org_preferences table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS org_preferences (
 			id                   INTEGER PRIMARY KEY AUTOINCREMENT,
 			org_id               INTEGER NOT NULL UNIQUE,
@@ -447,13 +562,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			updated_at           INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (org_id) REFERENCES orgs(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create custom_domains table (PART 36: Custom Domains)
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS custom_domains (
 			id                  INTEGER PRIMARY KEY AUTOINCREMENT,
 			owner_type          TEXT NOT NULL,
@@ -481,13 +596,13 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at          INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			updated_at          INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
 
 	// Create custom_domain_audit table
-	_, err = db.pool.ExecContext(ctx, `
+	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS custom_domain_audit (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			domain_id  INTEGER NOT NULL,
@@ -498,7 +613,7 @@ func InitDB(driverName string, dataSourceName string) error {
 			created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (domain_id) REFERENCES custom_domains(id) ON DELETE CASCADE
 		);
-	`)
+	`, f)
 	if err != nil {
 		return err
 	}
@@ -585,24 +700,30 @@ func InitDB(driverName string, dataSourceName string) error {
 		}
 
 	} else {
-		// PostgreSQL: supports IF NOT EXISTS
-		_, err = db.pool.ExecContext(ctx, `
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS author       TEXT NOT NULL DEFAULT '';
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS author_email TEXT NOT NULL DEFAULT '';
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS author_url   TEXT NOT NULL DEFAULT '';
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS is_file      BOOL NOT NULL DEFAULT false;
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS file_name    TEXT NOT NULL DEFAULT '';
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS mime_type    TEXT NOT NULL DEFAULT '';
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS is_editable  BOOL NOT NULL DEFAULT false;
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS is_private   BOOL NOT NULL DEFAULT false;
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS is_url       BOOL NOT NULL DEFAULT false;
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS original_url TEXT NOT NULL DEFAULT '';
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS user_id      INTEGER;
-			ALTER TABLE pastes ADD COLUMN IF NOT EXISTS org_id       INTEGER;
-		`)
-		if err != nil {
-			return err
+		// PostgreSQL: supports IF NOT EXISTS; each statement must be separate
+		pgCols := []columnDef{
+			{"author",       "TEXT NOT NULL DEFAULT ''"},
+			{"author_email", "TEXT NOT NULL DEFAULT ''"},
+			{"author_url",   "TEXT NOT NULL DEFAULT ''"},
+			{"is_file",      "BOOL NOT NULL DEFAULT false"},
+			{"file_name",    "TEXT NOT NULL DEFAULT ''"},
+			{"mime_type",    "TEXT NOT NULL DEFAULT ''"},
+			{"is_editable",  "BOOL NOT NULL DEFAULT false"},
+			{"is_private",   "BOOL NOT NULL DEFAULT false"},
+			{"is_url",       "BOOL NOT NULL DEFAULT false"},
+			{"original_url", "TEXT NOT NULL DEFAULT ''"},
+			{"user_id",      "INTEGER"},
+			{"org_id",       "INTEGER"},
 		}
+		for _, col := range pgCols {
+			_, err = db.pool.ExecContext(ctx,
+				fmt.Sprintf(`ALTER TABLE pastes ADD COLUMN IF NOT EXISTS %s %s`, col.name, col.definition))
+			if err != nil {
+				return err
+			}
+		}
+		_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_pastes_user ON pastes(user_id);`)
+		_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_pastes_org ON pastes(org_id);`)
 	}
 
 	return nil
