@@ -8,6 +8,7 @@ package apiv1
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	chromaLexers "github.com/alecthomas/chroma/v2/lexers"
@@ -131,7 +132,12 @@ func (data *Data) Hand(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleCompat(rw, req)
 
 	default:
-		err = netshare.ErrNotFound
+		// Support path-based paste ID: GET /api/v1/pastes/{id}
+		if strings.HasPrefix(routePath, apiBase+"/pastes/") {
+			err = data.handlePastes(rw, req)
+		} else {
+			err = netshare.ErrNotFound
+		}
 	}
 
 	// Log

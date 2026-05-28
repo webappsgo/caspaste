@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/casjay-forks/caspaste/src/caspasswd"
+	"github.com/casjay-forks/caspaste/src/config"
 	"github.com/casjay-forks/caspaste/src/netshare"
 )
 
@@ -32,9 +33,17 @@ func (data *Data) handlePastes(rw http.ResponseWriter, req *http.Request) error 
 	case "POST":
 		return data.createPaste(rw, req)
 	case "GET":
-		// Check if getting single paste or listing
 		req.ParseForm()
-		if req.Form.Get("id") != "" {
+		id := req.Form.Get("id")
+		// Also accept path-based ID: GET /api/v1/pastes/{id}
+		if id == "" {
+			prefix := config.APIBasePath() + "/pastes/"
+			if after, ok := strings.CutPrefix(req.URL.Path, prefix); ok && after != "" {
+				id = after
+				req.Form.Set("id", id)
+			}
+		}
+		if id != "" {
 			return data.getPaste(rw, req)
 		}
 		return data.listPastes(rw, req)

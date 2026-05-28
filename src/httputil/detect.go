@@ -138,13 +138,16 @@ func GetAPIResponseFormat(r *http.Request) ResponseFormat {
 		return FormatText
 	}
 
-	// 2. Check Accept header
+	// 2. Explicit Accept header wins over client-type heuristics
 	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "application/json") {
+		return FormatJSON
+	}
 	if strings.Contains(accept, "text/plain") {
 		return FormatText
 	}
 
-	// 3. Check if non-interactive client (uses same detection as frontend)
+	// 3. Non-interactive clients (curl, wget, etc.) default to plain text
 	if IsNonInteractiveClient(r) {
 		return FormatText
 	}

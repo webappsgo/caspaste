@@ -8,8 +8,10 @@ package netshare
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -32,15 +34,64 @@ func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem
 		return "", 0, 0, err
 	}
 
-	// Parse form data (both URL-encoded and multipart)
-	// ParseForm handles application/x-www-form-urlencoded
-	err = req.ParseForm()
-	if err != nil {
-		return "", 0, 0, err
+	// Parse request body — supports application/json, multipart/form-data,
+	// and application/x-www-form-urlencoded
+	ct := req.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "application/json") {
+		// Decode JSON body into typed struct then populate req.PostForm so all
+		// downstream validation logic runs unchanged
+		var j struct {
+			Title       string `json:"title"`
+			Body        string `json:"body"`
+			Syntax      string `json:"syntax"`
+			Expiration  int64  `json:"expiration"`
+			OneUse      bool   `json:"oneUse"`
+			Author      string `json:"author"`
+			AuthorEmail string `json:"authorEmail"`
+			AuthorURL   string `json:"authorURL"`
+			Editable    bool   `json:"editable"`
+			Private     bool   `json:"private"`
+			IsURL       bool   `json:"url"`
+			OriginalURL string `json:"originalURL"`
+			LineEnd     string `json:"lineEnd"`
+		}
+		if err = json.NewDecoder(req.Body).Decode(&j); err != nil {
+			return "", 0, 0, ErrBadRequest
+		}
+		v := url.Values{}
+		v.Set("title", j.Title)
+		v.Set("body", j.Body)
+		v.Set("syntax", j.Syntax)
+		v.Set("author", j.Author)
+		v.Set("authorEmail", j.AuthorEmail)
+		v.Set("authorURL", j.AuthorURL)
+		v.Set("originalURL", j.OriginalURL)
+		v.Set("lineEnd", j.LineEnd)
+		if j.Expiration > 0 {
+			v.Set("expiration", strconv.FormatInt(j.Expiration, 10))
+		}
+		if j.OneUse {
+			v.Set("oneUse", "true")
+		}
+		if j.Editable {
+			v.Set("editable", "true")
+		}
+		if j.Private {
+			v.Set("private", "true")
+		}
+		if j.IsURL {
+			v.Set("url", "true")
+		}
+		req.Form = v
+		req.PostForm = v
+	} else {
+		// ParseForm handles application/x-www-form-urlencoded
+		if err = req.ParseForm(); err != nil {
+			return "", 0, 0, err
+		}
+		// ParseMultipartForm handles multipart/form-data; 50 MB max
+		req.ParseMultipartForm(52428800)
 	}
-	// ParseMultipartForm handles multipart/form-data (includes file uploads)
-	// 50MB max - ignores error as it's optional for non-multipart
-	req.ParseMultipartForm(52428800)
 
 	paste := storage.Paste{
 		Title:       req.PostFormValue("title"),
