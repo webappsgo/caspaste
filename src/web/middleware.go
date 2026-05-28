@@ -302,6 +302,7 @@ type AuthUser struct {
 	Email         string
 	DisplayName   string
 	Role          string
+	AvatarURL     string
 	EmailVerified bool
 	TOTPEnabled   bool
 }

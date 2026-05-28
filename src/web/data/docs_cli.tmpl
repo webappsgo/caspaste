@@ -1,0 +1,424 @@
+{{/*
+   This file is part of CasPaste.
+
+   CasPaste is free software released under the MIT License.
+   See LICENSE.md file for details.
+*/}}
+
+{{define "titlePrefix"}}CLI &amp; Shell | {{end}}
+{{define "headAppend"}}<script src="/code.js"></script>{{end}}
+{{define "article"}}
+<h3><a href="/docs">{{call .Translate `docs.Title`}}</a> / CLI &amp; Shell Integration</h3>
+
+<p>Upload pastes from your terminal with <code>curl</code>, pipe any command's output, upload text
+files or binary images, and drop a shell function into your profile so any pipe can end with
+<code>| paste</code>.</p>
+
+<p>All examples use the <code>CASPASTE_URL</code> environment variable. Set it once:</p>
+{{ call .Highlight (printf "# bash / zsh — add to ~/.bashrc or ~/.zshrc\nexport CASPASTE_URL=%s\n\n# fish — add to ~/.config/fish/config.fish\nset -x CASPASTE_URL %s" .ServerURL .ServerURL) "bash" }}
+
+<h4 id="toc">Contents</h4>
+<ul>
+	<li><a href="#quick">Quick one-liners</a></li>
+	<li><a href="#stdin">Pipe from stdin (<code>cat file | curl</code>)</a></li>
+	<li><a href="#files">File &amp; image upload</a></li>
+	<li><a href="#json">JSON body</a></li>
+	<li><a href="#retrieve">Retrieve a paste</a></li>
+	<li><a href="#bash-zsh">Bash / Zsh function</a></li>
+	<li><a href="#fish">Fish function</a></li>
+	<li><a href="#powershell">PowerShell function</a></li>
+	<li><a href="#envvars">Environment variables</a></li>
+</ul>
+
+
+<h4 id="quick">Quick one-liners</h4>
+
+<h5>Paste an inline string</h5>
+{{ call .Highlight `curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=Hello, world!" \
+  -F "syntax=plaintext"` "bash" }}
+
+<h5>Paste a text file (body as field value)</h5>
+{{ call .Highlight `curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=<myfile.txt" \
+  -F "syntax=autodetect" \
+  -F "title=myfile.txt"` "bash" }}
+
+<h5>Upload a binary file / image</h5>
+{{ call .Highlight `curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "file=@screenshot.png"` "bash" }}
+
+<h5>Get just the paste URL — with jq</h5>
+{{ call .Highlight `curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -H "Accept: application/json" \
+  -F "body=Hello" \
+  | jq -r '.data.url'` "bash" }}
+
+<h5>Get just the paste URL — without jq (plain-text response)</h5>
+<p>curl is detected as a non-interactive client; omitting <code>Accept: application/json</code>
+returns a plain-text response that needs no JSON parsing:</p>
+{{ call .Highlight `curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=Hello" \
+  | grep '^url:' | cut -d' ' -f2` "bash" }}
+
+
+<h4 id="stdin">Pipe from stdin</h4>
+
+<p>The key is <code>-F "body=&lt;-"</code>. The <code>&lt;-</code> syntax tells curl to read the
+<em>field value</em> from stdin — not as a file attachment, just as the paste body. Every tool
+that writes to stdout feeds directly into this:</p>
+
+{{ call .Highlight `# Paste any command output
+ls -la | curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=<-" -F "syntax=autodetect" | jq -r '.data.url'
+
+# Paste a log tail
+tail -100 /var/log/syslog | curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=<-" -F "syntax=syslog" | jq -r '.data.url'
+
+# Paste git diff with syntax highlighting
+git diff | curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=<-" -F "syntax=diff" | jq -r '.data.url'
+
+# Paste compiler / test output
+cargo test 2>&1 | curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=<-" -F "syntax=plaintext" | jq -r '.data.url'
+
+# Redirect a file (same as -F "body=<file.txt")
+curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=<-" -F "syntax=autodetect" < myfile.txt | jq -r '.data.url'` "bash" }}
+
+<p><strong>Without jq</strong> — omit <code>Accept: application/json</code> and parse the plain-text reply:</p>
+{{ call .Highlight `git diff | curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "body=<-" -F "syntax=diff" \
+  | grep '^url:' | cut -d' ' -f2` "bash" }}
+
+
+<h4 id="files">File &amp; image upload</h4>
+
+<p>Use <code>-F "file=@path"</code> to upload a file as a binary multipart attachment. Works for
+any file type: text, images, PDFs, archives. The server stores the file binary-safely and returns
+it with the correct MIME type on download.</p>
+
+{{ call .Highlight `# Upload an image
+curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "file=@screenshot.png" | jq -r '.data.url'
+
+# Upload a PDF
+curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "file=@report.pdf" | jq -r '.data.url'
+
+# Upload with a custom title and 1-hour expiry
+curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "file=@diagram.svg" \
+  -F "title=Architecture Diagram" \
+  -F "expiration=3600" | jq -r '.data.url'
+
+# Capture a screenshot and upload in one step (Linux — requires scrot)
+scrot /tmp/snap.png && curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "file=@/tmp/snap.png" | jq -r '.data.url'
+
+# macOS screenshot upload
+screencapture -x /tmp/snap.png && curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -F "file=@/tmp/snap.png" | jq -r '.data.url'` "bash" }}
+
+<p><strong>Difference between <code>file=@path</code> and <code>body=&lt;path</code>:</strong></p>
+<table>
+	<tr>
+		<th>Form field</th>
+		<th>Best for</th>
+		<th>How it is stored</th>
+	</tr>
+	<tr>
+		<td><code>file=@path</code></td>
+		<td>Binary files, images, any file type</td>
+		<td>Binary attachment — served back with original MIME type</td>
+	</tr>
+	<tr>
+		<td><code>body=&lt;path</code></td>
+		<td>Plain-text files only</td>
+		<td>Raw text — syntax-highlighted when viewed in the browser</td>
+	</tr>
+</table>
+
+
+<h4 id="json">JSON body</h4>
+
+<p>Send <code>Content-Type: application/json</code> to POST a JSON object instead of form fields.
+Pair with <code>Accept: application/json</code> to receive a JSON response.</p>
+
+{{ call .Highlight `# Simple JSON paste
+curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"title":"My paste","body":"Hello, world!","syntax":"plaintext"}' \
+  | jq -r '.data.url'
+
+# Pipe stdin through jq to build the JSON payload (handles escaping automatically)
+cat myfile.py | jq -Rs '{"body":.,"syntax":"python","title":"script.py"}' \
+  | curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+       -H "Content-Type: application/json" \
+       -H "Accept: application/json" \
+       --data-binary @- \
+  | jq -r '.data.url'
+
+# Burn-after-reading paste (deleted on first view)
+curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"body":"secret token","oneUse":true,"expiration":600}' \
+  | jq -r '.data.url'
+
+# Private paste with author metadata
+curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"body":"private content","private":true,"author":"Alice","authorURL":"https://alice.example.com"}' \
+  | jq -r '.data.url'` "bash" }}
+
+<p>See <a href="/docs/apiv1#create">API v1 reference</a> for the full list of JSON fields.</p>
+
+
+<h4 id="retrieve">Retrieve a paste</h4>
+
+{{ call .Highlight `# Get by ID — query param
+curl -sS "$CASPASTE_URL/api/v1/pastes?id=XcmX9ON1" | jq -r '.data.body'
+
+# Get by ID — path style (equivalent)
+curl -sS "$CASPASTE_URL/api/v1/pastes/XcmX9ON1" | jq -r '.data.body'
+
+# Raw body as plain text (no JSON wrapping)
+curl -sS "$CASPASTE_URL/XcmX9ON1/raw"
+
+# Download a file paste with its original filename
+curl -sS -OJ "$CASPASTE_URL/XcmX9ON1/raw"
+
+# List recent pastes
+curl -sS "$CASPASTE_URL/api/v1/pastes" | jq '.[].id'` "bash" }}
+
+
+<h4 id="bash-zsh">Bash / Zsh function</h4>
+
+<p>Add to <code>~/.bashrc</code>, <code>~/.zshrc</code>, or <code>~/.bash_profile</code>.
+After sourcing, any pipe can end with <code>| paste</code>.</p>
+
+{{ call .Highlight `# ── CasPaste shell function ─────────────────────────────────
+paste() {
+  local url="${CASPASTE_URL:-https://your-server}"
+  local syntax="${CASPASTE_SYNTAX:-autodetect}"
+  local title="${CASPASTE_TITLE:-}"
+  local result
+
+  if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    printf 'Usage:\n'
+    printf '  paste [file]        Upload a file (text or binary)\n'
+    printf '  paste "text"        Paste an inline string\n'
+    printf '  cat file | paste    Paste from stdin\n'
+    printf '  cmd  | paste        Paste command output\n'
+    printf '\nEnvironment variables:\n'
+    printf '  CASPASTE_URL     Server base URL (required)\n'
+    printf '  CASPASTE_SYNTAX  Syntax hint, default: autodetect\n'
+    printf '  CASPASTE_TITLE   Default title\n'
+    return 0
+  fi
+
+  if [ -n "${1:-}" ] && [ -f "$1" ]; then
+    # File argument — binary-safe multipart upload
+    result=$(curl -sS -X POST "$url/api/v1/pastes" \
+      -H "Accept: application/json" \
+      -F "file=@$1" \
+      -F "syntax=$syntax" \
+      ${title:+-F "title=$title"})
+  elif [ -n "${1:-}" ]; then
+    # Inline text argument
+    result=$(curl -sS -X POST "$url/api/v1/pastes" \
+      -H "Accept: application/json" \
+      -F "body=$1" \
+      -F "syntax=$syntax" \
+      ${title:+-F "title=$title"})
+  else
+    # Stdin — works with pipes and redirects
+    result=$(curl -sS -X POST "$url/api/v1/pastes" \
+      -H "Accept: application/json" \
+      -F "body=<-" \
+      -F "syntax=$syntax" \
+      ${title:+-F "title=$title"})
+  fi
+
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "$result" | jq -r '.data.url // .error // "upload failed"'
+  else
+    printf '%s\n' "$result" | grep -o '"url":"[^"]*"' | cut -d'"' -f4
+  fi
+}
+# ─────────────────────────────────────────────────────────────` "bash" }}
+
+<h5>Usage examples</h5>
+{{ call .Highlight `# Set your server
+export CASPASTE_URL=https://your-server
+
+# Pipe command output
+git diff | paste
+ls -la | paste
+cat /var/log/syslog | paste
+
+# Upload a file
+paste myfile.py
+paste screenshot.png
+
+# Inline text
+paste "quick note"
+
+# Override syntax or title inline
+CASPASTE_SYNTAX=go paste main.go
+CASPASTE_TITLE="Today's log" paste < app.log` "bash" }}
+
+
+<h4 id="fish">Fish function</h4>
+
+<p>Save as <code>~/.config/fish/functions/paste.fish</code> — fish auto-loads it.</p>
+
+{{ call .Highlight `# ~/.config/fish/functions/paste.fish
+function paste --description "Upload to CasPaste"
+    set -q CASPASTE_URL;    or set -l CASPASTE_URL    "https://your-server"
+    set -q CASPASTE_SYNTAX; or set -l CASPASTE_SYNTAX "autodetect"
+    set -q CASPASTE_TITLE;  or set -l CASPASTE_TITLE  ""
+
+    set -l result
+
+    if test (count $argv) -gt 0; and test -f $argv[1]
+        # File argument — binary-safe multipart upload
+        set result (curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+          -H "Accept: application/json" \
+          -F "file=@$argv[1]" \
+          -F "syntax=$CASPASTE_SYNTAX")
+    else if test (count $argv) -gt 0
+        # Inline text argument
+        set result (curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+          -H "Accept: application/json" \
+          -F "body=$argv[1]" \
+          -F "syntax=$CASPASTE_SYNTAX")
+    else
+        # Stdin — works with pipes
+        set result (curl -sS -X POST "$CASPASTE_URL/api/v1/pastes" \
+          -H "Accept: application/json" \
+          -F "body=<-" \
+          -F "syntax=$CASPASTE_SYNTAX")
+    end
+
+    if command -q jq
+        echo $result | jq -r '.data.url // .error // "upload failed"'
+    else
+        echo $result | string match -rg '"url":"([^"]+)"'
+    end
+end` "bash" }}
+
+<h5>Usage examples</h5>
+{{ call .Highlight `# Set your server (add to ~/.config/fish/config.fish)
+set -x CASPASTE_URL https://your-server
+
+# Pipe command output
+git diff | paste
+cat /var/log/syslog | paste
+
+# Upload a file
+paste myfile.go
+paste screenshot.png
+
+# Inline text
+paste "quick note"
+
+# Override syntax
+set -x CASPASTE_SYNTAX python; paste script.py; set -e CASPASTE_SYNTAX` "bash" }}
+
+
+<h4 id="powershell">PowerShell function</h4>
+
+<p>Add to your <code>$PROFILE</code> (<code>Microsoft.PowerShell_profile.ps1</code>).
+Supports pipeline input, file upload, and inline text.</p>
+
+{{ call .Highlight `# ── CasPaste PowerShell function ─────────────────────────────
+function Paste {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string]$File,
+
+        [string]$Syntax = ($env:CASPASTE_SYNTAX ?? "autodetect"),
+        [string]$Title  = ($env:CASPASTE_TITLE  ?? ""),
+        [string]$Url    = ($env:CASPASTE_URL     ?? "https://your-server")
+    )
+    begin   { $lines = [System.Collections.Generic.List[string]]::new() }
+    process { if ($null -ne $_) { $lines.Add([string]$_) } }
+    end {
+        $nl      = [char]10
+        $headers = @{ Accept = "application/json" }
+
+        if ($File) {
+            # Binary-safe file upload
+            $form = @{ file = Get-Item $File; syntax = $Syntax }
+            if ($Title) { $form.title = $Title }
+        } elseif ($lines.Count -gt 0) {
+            # Pipeline or inline text
+            $form = @{ body = ($lines -join $nl); syntax = $Syntax }
+            if ($Title) { $form.title = $Title }
+        } else {
+            Write-Error "Provide -File or pipe text to Paste"
+            return
+        }
+
+        $callArgs = @{
+            Uri     = "$Url/api/v1/pastes"
+            Method  = "POST"
+            Form    = $form
+            Headers = $headers
+        }
+        (Invoke-RestMethod @callArgs).data.url
+    }
+}
+# ──────────────────────────────────────────────────────────────` "powershell" }}
+
+<h5>Usage examples</h5>
+{{ call .Highlight `# Set your server (add to $PROFILE)
+$env:CASPASTE_URL = "https://your-server"
+
+# Pipe command output
+git diff | Paste
+Get-Content app.log | Paste
+
+# Upload a file (text or binary)
+Paste -File screenshot.png
+Paste -File report.pdf -Title "Monthly Report"
+
+# Inline text
+"quick note" | Paste
+
+# Override syntax
+Paste -File main.go -Syntax go` "powershell" }}
+
+
+<h4 id="envvars">Environment variables</h4>
+
+<table>
+	<tr>
+		<th>Variable</th>
+		<th>Default</th>
+		<th>Description</th>
+	</tr>
+	<tr>
+		<td><code>CASPASTE_URL</code></td>
+		<td><em>(required)</em></td>
+		<td>Base URL of your CasPaste server, e.g. <code>{{.ServerURL}}</code></td>
+	</tr>
+	<tr>
+		<td><code>CASPASTE_SYNTAX</code></td>
+		<td><code>autodetect</code></td>
+		<td>Default syntax for text pastes. Any value from <a href="/api/v1/server/info"><code>/api/v1/server/info</code></a> <code>syntaxes</code> list, or <code>autodetect</code>.</td>
+	</tr>
+	<tr>
+		<td><code>CASPASTE_TITLE</code></td>
+		<td><em>empty</em></td>
+		<td>Default title applied to every paste created by the shell function.</td>
+	</tr>
+</table>
+{{end}}

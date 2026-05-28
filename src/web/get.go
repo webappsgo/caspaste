@@ -147,6 +147,7 @@ type pasteTmpl struct {
 	// Using template.URL to mark as safe for embedding
 	MediaDataURL template.URL
 
+	User      *AuthUser
 	Language  string
 	Theme     func(string) string
 	Translate func(string, ...interface{}) template.HTML
@@ -154,6 +155,7 @@ type pasteTmpl struct {
 
 type pasteContinueTmpl struct {
 	ID        string
+	User      *AuthUser
 	Language  string
 	Theme     func(string) string
 	Translate func(string, ...interface{}) template.HTML
@@ -185,6 +187,7 @@ func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) erro
 		if req.PostForm.Get("oneUseContinue") != "true" {
 			tmplData := pasteContinueTmpl{
 				ID:        paste.ID,
+				User:      GetAuthUser(req.Context()),
 				Language:  getCookie(req, "lang"),
 				Theme:     data.getThemeFunc(req),
 				Translate: data.Locales.findLocale(req).translate,
@@ -306,6 +309,7 @@ func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) erro
 		IsMarkdown:   isMarkdown,
 		MediaDataURL: mediaDataURL,
 
+		User:      GetAuthUser(req.Context()),
 		Language:  getCookie(req, "lang"),
 		Theme:     data.getThemeFunc(req),
 		Translate: data.Locales.findLocale(req).translate,

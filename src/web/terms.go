@@ -13,6 +13,7 @@ import (
 
 type termsOfUseTmpl struct {
 	TermsOfUse string
+	User       *AuthUser
 
 	Language  string
 	Theme     func(string) string
@@ -25,6 +26,7 @@ func (data *Data) handleTermsOfUse(rw http.ResponseWriter, req *http.Request) er
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.TermsOfUse.Execute(rw, termsOfUseTmpl{
 		TermsOfUse: data.ServerTermsOfUse,
+		User:       GetAuthUser(req.Context()),
 		Language:   getCookie(req, "lang"),
 		Theme:      data.getThemeFunc(req),
 		Highlight:  data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,

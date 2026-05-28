@@ -20,6 +20,7 @@ type errorTmpl struct {
 	Code      int
 	AdminName string
 	AdminMail string
+	User      *AuthUser
 	// Language for base template
 	Language string
 	// Theme function to get theme values
@@ -52,6 +53,7 @@ func (data *Data) writeError(rw http.ResponseWriter, req *http.Request, e error)
 		Code:      0,
 		AdminName: data.AdminName,
 		AdminMail: data.AdminMail,
+		User:      GetAuthUser(req.Context()),
 		// Get language from cookie
 		Language: getCookie(req, "lang"),
 		// Theme lookup function

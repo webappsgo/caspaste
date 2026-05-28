@@ -14,6 +14,7 @@ import (
 )
 
 type createTmpl struct {
+	User              *AuthUser
 	Language          string
 	Theme             func(string) string
 	TitleMaxLen       int
@@ -62,6 +63,7 @@ func (data *Data) handleNewPaste(rw http.ResponseWriter, req *http.Request) erro
 
 	// Else show create page
 	tmplData := createTmpl{
+		User:               GetAuthUser(req.Context()),
 		Language:           getCookie(req, "lang"),
 		Theme:              themeLookup,
 		TitleMaxLen:        data.TitleMaxLen,

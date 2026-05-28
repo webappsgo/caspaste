@@ -23,6 +23,7 @@ type aboutTmpl struct {
 
 	AdminName string
 	AdminMail string
+	User      *AuthUser
 
 	Language  string
 	Theme     func(string) string
@@ -32,6 +33,7 @@ type aboutTmpl struct {
 }
 
 type aboutMinTmp struct {
+	User      *AuthUser
 	Language  string
 	Theme     func(string) string
 	Translate func(string, ...interface{}) template.HTML
@@ -49,6 +51,7 @@ func (data *Data) handleAbout(rw http.ResponseWriter, req *http.Request) error {
 		ServerTermsExist: data.ServerTermsExist,
 		AdminName:        data.AdminName,
 		AdminMail:        data.AdminMail,
+		User:             GetAuthUser(req.Context()),
 		Language:         getCookie(req, "lang"),
 		Theme:            data.getThemeFunc(req),
 		Highlight:        data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
@@ -63,6 +66,7 @@ func (data *Data) handleAbout(rw http.ResponseWriter, req *http.Request) error {
 func (data *Data) handleAuthors(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.Authors.Execute(rw, aboutMinTmp{
+		User:      GetAuthUser(req.Context()),
 		Language:  getCookie(req, "lang"),
 		Theme:     data.getThemeFunc(req),
 		Translate: data.Locales.findLocale(req).translate,
@@ -73,6 +77,7 @@ func (data *Data) handleAuthors(rw http.ResponseWriter, req *http.Request) error
 func (data *Data) handleLicense(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.License.Execute(rw, aboutMinTmp{
+		User:      GetAuthUser(req.Context()),
 		Language:  getCookie(req, "lang"),
 		Theme:     data.getThemeFunc(req),
 		Translate: data.Locales.findLocale(req).translate,
@@ -83,6 +88,7 @@ func (data *Data) handleLicense(rw http.ResponseWriter, req *http.Request) error
 func (data *Data) handleSourceCodePage(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.SourceCodePage.Execute(rw, aboutMinTmp{
+		User:      GetAuthUser(req.Context()),
 		Language:  getCookie(req, "lang"),
 		Theme:     data.getThemeFunc(req),
 		Translate: data.Locales.findLocale(req).translate,
@@ -93,6 +99,7 @@ func (data *Data) handleSourceCodePage(rw http.ResponseWriter, req *http.Request
 func (data *Data) handleSecurityPolicy(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.SecurityPolicy.Execute(rw, aboutMinTmp{
+		User:      GetAuthUser(req.Context()),
 		Language:  getCookie(req, "lang"),
 		Theme:     data.getThemeFunc(req),
 		Translate: data.Locales.findLocale(req).translate,

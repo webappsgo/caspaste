@@ -74,6 +74,7 @@ NextOffset int
 PrevOffset int
 HasNext    bool
 HasPrev    bool
+User       *AuthUser
 Language   string
 Theme      func(string) string
 Translate  func(string, ...interface{}) template.HTML
@@ -85,6 +86,7 @@ NextOffset: offset + limit,
 PrevOffset: offset - limit,
 HasNext:    len(pastes) == limit,
 HasPrev:    offset > 0,
+User:       GetAuthUser(req.Context()),
 Language:   getCookie(req, "lang"),
 Theme:      themeLookup,
 Translate:  data.Locales.findLocale(req).translate,

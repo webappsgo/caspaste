@@ -28,6 +28,7 @@ type settingsTmpl struct {
 	AuthorURL       string
 
 	AuthOk bool
+	User   *AuthUser
 
 	Language  string
 	Theme     func(string) string
@@ -82,6 +83,7 @@ func (data *Data) handleSettings(rw http.ResponseWriter, req *http.Request) erro
 			AuthorEmail:      getCookie(req, "authorEmail"),
 			AuthorURL:        getCookie(req, "authorURL"),
 			AuthOk:           isAuthenticated,
+			User:             GetAuthUser(req.Context()),
 			Language:         getCookie(req, "lang"),
 			Theme:            themeLookup,
 			Translate:        data.Locales.findLocale(req).translate,

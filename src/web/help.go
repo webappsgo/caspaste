@@ -19,6 +19,7 @@ type embHelpTmpl struct {
 
 	Protocol string
 	Host     string
+	User     *AuthUser
 
 	Language  string
 	Theme     func(string) string
@@ -50,6 +51,7 @@ func (data *Data) handleEmbeddedHelp(rw http.ResponseWriter, req *http.Request) 
 		OneUse:     paste.OneUse,
 		Protocol:   netshare.GetProtocol(req),
 		Host:       netshare.GetHost(req),
+		User:       GetAuthUser(req.Context()),
 		Language:   getCookie(req, "lang"),
 		Theme:      data.getThemeFunc(req),
 		Translate:  data.Locales.findLocale(req).translate,

@@ -40,6 +40,7 @@ func init() {
 }
 
 type loginTmpl struct {
+	User      *AuthUser
 	Language  string
 	Theme     func(string) string
 	Translate func(string, ...interface{}) template.HTML
@@ -161,6 +162,7 @@ func (data *Data) handleLoginPage(rw http.ResponseWriter, req *http.Request) err
 	}
 
 	tmplData := loginTmpl{
+		User:      GetAuthUser(req.Context()),
 		Language:  getCookie(req, "lang"),
 		Theme:     data.getThemeFunc(req),
 		Translate: data.Locales.findLocale(req).translate,
@@ -247,6 +249,7 @@ func (data *Data) handleLoginSubmit(rw http.ResponseWriter, req *http.Request) e
 // handleLoginError shows the login page with error
 func (data *Data) handleLoginError(rw http.ResponseWriter, req *http.Request, redirect string) error {
 	tmplData := loginTmpl{
+		User:      GetAuthUser(req.Context()),
 		Language:  getCookie(req, "lang"),
 		Theme:     data.getThemeFunc(req),
 		Translate: data.Locales.findLocale(req).translate,

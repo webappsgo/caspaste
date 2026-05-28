@@ -60,10 +60,11 @@ type Data struct {
 	SourceCodePage *template.Template
 	SecurityPolicy *template.Template
 
-	Docs           *template.Template
-	DocsApiV1      *template.Template
-	DocsLibraries  *template.Template
-	DocsCustomize  *template.Template
+	Docs            *template.Template
+	DocsApiV1       *template.Template
+	DocsLibraries   *template.Template
+	DocsCustomize   *template.Template
+	DocsCliExamples *template.Template
 
 	EmbeddedPage     *template.Template
 	EmbeddedHelpPage *template.Template
@@ -334,6 +335,12 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 		return nil, err
 	}
 
+	// docs_cli.tmpl
+	data.DocsCliExamples, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/docs_cli.tmpl")
+	if err != nil {
+		return nil, err
+	}
+
 	// error.tmpl
 	data.ErrorPage, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/error.tmpl")
 	if err != nil {
@@ -453,6 +460,8 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		http.Redirect(rw, req, "/docs/libraries", http.StatusMovedPermanently)
 	case "/docs/customize":
 		err = data.handleDocsCustomize(rw, req)
+	case "/docs/cli":
+		err = data.handleDocsCliExamples(rw, req)
 	// Auth
 	case "/login":
 		if req.Method == "POST" {

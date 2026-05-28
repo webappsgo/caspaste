@@ -17,12 +17,14 @@
 
 <h4 id="table-of-content">{{call .Translate `docsAPIv1.TableOfContent`}}</h4>
 <ul>
-	<li><a href="#create">POST <code>/api/v1/pastes</code></a> - Create paste</li>
-	<li><a href="#get">GET <code>/api/v1/pastes?id=X</code></a> - Get single paste</li>
+	<li><a href="#create">POST <code>/api/v1/pastes</code></a> - Create paste (form, JSON, or file upload)</li>
+	<li><a href="#get">GET <code>/api/v1/pastes/{id}</code></a> - Get single paste</li>
 	<li><a href="#list">GET <code>/api/v1/pastes</code></a> - List pastes</li>
 	<li><a href="#server-info">GET <code>/api/v1/server/info</code></a> - Server info</li>
 	<li><a href="#errors">{{call .Translate `docsAPIv1.PossibleAPIErrors`}}</a></li>
 </ul>
+<p>For curl one-liners, piping stdin, and ready-to-use shell functions see
+<a href="/docs/cli">CLI &amp; Shell Integration</a>.</p>
 
 
 <h4 id="create">POST <code>/api/v1/pastes</code></h4>
@@ -87,7 +89,16 @@
 		<td></td>
 		<td>{{call .Translate `docsAPIv1.ReqNewAuthorURL` .MaxLenAuthorAll}}</td>
 	</tr>
+	<tr>
+		<td><code>file</code></td>
+		<td></td>
+		<td></td>
+		<td>Binary file upload (<code>multipart/form-data</code> only). When present, <code>body</code> is ignored. The file is stored binary-safely and served back with its original MIME type.</td>
+	</tr>
 </table>
+<p><strong>Content-Type support:</strong> <code>application/x-www-form-urlencoded</code>,
+<code>multipart/form-data</code> (required for <code>file</code> uploads), and
+<code>application/json</code> (all fields except <code>file</code>).</p>
 <p>{{call .Translate `docsAPIv1.ResponseExample`}}</p>
 {{ call .Highlight `{
 	"id": "XcmX9ON1",
@@ -99,43 +110,63 @@
 <details>
 	<summary><strong>Code Examples</strong></summary>
 
-	<h5>cURL</h5>
-	{{ call .Highlight `curl -X POST https://paste.example.com/api/v1/pastes \
-  -d "title=My Paste" \
-  -d "body=Hello World" \
-  -d "syntax=autodetect" \
-  -d "expiration=3600"` `bash`}}
+	<h5>cURL — form data</h5>
+	{{ call .Highlight (printf `curl -sS -X POST %s/api/v1/pastes \
+  -H "Accept: application/json" \
+  -F "title=My Paste" \
+  -F "body=Hello World" \
+  -F "syntax=autodetect" \
+  -F "expiration=3600" \
+  | jq -r '.data.url'` .ServerURL) "bash" }}
+
+	<h5>cURL — JSON body</h5>
+	{{ call .Highlight (printf `curl -sS -X POST %s/api/v1/pastes \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"title":"My Paste","body":"Hello World","syntax":"autodetect","expiration":3600}' \
+  | jq -r '.data.url'` .ServerURL) "bash" }}
+
+	<h5>cURL — file upload</h5>
+	{{ call .Highlight (printf `curl -sS -X POST %s/api/v1/pastes \
+  -F "file=@screenshot.png" \
+  | jq -r '.data.url'` .ServerURL) "bash" }}
 
 	<h5>Node.js</h5>
-	{{ call .Highlight `const response = await fetch('https://paste.example.com/api/v1/pastes', {
+	{{ call .Highlight (printf `const response = await fetch('%s/api/v1/pastes', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: new URLSearchParams({
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+  body: JSON.stringify({
     title: 'My Paste',
     body: 'Hello World',
     syntax: 'autodetect',
-    expiration: '3600'
-  })
+    expiration: 3600,
+  }),
 });
-const data = await response.json();
-console.log('Paste URL:', data.url);` `javascript`}}
+const { data } = await response.json();
+console.log('Paste URL:', data.url);` .ServerURL) "javascript" }}
 
 	<h5>Python</h5>
-	{{ call .Highlight `import requests
+	{{ call .Highlight (printf `import requests
 
-response = requests.post('https://paste.example.com/api/v1/pastes', data={
+r = requests.post('%s/api/v1/pastes', json={
     'title': 'My Paste',
     'body': 'Hello World',
     'syntax': 'autodetect',
-    'expiration': '3600'
+    'expiration': 3600,
 })
-data = response.json()
-print('Paste URL:', data['url'])` `python`}}
+print('Paste URL:', r.json()['data']['url'])` .ServerURL) "python" }}
 </details>
 
 
-<h4 id="get">GET <code>/api/v1/pastes?id=X</code></h4>
-<p>Get a single paste by ID.</p>
+<h4 id="get">GET <code>/api/v1/pastes/{id}</code></h4>
+<p>Get a single paste by ID. Two equivalent forms are accepted:</p>
+<ul>
+	<li>Query parameter: <code>GET /api/v1/pastes?id={id}</code></li>
+	<li>Path segment: <code>GET /api/v1/pastes/{id}</code></li>
+</ul>
 <p>{{call .Translate `docsAPIv1.RequestParameters`}}</p>
 <table>
 	<th>{{call .Translate `docsAPIv1.Field`}}</th>
@@ -167,20 +198,22 @@ print('Paste URL:', data['url'])` `python`}}
 <details>
 	<summary><strong>Code Examples</strong></summary>
 
-	<h5>cURL</h5>
-	{{ call .Highlight `curl https://paste.example.com/api/v1/pastes?id=XcmX9ON1` `bash`}}
+	<h5>cURL — query param</h5>
+	{{ call .Highlight (printf "curl -sS %s/api/v1/pastes?id=XcmX9ON1 | jq -r '.data.body'" .ServerURL) "bash" }}
+
+	<h5>cURL — path style (equivalent)</h5>
+	{{ call .Highlight (printf "curl -sS %s/api/v1/pastes/XcmX9ON1 | jq -r '.data.body'" .ServerURL) "bash" }}
 
 	<h5>Node.js</h5>
-	{{ call .Highlight `const response = await fetch('https://paste.example.com/api/v1/pastes?id=XcmX9ON1');
-const data = await response.json();
-console.log('Body:', data.body);` `javascript`}}
+	{{ call .Highlight (printf `const response = await fetch('%s/api/v1/pastes/XcmX9ON1');
+const { data } = await response.json();
+console.log('Body:', data.body);` .ServerURL) "javascript" }}
 
 	<h5>Python</h5>
-	{{ call .Highlight `import requests
+	{{ call .Highlight (printf `import requests
 
-response = requests.get('https://paste.example.com/api/v1/pastes', params={'id': 'XcmX9ON1'})
-data = response.json()
-print('Body:', data['body'])` `python`}}
+r = requests.get('%s/api/v1/pastes/XcmX9ON1')
+print('Body:', r.json()['data']['body'])` .ServerURL) "python" }}
 </details>
 
 
@@ -227,21 +260,20 @@ print('Body:', data['body'])` `python`}}
 	<summary><strong>Code Examples</strong></summary>
 
 	<h5>cURL</h5>
-	{{ call .Highlight `curl https://paste.example.com/api/v1/pastes` `bash`}}
-	{{ call .Highlight `curl https://paste.example.com/api/v1/pastes?limit=10&offset=20` `bash`}}
+	{{ call .Highlight (printf "curl -sS %s/api/v1/pastes | jq '.[].id'" .ServerURL) "bash" }}
+	{{ call .Highlight (printf "curl -sS \"%s/api/v1/pastes?limit=10&offset=20\" | jq '.[].id'" .ServerURL) "bash" }}
 
 	<h5>Node.js</h5>
-	{{ call .Highlight `const response = await fetch('https://paste.example.com/api/v1/pastes');
+	{{ call .Highlight (printf `const response = await fetch('%s/api/v1/pastes');
 const pastes = await response.json();
-pastes.forEach(p => console.log(p.id, p.title));` `javascript`}}
+pastes.forEach(p => console.log(p.id, p.title));` .ServerURL) "javascript" }}
 
 	<h5>Python</h5>
-	{{ call .Highlight `import requests
+	{{ call .Highlight (printf `import requests
 
-response = requests.get('https://paste.example.com/api/v1/pastes')
-pastes = response.json()
+pastes = requests.get('%s/api/v1/pastes').json()
 for p in pastes:
-    print(p['id'], p['title'])` `python`}}
+    print(p['id'], p['title'])` .ServerURL) "python" }}
 </details>
 
 
@@ -282,21 +314,20 @@ for p in pastes:
 	<summary><strong>Code Examples</strong></summary>
 
 	<h5>cURL</h5>
-	{{ call .Highlight `curl https://paste.example.com/api/v1/server/info` `bash`}}
+	{{ call .Highlight (printf "curl -sS %s/api/v1/server/info | jq '{software,version,bodyMaxlength}'" .ServerURL) "bash" }}
 
 	<h5>Node.js</h5>
-	{{ call .Highlight `const response = await fetch('https://paste.example.com/api/v1/server/info');
+	{{ call .Highlight (printf `const response = await fetch('%s/api/v1/server/info');
 const info = await response.json();
 console.log('Server:', info.software, info.version);
-console.log('Max paste lifetime:', info.maxLifeTime);` `javascript`}}
+console.log('Max paste lifetime:', info.maxLifeTime);` .ServerURL) "javascript" }}
 
 	<h5>Python</h5>
-	{{ call .Highlight `import requests
+	{{ call .Highlight (printf `import requests
 
-response = requests.get('https://paste.example.com/api/v1/server/info')
-info = response.json()
+info = requests.get('%s/api/v1/server/info').json()
 print(f"Server: {info['software']} {info['version']}")
-print(f"Available syntaxes: {len(info['syntaxes'])}")` `python`}}
+print(f"Available syntaxes: {len(info['syntaxes'])}")` .ServerURL) "python" }}
 </details>
 
 
