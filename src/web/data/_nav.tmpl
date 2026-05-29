@@ -93,15 +93,16 @@
 						</div>
 						<div class="dropdown-divider" role="separator"></div>
 						<a href="/server/help" class="dropdown-item" role="menuitem">{{ call .Translate `profile.Help` }}</a>
-						<form action="/auth/logout" method="POST" class="logout-form">
-							<input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+						<form action="/server/auth/logout" method="POST" class="logout-form">
+							<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 							<button type="submit" class="dropdown-item logout" role="menuitem">{{ call .Translate `profile.SignOut` }}</button>
 						</form>
 					</div>
 				</div>
 				{{else}}
 				{{/* Login/Register links for unauthenticated users */}}
-				<a href="/auth/login" class="nav-button">{{ call .Translate `auth.Login` }}</a>
+				<a href="/server/auth/login" class="nav-button">{{ call .Translate `auth.Login` }}</a>
+				{{if .ShowRegister}}<a href="/server/auth/register" class="nav-button">{{ call .Translate `auth.Register` }}</a>{{end}}
 				{{end}}
 			</div>
 		</nav>

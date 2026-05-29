@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -40,14 +39,18 @@ func init() {
 }
 
 type loginTmpl struct {
-	User      *AuthUser
-	Language  string
-	Theme     func(string) string
-	Translate func(string, ...interface{}) template.HTML
-	Error     bool
-	Redirect  string
+	User     *AuthUser
+	Language string
+	Theme    func(string) string
+	Error    bool
+	Redirect string
 	// CSRF token for form protection per AI.md PART 11
-	CSRFToken string
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
+	Translate func(string, ...interface{}) template.HTML
 }
 
 // generateSessionToken creates a signed session token
@@ -162,13 +165,16 @@ func (data *Data) handleLoginPage(rw http.ResponseWriter, req *http.Request) err
 	}
 
 	tmplData := loginTmpl{
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
-		Error:     false,
-		Redirect:  redirect,
-		CSRFToken: GetCSRFToken(req, 32),
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		Error:         false,
+		Redirect:      redirect,
+		CSRFToken:     GetCSRFToken(req, 32),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	}
 
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -249,13 +255,16 @@ func (data *Data) handleLoginSubmit(rw http.ResponseWriter, req *http.Request) e
 // handleLoginError shows the login page with error
 func (data *Data) handleLoginError(rw http.ResponseWriter, req *http.Request, redirect string) error {
 	tmplData := loginTmpl{
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
-		Error:     true,
-		Redirect:  redirect,
-		CSRFToken: GetCSRFToken(req, 32),
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		Error:         true,
+		Redirect:      redirect,
+		CSRFToken:     GetCSRFToken(req, 32),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	}
 
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -304,7 +313,7 @@ func (data *Data) requireAuth(rw http.ResponseWriter, req *http.Request) bool {
 	if req.URL.RawQuery != "" {
 		redirect += "?" + req.URL.RawQuery
 	}
-	writeRedirect(rw, req, "/login?redirect="+redirect, 302)
+	writeRedirect(rw, req, "/server/auth/login?redirect="+redirect, 302)
 	return false
 }
 
@@ -314,6 +323,9 @@ func IsPublicPath(path string) bool {
 	publicPaths := []string{
 		"/login",
 		"/logout",
+		"/server/auth/login",
+		"/server/auth/logout",
+		"/server/auth/register",
 		"/healthz",
 		"/style.css",
 		"/main.js",

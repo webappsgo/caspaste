@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -110,6 +109,10 @@ type Data struct {
 
 	UiDefaultLifeTime string
 	UiDefaultTheme    string
+
+	// ShowRegister controls whether the register link appears in the nav.
+	// True when multi-user is enabled and registration mode is open or public.
+	ShowRegister bool
 }
 
 // LoadContentWithOverride loads content from embedded FS or overrides from file
@@ -155,6 +158,8 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.UiDefaultLifeTime = cfg.UiDefaultLifetime
 	data.UiDefaultTheme = cfg.UiDefaultTheme
 	data.Public = cfg.Public
+	// Show register link when multi-user is enabled and registration is open
+	data.ShowRegister = cfg.Users.Enabled && (cfg.Users.Registration.Mode == "open" || cfg.Users.Registration.Mode == "public")
 	data.CasPasswdFile = cfg.CasPasswdFile
 
 	// Initialize brute force protection for login
@@ -462,15 +467,22 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleDocsCustomize(rw, req)
 	case "/docs/cli":
 		err = data.handleDocsCliExamples(rw, req)
-	// Auth
-	case "/login":
+	// Canonical auth routes per AI.md PART 34
+	case "/server/auth/login":
 		if req.Method == "POST" {
 			err = data.handleLoginSubmit(rw, req)
 		} else {
 			err = data.handleLoginPage(rw, req)
 		}
-	case "/logout":
+	case "/server/auth/logout":
 		err = data.handleLogout(rw, req)
+	case "/server/auth/register":
+		err = data.handleRegisterPage(rw, req)
+	// Legacy auth redirects
+	case "/login":
+		http.Redirect(rw, req, "/server/auth/login", http.StatusMovedPermanently)
+	case "/logout":
+		http.Redirect(rw, req, "/server/auth/logout", http.StatusMovedPermanently)
 	// User routes (PART 34)
 	case "/users":
 		err = data.handleUserDashboard(rw, req)

@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -17,8 +16,14 @@ type docsTmpl struct {
 	ServerURL string
 	User      *AuthUser
 
-	Language  string
-	Theme     func(string) string
+	Language string
+	Theme    func(string) string
+
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
 	Highlight func(string, string) template.HTML
 	Translate func(string, ...interface{}) template.HTML
 }
@@ -28,8 +33,14 @@ type docsApiV1Tmpl struct {
 	ServerURL       string
 	User            *AuthUser
 
-	Language  string
-	Theme     func(string) string
+	Language string
+	Theme    func(string) string
+
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
 	Highlight func(string, string) template.HTML
 	Translate func(string, ...interface{}) template.HTML
 }
@@ -43,11 +54,15 @@ func serverBaseURL(req *http.Request) string {
 func (data *Data) handleDocs(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.Docs.Execute(rw, docsTmpl{
-		ServerURL: serverBaseURL(req),
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
+		ServerURL:     serverBaseURL(req),
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	})
 }
 
@@ -60,6 +75,10 @@ func (data *Data) handleDocsAPIv1(rw http.ResponseWriter, req *http.Request) err
 		User:            GetAuthUser(req.Context()),
 		Language:        getCookie(req, "lang"),
 		Theme:           data.getThemeFunc(req),
+		CSRFToken:       data.buildCSRFToken(req),
+		UnreadCount:     0,
+		Notifications:   nil,
+		ShowRegister:    data.ShowRegister,
 		Translate:       data.Locales.findLocale(req).translate,
 		Highlight:       data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 	})
@@ -69,11 +88,15 @@ func (data *Data) handleDocsAPIv1(rw http.ResponseWriter, req *http.Request) err
 func (data *Data) handleDocsLibraries(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.DocsLibraries.Execute(rw, docsTmpl{
-		ServerURL: serverBaseURL(req),
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
+		ServerURL:     serverBaseURL(req),
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	})
 }
 
@@ -81,12 +104,16 @@ func (data *Data) handleDocsLibraries(rw http.ResponseWriter, req *http.Request)
 func (data *Data) handleDocsCustomize(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.DocsCustomize.Execute(rw, docsTmpl{
-		ServerURL: serverBaseURL(req),
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
-		Highlight: data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
+		ServerURL:     serverBaseURL(req),
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
+		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 	})
 }
 
@@ -94,11 +121,15 @@ func (data *Data) handleDocsCustomize(rw http.ResponseWriter, req *http.Request)
 func (data *Data) handleDocsCliExamples(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.DocsCliExamples.Execute(rw, docsTmpl{
-		ServerURL: serverBaseURL(req),
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
-		Highlight: data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
+		ServerURL:     serverBaseURL(req),
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
+		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 	})
 }

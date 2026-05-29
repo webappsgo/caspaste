@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -287,12 +286,12 @@ func PathSecurityMiddleware(next http.Handler) http.Handler {
 
 // Context keys for authentication (PART 34, 35, 36)
 type (
-	UserContextKey       struct{}
-	SessionContextKey    struct{}
-	TokenInfoContextKey  struct{}
-	CustomDomainKey      struct{}
-	OrgContextKey        struct{}
-	OrgMemberRoleKey     struct{}
+	UserContextKey      struct{}
+	SessionContextKey   struct{}
+	TokenInfoContextKey struct{}
+	CustomDomainKey     struct{}
+	OrgContextKey       struct{}
+	OrgMemberRoleKey    struct{}
 )
 
 // AuthUser represents an authenticated user in the request context

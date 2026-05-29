@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -29,10 +28,13 @@ type createTmpl struct {
 	AuthorEmailDefault string
 	AuthorURLDefault   string
 
-	Translate func(string, ...interface{}) template.HTML
-
 	// CSRF token for form protection per AI.md PART 11
-	CSRFToken string
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
+	Translate func(string, ...interface{}) template.HTML
 }
 
 func (data *Data) handleNewPaste(rw http.ResponseWriter, req *http.Request) error {
@@ -76,8 +78,11 @@ func (data *Data) handleNewPaste(rw http.ResponseWriter, req *http.Request) erro
 		AuthorDefault:      getCookie(req, "author"),
 		AuthorEmailDefault: getCookie(req, "authorEmail"),
 		AuthorURLDefault:   getCookie(req, "authorURL"),
-		Translate:          data.Locales.findLocale(req).translate,
 		CSRFToken:          GetCSRFToken(req, 32),
+		UnreadCount:        0,
+		Notifications:      nil,
+		ShowRegister:       data.ShowRegister,
+		Translate:          data.Locales.findLocale(req).translate,
 	}
 
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -147,20 +146,31 @@ type pasteTmpl struct {
 	// Using template.URL to mark as safe for embedding
 	MediaDataURL template.URL
 
-	User      *AuthUser
-	Language  string
-	Theme     func(string) string
+	User     *AuthUser
+	Language string
+	Theme    func(string) string
+
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
 	Translate func(string, ...interface{}) template.HTML
 }
 
 type pasteContinueTmpl struct {
-	ID        string
-	User      *AuthUser
-	Language  string
-	Theme     func(string) string
-	Translate func(string, ...interface{}) template.HTML
+	ID       string
+	User     *AuthUser
+	Language string
+	Theme    func(string) string
+
 	// CSRF token for form protection per AI.md PART 11
-	CSRFToken string
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
+	Translate func(string, ...interface{}) template.HTML
 }
 
 func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) error {
@@ -186,12 +196,15 @@ func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) erro
 
 		if req.PostForm.Get("oneUseContinue") != "true" {
 			tmplData := pasteContinueTmpl{
-				ID:        paste.ID,
-				User:      GetAuthUser(req.Context()),
-				Language:  getCookie(req, "lang"),
-				Theme:     data.getThemeFunc(req),
-				Translate: data.Locales.findLocale(req).translate,
-				CSRFToken: GetCSRFToken(req, 32),
+				ID:            paste.ID,
+				User:          GetAuthUser(req.Context()),
+				Language:      getCookie(req, "lang"),
+				Theme:         data.getThemeFunc(req),
+				CSRFToken:     GetCSRFToken(req, 32),
+				UnreadCount:   0,
+				Notifications: nil,
+				ShowRegister:  data.ShowRegister,
+				Translate:     data.Locales.findLocale(req).translate,
 			}
 
 			return data.PasteContinue.Execute(rw, tmplData)
@@ -309,10 +322,14 @@ func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) erro
 		IsMarkdown:   isMarkdown,
 		MediaDataURL: mediaDataURL,
 
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	}
 
 	// Get body line end (only for text content)

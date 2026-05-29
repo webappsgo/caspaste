@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -25,17 +24,28 @@ type aboutTmpl struct {
 	AdminMail string
 	User      *AuthUser
 
-	Language  string
-	Theme     func(string) string
+	Language string
+	Theme    func(string) string
+
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
 
 	Highlight func(string, string) template.HTML
 	Translate func(string, ...interface{}) template.HTML
 }
 
 type aboutMinTmp struct {
-	User      *AuthUser
-	Language  string
-	Theme     func(string) string
+	User     *AuthUser
+	Language string
+	Theme    func(string) string
+
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
 	Translate func(string, ...interface{}) template.HTML
 }
 
@@ -54,6 +64,10 @@ func (data *Data) handleAbout(rw http.ResponseWriter, req *http.Request) error {
 		User:             GetAuthUser(req.Context()),
 		Language:         getCookie(req, "lang"),
 		Theme:            data.getThemeFunc(req),
+		CSRFToken:        data.buildCSRFToken(req),
+		UnreadCount:      0,
+		Notifications:    nil,
+		ShowRegister:     data.ShowRegister,
 		Highlight:        data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 		Translate:        data.Locales.findLocale(req).translate,
 	}
@@ -66,10 +80,14 @@ func (data *Data) handleAbout(rw http.ResponseWriter, req *http.Request) error {
 func (data *Data) handleAuthors(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.Authors.Execute(rw, aboutMinTmp{
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	})
 }
 
@@ -77,10 +95,14 @@ func (data *Data) handleAuthors(rw http.ResponseWriter, req *http.Request) error
 func (data *Data) handleLicense(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.License.Execute(rw, aboutMinTmp{
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	})
 }
 
@@ -88,10 +110,14 @@ func (data *Data) handleLicense(rw http.ResponseWriter, req *http.Request) error
 func (data *Data) handleSourceCodePage(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.SourceCodePage.Execute(rw, aboutMinTmp{
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	})
 }
 
@@ -99,9 +125,13 @@ func (data *Data) handleSourceCodePage(rw http.ResponseWriter, req *http.Request
 func (data *Data) handleSecurityPolicy(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.SecurityPolicy.Execute(rw, aboutMinTmp{
-		User:      GetAuthUser(req.Context()),
-		Language:  getCookie(req, "lang"),
-		Theme:     data.getThemeFunc(req),
-		Translate: data.Locales.findLocale(req).translate,
+		User:          GetAuthUser(req.Context()),
+		Language:      getCookie(req, "lang"),
+		Theme:         data.getThemeFunc(req),
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     data.Locales.findLocale(req).translate,
 	})
 }

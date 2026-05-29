@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -50,7 +49,7 @@ func (data *Data) handleRegisterPage(rw http.ResponseWriter, req *http.Request) 
 			</div>
 			<button type="submit">Register</button>
 		</form>
-		<p>Already have an account? <a href="/login">Login</a></p>
+		<p>Already have an account? <a href="/server/auth/login">Login</a></p>
 	</div>
 </body>
 </html>`
@@ -307,7 +306,7 @@ func (data *Data) routeAuth(rw http.ResponseWriter, req *http.Request) error {
 
 	default:
 		// Redirect unknown auth paths to login
-		http.Redirect(rw, req, "/login", http.StatusFound)
+		http.Redirect(rw, req, "/server/auth/login", http.StatusFound)
 		return nil
 	}
 }

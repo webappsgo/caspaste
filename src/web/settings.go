@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -35,7 +34,10 @@ type settingsTmpl struct {
 	Translate func(string, ...interface{}) template.HTML
 
 	// CSRF token for form protection per AI.md PART 11
-	CSRFToken string
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
 }
 
 // Pattern: /settings
@@ -88,6 +90,9 @@ func (data *Data) handleSettings(rw http.ResponseWriter, req *http.Request) erro
 			Theme:            themeLookup,
 			Translate:        data.Locales.findLocale(req).translate,
 			CSRFToken:        GetCSRFToken(req, 32),
+			UnreadCount:      0,
+			Notifications:    nil,
+			ShowRegister:     data.ShowRegister,
 		}
 
 		if dataTmpl.ThemeCode == "" {

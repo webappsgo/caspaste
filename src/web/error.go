@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -24,31 +23,37 @@ type errorTmpl struct {
 	// Language for base template
 	Language string
 	// Theme function to get theme values
-	Theme     func(string) string
+	Theme func(string) string
+
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowRegister  bool
+
 	Translate func(string, ...interface{}) template.HTML
 }
 
 func (data *Data) writeError(rw http.ResponseWriter, req *http.Request, e error) (int, error) {
 	locale := data.Locales.findLocale(req)
-	
+
 	// Get theme name, use default if not set
 	themeName := getCookie(req, "theme")
 	if themeName == "" {
 		themeName = data.UiDefaultTheme
 	}
-	
+
 	// Get theme map
 	themeMap, exists := data.Themes[themeName]
 	if !exists {
 		// Fallback to default theme if specified theme doesn't exist
 		themeMap = data.Themes[data.UiDefaultTheme]
 	}
-	
+
 	// Create theme lookup function
 	themeLookup := func(key string) string {
 		return themeMap[key]
 	}
-	
+
 	errData := errorTmpl{
 		Code:      0,
 		AdminName: data.AdminName,
@@ -57,8 +62,12 @@ func (data *Data) writeError(rw http.ResponseWriter, req *http.Request, e error)
 		// Get language from cookie
 		Language: getCookie(req, "lang"),
 		// Theme lookup function
-		Theme:     themeLookup,
-		Translate: locale.translate,
+		Theme:         themeLookup,
+		CSRFToken:     data.buildCSRFToken(req),
+		UnreadCount:   0,
+		Notifications: nil,
+		ShowRegister:  data.ShowRegister,
+		Translate:     locale.translate,
 	}
 
 	// Detect error type
