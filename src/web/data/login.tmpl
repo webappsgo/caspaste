@@ -23,7 +23,7 @@
 	</div>
 	{{end}}
 
-	<form class="login-form" action="/login" method="post">
+	<form class="login-form" action="/server/auth/login" method="post">
 		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 		<input type="hidden" name="redirect" value="{{.Redirect}}">
 

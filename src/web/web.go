@@ -531,8 +531,13 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		} else if strings.HasPrefix(req.URL.Path, "/edit/") {
 			err = data.handleEditPaste(rw, req)
 
+		} else if strings.HasPrefix(req.URL.Path, "/server/auth/") {
+			// Canonical auth routes per AI.md PART 34 — rewrite to /auth/ prefix for routeAuth
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/server")
+			err = data.routeAuth(rw, req)
+
 		} else if strings.HasPrefix(req.URL.Path, "/auth/") {
-			// Auth routes (PART 34)
+			// Legacy /auth/* prefix — still supported
 			err = data.routeAuth(rw, req)
 
 		} else if strings.HasPrefix(req.URL.Path, "/orgs") {

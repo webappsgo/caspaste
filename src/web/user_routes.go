@@ -151,7 +151,7 @@ func (data *Data) renderUserDashboard(rw http.ResponseWriter, req *http.Request,
 				<li><a href="/users/tokens">API Tokens</a></li>
 				<li><a href="/users/domains">Custom Domains</a></li>
 				<li><a href="/orgs">Organizations</a></li>
-				<li><a href="/logout">Logout</a></li>
+				<li><a href="/server/auth/logout">Logout</a></li>
 			</ul>
 		</nav>
 	</div>

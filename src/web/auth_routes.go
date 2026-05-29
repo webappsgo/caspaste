@@ -83,7 +83,7 @@ func (data *Data) handlePasswordForgotPage(rw http.ResponseWriter, req *http.Req
 			</div>
 			<button type="submit">Send Reset Link</button>
 		</form>
-		<p><a href="/login">Back to Login</a></p>
+		<p><a href="/server/auth/login">Back to Login</a></p>
 	</div>
 </body>
 </html>`
@@ -155,7 +155,7 @@ func (data *Data) handle2FAPage(rw http.ResponseWriter, req *http.Request) error
 			</div>
 			<button type="submit">Verify</button>
 		</form>
-		<p><a href="/auth/recovery/use">Use a recovery key instead</a></p>
+		<p><a href="/server/auth/recovery/use">Use a recovery key instead</a></p>
 	</div>
 </body>
 </html>`
@@ -195,7 +195,7 @@ func (data *Data) handleRecoveryPage(rw http.ResponseWriter, req *http.Request) 
 			<button type="submit">Use Recovery Key</button>
 		</form>
 		<p><strong>Note:</strong> Using a recovery key will disable 2FA on your account. You can re-enable it after logging in.</p>
-		<p><a href="/login">Back to Login</a></p>
+		<p><a href="/server/auth/login">Back to Login</a></p>
 	</div>
 </body>
 </html>`
