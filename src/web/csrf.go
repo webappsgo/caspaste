@@ -156,12 +156,17 @@ func (s *csrfTokenStore) regenerateToken(sessionID string, tokenLength int) (str
 
 // getSessionID extracts or creates a session ID from the request
 func getSessionID(req *http.Request) string {
-	// Try to get from session cookie first
+	// Try the canonical CasPaste session cookie first
+	if cookie, err := req.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
+		return cookie.Value
+	}
+
+	// Try legacy "session" cookie
 	if cookie, err := req.Cookie("session"); err == nil && cookie.Value != "" {
 		return cookie.Value
 	}
 
-	// Try to get from auth cookie
+	// Try legacy "auth" cookie
 	if cookie, err := req.Cookie("auth"); err == nil && cookie.Value != "" {
 		return cookie.Value
 	}
@@ -315,9 +320,14 @@ func extractCSRFToken(r *http.Request, config CSRFConfig) string {
 		return token
 	}
 
-	// Parse form if not already parsed
-	if r.Form == nil {
-		r.ParseMultipartForm(32 << 20)
+	// Always attempt multipart parsing — ParseMultipartForm calls ParseForm
+	// internally, so it handles both multipart/form-data and
+	// application/x-www-form-urlencoded.  The check against r.MultipartForm
+	// avoids re-parsing an already-parsed multipart body; the check against
+	// r.Form skips the call for plain URL-encoded requests that were already
+	// parsed by an earlier middleware.
+	if r.MultipartForm == nil || r.Form == nil {
+		_ = r.ParseMultipartForm(32 << 20)
 	}
 
 	// Check form field

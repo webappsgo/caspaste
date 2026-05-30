@@ -115,20 +115,68 @@ document.addEventListener("DOMContentLoaded", () => {
 	let createPasteForm = document.getElementById("create-paste-form");
 	if (createPasteForm != null) {
 		createPasteForm.addEventListener("submit", (event) => {
-			// Check if a file is selected - if so, let the form submit normally
-			// since XHR with x-www-form-urlencoded cannot handle file uploads
-			let fileInput = document.getElementById("paste-file");
-			if (fileInput && fileInput.files && fileInput.files.length > 0) {
-				// Let form submit normally with multipart/form-data
-				return true;
-			}
-
 			event.preventDefault();
 
-			// Get form data
-			let data = "";
-			let title = "";
+			let fileInput = document.getElementById("paste-file");
+			let hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
 
+			// Read the CSRF token from the hidden form field
+			let csrfTokenEl = createPasteForm.querySelector('input[name="csrf_token"]');
+			let csrfToken = csrfTokenEl ? csrfTokenEl.value : "";
+
+			// Get the paste title for history storage
+			let title = "";
+			let titleEl = createPasteForm.querySelector('input[name="title"],textarea[name="title"]');
+			if (titleEl) {
+				title = titleEl.value;
+			}
+
+			if (hasFile) {
+				// File upload: use FormData so the binary payload is preserved.
+				// Send to / (web handler) with the CSRF token in the header so the
+				// middleware finds it without having to parse the multipart body first.
+				var xhrFile = new XMLHttpRequest();
+				xhrFile.open("POST", "/", true);
+				xhrFile.setRequestHeader("X-CSRF-Token", csrfToken);
+
+				xhrFile.onload = () => {
+					if (xhrFile.status != 200) {
+						switch (xhrFile.status) {
+							case 400: showToast("{{ call .Translate `error.400` | call .Translate `historyJS.Error` 400 }}", "error"); break;
+							case 401: showToast("{{ call .Translate `error.401` | call .Translate `historyJS.Error` 401 }}", "error"); break;
+							case 403: showToast("{{ call .Translate `error.403` | call .Translate `historyJS.Error` 403 }}", "error"); break;
+							case 413: showToast("{{ call .Translate `error.413` | call .Translate `historyJS.Error` 413 }}", "error"); break;
+							case 429: showToast("{{ call .Translate `error.429` | call .Translate `historyJS.Error` 429 }}", "warning"); break;
+							case 500: showToast("{{ call .Translate `error.500` | call .Translate `historyJS.Error` 500 }}", "error"); break;
+							default: showToast("{{ call .Translate `historyJS.ErrorUnknown` `"+xhrFile.status+"` }}", "error"); break;
+						}
+						return;
+					}
+
+					// After following the server redirect, responseURL is the paste URL
+					var pasteURL = xhrFile.responseURL;
+					var pasteId = pasteURL.replace(/\/+$/, "").split("/").pop();
+
+					// Save to history
+					if (localStorage.getItem("DisableHistory") != "true") {
+						let historyJSON = localStorage.getItem("history");
+						let history = [];
+						if (historyJSON != null) {
+							history = JSON.parse(historyJSON);
+						}
+						history.splice(0, 0, {id: pasteId, createTime: Math.floor(Date.now() / 1000), deleteTime: 0, title: title});
+						localStorage.setItem("history", JSON.stringify(history));
+					}
+
+					window.location = pasteURL;
+				};
+
+				xhrFile.send(new FormData(createPasteForm));
+				return false;
+			}
+
+			// Text paste: encode as URL-encoded and POST to the CSRF-exempt API
+			let data = "";
 			Array.from(createPasteForm.elements)
 				.filter((item) => !!item.name && item.type !== "file")
 				.map((element) => {
@@ -140,10 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
 						} else {
 							value = "false";
 						}
-					}
-
-					if (name == "title") {
-						title = value;
 					}
 
 					data = data + "&" + name + "=" + encodeURIComponent(value);
@@ -172,6 +216,9 @@ document.addEventListener("DOMContentLoaded", () => {
 					return;
 				}
 
+				// API response is {"ok": true, "data": {"id": "...", ...}}
+				var paste = xhr.response && xhr.response.data ? xhr.response.data : xhr.response;
+
 				// Save to history
 				if (localStorage.getItem("DisableHistory") != "true") {
 					let historyJSON = localStorage.getItem("history");
@@ -180,12 +227,12 @@ document.addEventListener("DOMContentLoaded", () => {
 						history = JSON.parse(historyJSON);
 					}
 
-					history.splice(0, 0, {id: xhr.response.id, createTime: xhr.response.createTime, deleteTime: xhr.response.deleteTime, title: title});
+					history.splice(0, 0, {id: paste.id, createTime: paste.createTime, deleteTime: paste.deleteTime, title: title});
 					localStorage.setItem("history", JSON.stringify(history));
 				}
 
-				// Redirect
-				window.location = window.location + xhr.response.id;
+				// Redirect to the new paste
+				window.location = "/" + paste.id;
 			};
 
 			xhr.send(data);
