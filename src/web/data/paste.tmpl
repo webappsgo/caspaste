@@ -9,7 +9,6 @@
 
 {{define "titlePrefix"}}{{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} | {{end}}
 {{define "headAppend"}}
-<script src="/paste.js"></script>
 <script src="/code.js"></script>
 {{end}}
 {{define "article"}}
@@ -90,5 +89,26 @@
 {{else}}
 <p>{{ call .Translate `paste.Expires` }} <span id="deleteTime">{{.DeleteTimeStr}}</span></p>
 {{end}}
+
+{{/* Progressive enhancement: save paste to localStorage history when arriving from the create form */}}
+<script>
+(function() {
+  try {
+    if (localStorage.getItem("DisableHistory") === "true") return;
+    var ref = document.referrer;
+    if (!ref) return;
+    var refPath = new URL(ref).pathname;
+    if (refPath !== "/") return;
+    var id = "{{.ID}}";
+    var historyJSON = localStorage.getItem("history");
+    var hist = historyJSON ? JSON.parse(historyJSON) : [];
+    for (var i = 0; i < hist.length; i++) {
+      if (hist[i].id === id) return;
+    }
+    hist.unshift({id: id, createTime: {{.CreateTime}}, deleteTime: {{.DeleteTime}}, title: "{{.Title}}"});
+    localStorage.setItem("history", JSON.stringify(hist));
+  } catch(e) {}
+})();
+</script>
 
 {{end}}

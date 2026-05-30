@@ -9,9 +9,19 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/casjay-forks/caspaste/src/netshare"
 )
+
+// pasteListViewItem is the template-facing representation of a paste list row.
+// It replaces the raw DB struct so timestamps are pre-formatted server-side.
+type pasteListViewItem struct {
+	ID            string
+	Title         string
+	Syntax        string
+	CreateTimeStr string
+}
 
 type listTmpl struct {
 	Pastes     interface{}
@@ -67,9 +77,20 @@ func (data *Data) handleList(rw http.ResponseWriter, req *http.Request) error {
 	}
 
 	// Get paste list from database
-	pastes, err := data.DB.PasteList(limit, offset)
+	rawPastes, err := data.DB.PasteList(limit, offset)
 	if err != nil {
 		return err
+	}
+
+	// Convert to view items with human-readable timestamps
+	pastes := make([]pasteListViewItem, len(rawPastes))
+	for i, p := range rawPastes {
+		pastes[i] = pasteListViewItem{
+			ID:            p.ID,
+			Title:         p.Title,
+			Syntax:        p.Syntax,
+			CreateTimeStr: time.Unix(p.CreateTime, 0).UTC().Format("02 Jan 2006 15:04"),
+		}
 	}
 
 	// Get theme
@@ -92,7 +113,7 @@ func (data *Data) handleList(rw http.ResponseWriter, req *http.Request) error {
 		Offset:        offset,
 		NextOffset:    offset + limit,
 		PrevOffset:    offset - limit,
-		HasNext:       len(pastes) == limit,
+		HasNext:       len(rawPastes) == limit,
 		HasPrev:       offset > 0,
 		User:          GetAuthUser(req.Context()),
 		Language:      getCookie(req, "lang"),
