@@ -199,15 +199,16 @@ header .site-title {
    FOOTER - MOBILE FIRST
    ======================================== */
 footer {
-	padding: 1.25rem 1rem;
+	padding: 1rem 1rem;
 	margin-top: auto;
 	text-align: center;
 	color: {{call .Theme `color.Font`}};
-	background: {{call .Theme `color.Header`}};
-	border-top: 1px solid {{call .Theme `color.Border`}};
-	font-size: 0.875rem;
+	background: {{call .Theme `color.BackgroundBlack`}};
+	border-top: 2px solid {{call .Theme `color.Border`}};
+	font-size: 0.8125rem;
 }
 
+/* Mobile: stack links above copyright, both centered */
 footer nav {
 	display: flex;
 	flex-direction: column;
@@ -218,100 +219,82 @@ footer nav {
 
 footer nav p {
 	margin: 0;
-	line-height: 1.8;
+	line-height: 1.6;
 	text-align: center;
 }
 
+/* Muted link color by default; brighten on hover — professional, not distracting */
 footer a {
-	color: {{call .Theme `color.Link`}};
-	text-decoration: underline;
-	text-decoration-thickness: 1px;
-	text-underline-offset: 2px;
-	transition: all 0.2s ease;
+	color: {{call .Theme `color.Grey`}};
+	text-decoration: none;
+	transition: color 0.15s ease;
 }
 
 footer a:hover {
-	opacity: 0.8;
+	color: {{call .Theme `color.Font`}};
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 2px;
 }
 
 footer a:focus-visible {
 	outline: 2px solid {{call .Theme `color.FocusOutline`}};
 	outline-offset: 2px;
 	border-radius: 2px;
+	color: {{call .Theme `color.Font`}};
 }
 
-/* Mobile-first: base styles are for mobile (stacked) */
+/* Mobile: links flow inline, wrapping naturally — no full-width button blocks */
 .footer-links {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
+	flex-wrap: wrap;
 	justify-content: center;
 	align-items: center;
-	gap: 0.25rem;
+	gap: 0.125rem 0.25rem;
 }
 
+/* Touch targets: pad the link area to meet 44px minimum height */
 .footer-links a {
-	padding: 0.5rem 0.75rem;
+	padding: 0.5rem 0.25rem;
 	min-height: 44px;
 	display: inline-flex;
 	align-items: center;
-	width: 100%;
-	justify-content: center;
-	border-radius: 4px;
-	background: {{call .Theme `color.Element`}};
 }
 
+/* Dot separator — always visible, never interactive */
 .footer-sep {
 	color: {{call .Theme `color.Grey`}};
 	user-select: none;
-	display: none;
+	opacity: 0.5;
+	padding: 0 0.125rem;
 }
 
 .footer-copyright {
-	margin-top: 0.5rem;
-	opacity: 0.8;
+	color: {{call .Theme `color.Grey`}};
+	opacity: 0.75;
 }
 
-/* Small screens and up - horizontal footer links */
-@media (min-width: 480px) {
-	.footer-links {
-		flex-direction: row;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-	}
-
-	.footer-sep {
-		display: inline;
-	}
-
-	.footer-links a {
-		width: auto;
-		background: transparent;
-		border-radius: 0;
-	}
-}
-
-/* Tablet and up */
+/* Tablet and up: single row — links left, copyright right */
 @media (min-width: 768px) {
 	footer {
-		padding: 2rem 0;
-		font-size: 1rem;
+		padding: 1.25rem 0;
 	}
 
 	footer nav {
 		flex-direction: row;
-	}
-
-	.footer-links {
-		gap: 0.25rem 0.5rem;
+		justify-content: space-between;
+		align-items: center;
 	}
 
 	.footer-links a {
-		padding: 0;
+		padding: 0.25rem 0.25rem;
 		min-height: auto;
 	}
 
 	.footer-copyright {
-		margin-top: 0.75rem;
+		margin-top: 0;
+		white-space: nowrap;
 	}
 }
 
