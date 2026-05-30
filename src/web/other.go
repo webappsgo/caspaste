@@ -42,6 +42,11 @@ func (data *Data) handleNavJS(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+func (data *Data) handleSettingsJS(rw http.ResponseWriter, req *http.Request) error {
+	ServeWithETag(rw, req, *data.SettingsJS, "application/javascript; charset=utf-8", "static")
+	return nil
+}
+
 func (data *Data) handleCodeJS(rw http.ResponseWriter, req *http.Request) error {
 	rw.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	return data.CodeJS.Execute(rw, jsTmpl{

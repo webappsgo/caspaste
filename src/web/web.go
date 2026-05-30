@@ -45,6 +45,7 @@ type Data struct {
 	MainJS         *[]byte
 	ToastJS        *[]byte
 	NavJS          *[]byte
+	SettingsJS     *[]byte
 	HistoryJS      *textTemplate.Template
 	CodeJS         *textTemplate.Template
 	PastePage      *template.Template
@@ -238,6 +239,13 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	}
 	data.NavJS = &navJS
 
+	// settings.js
+	settingsJS, err := embFS.ReadFile("data/settings.js")
+	if err != nil {
+		return nil, err
+	}
+	data.SettingsJS = &settingsJS
+
 	// history.js
 	data.HistoryJS, err = textTemplate.ParseFS(embFS, "data/history.js")
 	if err != nil {
@@ -420,6 +428,8 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleToastJS(rw, req)
 	case "/nav.js":
 		err = data.handleNavJS(rw, req)
+	case "/settings.js":
+		err = data.handleSettingsJS(rw, req)
 	case "/history.js":
 		err = data.handleHistoryJS(rw, req)
 	case "/code.js":
