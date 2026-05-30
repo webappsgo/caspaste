@@ -111,6 +111,10 @@ type Data struct {
 	UiDefaultLifeTime string
 	UiDefaultTheme    string
 
+	// ShowLogin controls whether the login link appears in the nav.
+	// True when multi-user support is enabled (i.e., accounts exist to log into).
+	ShowLogin bool
+
 	// ShowRegister controls whether the register link appears in the nav.
 	// True when multi-user is enabled and registration mode is open or public.
 	ShowRegister bool
@@ -159,6 +163,8 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.UiDefaultLifeTime = cfg.UiDefaultLifetime
 	data.UiDefaultTheme = cfg.UiDefaultTheme
 	data.Public = cfg.Public
+	// Show login link only when the multi-user feature is enabled (accounts exist to log into)
+	data.ShowLogin = cfg.Users.Enabled
 	// Show register link when multi-user is enabled and registration is open
 	data.ShowRegister = cfg.Users.Enabled && (cfg.Users.Registration.Mode == "open" || cfg.Users.Registration.Mode == "public")
 	data.CasPasswdFile = cfg.CasPasswdFile

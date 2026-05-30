@@ -26,6 +26,7 @@ type embHelpTmpl struct {
 	CSRFToken     string
 	UnreadCount   int
 	Notifications []NavNotification
+	ShowLogin     bool
 	ShowRegister  bool
 
 	Translate func(string, ...interface{}) template.HTML
@@ -62,6 +63,7 @@ func (data *Data) handleEmbeddedHelp(rw http.ResponseWriter, req *http.Request) 
 		CSRFToken:     data.buildCSRFToken(req),
 		UnreadCount:   0,
 		Notifications: nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,

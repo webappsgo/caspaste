@@ -100,8 +100,8 @@
 					</div>
 				</div>
 				{{else}}
-				{{/* Login/Register links for unauthenticated users */}}
-				<a href="/server/auth/login" class="nav-button">{{ call .Translate `auth.Login` }}</a>
+				{{/* Login/Register links — only shown when multi-user is enabled */}}
+				{{if .ShowLogin}}<a href="/server/auth/login" class="nav-button">{{ call .Translate `auth.Login` }}</a>{{end}}
 				{{if .ShowRegister}}<a href="/server/auth/register" class="nav-button">{{ call .Translate `auth.Register` }}</a>{{end}}
 				{{end}}
 			</div>

@@ -22,6 +22,7 @@ type docsTmpl struct {
 	CSRFToken     string
 	UnreadCount   int
 	Notifications []NavNotification
+	ShowLogin     bool
 	ShowRegister  bool
 
 	Highlight func(string, string) template.HTML
@@ -39,6 +40,7 @@ type docsApiV1Tmpl struct {
 	CSRFToken     string
 	UnreadCount   int
 	Notifications []NavNotification
+	ShowLogin     bool
 	ShowRegister  bool
 
 	Highlight func(string, string) template.HTML
@@ -61,6 +63,7 @@ func (data *Data) handleDocs(rw http.ResponseWriter, req *http.Request) error {
 		CSRFToken:     data.buildCSRFToken(req),
 		UnreadCount:   0,
 		Notifications: nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 	})
@@ -78,6 +81,7 @@ func (data *Data) handleDocsAPIv1(rw http.ResponseWriter, req *http.Request) err
 		CSRFToken:       data.buildCSRFToken(req),
 		UnreadCount:     0,
 		Notifications:   nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:    data.ShowRegister,
 		Translate:       data.Locales.findLocale(req).translate,
 		Highlight:       data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
@@ -95,6 +99,7 @@ func (data *Data) handleDocsLibraries(rw http.ResponseWriter, req *http.Request)
 		CSRFToken:     data.buildCSRFToken(req),
 		UnreadCount:   0,
 		Notifications: nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 	})
@@ -111,6 +116,7 @@ func (data *Data) handleDocsCustomize(rw http.ResponseWriter, req *http.Request)
 		CSRFToken:     data.buildCSRFToken(req),
 		UnreadCount:   0,
 		Notifications: nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
@@ -128,6 +134,7 @@ func (data *Data) handleDocsCliExamples(rw http.ResponseWriter, req *http.Reques
 		CSRFToken:     data.buildCSRFToken(req),
 		UnreadCount:   0,
 		Notifications: nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,

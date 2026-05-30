@@ -32,6 +32,7 @@ type createTmpl struct {
 	CSRFToken     string
 	UnreadCount   int
 	Notifications []NavNotification
+	ShowLogin     bool
 	ShowRegister  bool
 
 	Translate func(string, ...interface{}) template.HTML
@@ -81,6 +82,7 @@ func (data *Data) handleNewPaste(rw http.ResponseWriter, req *http.Request) erro
 		CSRFToken:          GetCSRFToken(req, 32),
 		UnreadCount:        0,
 		Notifications:      nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:       data.ShowRegister,
 		Translate:          data.Locales.findLocale(req).translate,
 	}

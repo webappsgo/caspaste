@@ -28,6 +28,7 @@ type listTmpl struct {
 	CSRFToken     string
 	UnreadCount   int
 	Notifications []NavNotification
+	ShowLogin     bool
 	ShowRegister  bool
 
 	Translate func(string, ...interface{}) template.HTML
@@ -99,6 +100,7 @@ func (data *Data) handleList(rw http.ResponseWriter, req *http.Request) error {
 		CSRFToken:     data.buildCSRFToken(req),
 		UnreadCount:   0,
 		Notifications: nil,
+		ShowLogin:     data.ShowLogin,
 		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 	}
