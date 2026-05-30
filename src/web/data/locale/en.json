@@ -92,6 +92,7 @@
 	"docsLibraries.Title": "Client Libraries",
 	"error.400": "Bad Request",
 	"error.401": "Unauthorized",
+	"error.403": "Forbidden",
 	"error.404": "Not Found",
 	"error.405": "Method Not Allowed",
 	"error.413": "Payload Too Large",

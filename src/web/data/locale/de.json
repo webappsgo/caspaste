@@ -64,6 +64,7 @@
     "docsAPIv1Libs.Title": "Bibliotheken, um mit der API zu arbeiten",
     "error.400": "Fehlerhafte Anfrage",
     "error.401": "Unautorisiert",
+    "error.403": "Verboten",
     "error.405": "Methode nicht erlaubt",
     "error.429": "Zu viele Anfragen",
     "error.500": "Interner Server Fehler",
