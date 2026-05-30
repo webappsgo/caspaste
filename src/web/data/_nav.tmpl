@@ -19,11 +19,20 @@
 				<input type="checkbox" id="history-popup-state" class="history-popup-checkbox" aria-hidden="true">
 				<label for="history-popup-state" class="nav-button" aria-label="View paste history">{{ call .Translate `base.History` }}</label>
 				<a href="/settings" aria-label="Settings">{{ call .Translate `base.Settings` }}</a>
+				{{/* Login/Register live here: inside the hamburger on mobile, right-aligned on desktop */}}
+				{{if not .User}}
+				{{if or .ShowLogin .ShowRegister}}
+				<div class="nav-auth-group">
+					{{if .ShowLogin}}<a href="/server/auth/login" class="nav-button" aria-label="Sign in">{{ call .Translate `auth.Login` }}</a>{{end}}
+					{{if .ShowRegister}}<a href="/server/auth/register" class="nav-button" aria-label="Create account">{{ call .Translate `auth.Register` }}</a>{{end}}
+				</div>
+				{{end}}
+				{{end}}
 			</div>
 
-			{{/* Header Actions - Notification Bell + Profile (Per AI.md PART 16, PART 34) */}}
+			{{/* Header Actions - Notification Bell + Profile; only rendered when logged in */}}
+			{{if .User}}
 			<div class="header-actions">
-				{{if .User}}
 				{{/* Notification Bell - Required when PART 34 implemented */}}
 				<div class="notification-bell" aria-label="Notifications">
 					<button type="button" class="bell-button" id="js-notification-bell" aria-haspopup="true" aria-expanded="false" aria-label="{{if .UnreadCount}}{{.UnreadCount}} unread notifications{{else}}Notifications{{end}}">
@@ -99,11 +108,7 @@
 						</form>
 					</div>
 				</div>
-				{{else}}
-				{{/* Login/Register links — only shown when multi-user is enabled */}}
-				{{if .ShowLogin}}<a href="/server/auth/login" class="nav-button">{{ call .Translate `auth.Login` }}</a>{{end}}
-				{{if .ShowRegister}}<a href="/server/auth/register" class="nav-button">{{ call .Translate `auth.Register` }}</a>{{end}}
-				{{end}}
 			</div>
+			{{end}}
 		</nav>
 {{end}}

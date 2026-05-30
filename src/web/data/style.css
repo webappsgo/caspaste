@@ -1133,6 +1133,16 @@ h4 a, h5 a, h6 a {
 	padding: 0.75rem 1rem;
 }
 
+/* Auth group (Login/Register) inside nav-links.
+   Mobile: full-width column items, same as all other nav-links children.
+   Desktop: flex row pushed to the far right of the nav bar. */
+.nav-auth-group {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	gap: 0.25rem;
+}
+
 /* Tablet and up: horizontal nav, hide hamburger, reset flex order */
 @media (min-width: 768px) {
 	.nav-toggle {
@@ -1157,6 +1167,13 @@ h4 a, h5 a, h6 a {
 	.nav-links button {
 		width: auto;
 		text-align: left;
+	}
+
+	.nav-auth-group {
+		flex-direction: row;
+		width: auto;
+		gap: 0.5rem;
+		margin-left: auto;
 	}
 }
 
