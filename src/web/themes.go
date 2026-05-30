@@ -26,6 +26,18 @@ type Themes map[string]Theme
 type ThemesListPart map[string]string
 type ThemesList map[string]ThemesListPart
 
+// ThemeGroupItem is a single theme entry for display in a grouped selector.
+type ThemeGroupItem struct {
+	Key  string
+	Name string
+}
+
+// ThemeGroup is a labeled group of themes for <optgroup> rendering.
+type ThemeGroup struct {
+	Label string
+	Items []ThemeGroupItem
+}
+
 func loadThemes(hostThemeDir string, localesList LocalesList, defaultTheme string) (Themes, ThemesList, error) {
 	// Normalize default theme aliases before loading
 	themeAliases := map[string]string{
@@ -167,28 +179,12 @@ func loadThemes(hostThemeDir string, localesList LocalesList, defaultTheme strin
 		return nil, nil, errors.New("web: default theme '" + defaultTheme + "' not found")
 	}
 
-	// Create theme aliases for convenience
-	// "dark" → "dark/dracula", "light" → "light/github", "auto" → special auto-switch theme
-	if _, exists := themes["dark/dracula"]; exists {
-		themes["dark"] = themes["dark/dracula"]
+	// "auto" theme: the auto.theme file is loaded above; only set a fallback if it was not present.
+	if _, autoExists := themes["auto"]; !autoExists {
+		themes["auto"] = themes[defaultTheme]
 		for localeCode := range themesList {
-			if name, ok := themesList[localeCode]["dark/dracula"]; ok {
-				themesList[localeCode]["dark"] = name + " (alias)"
-			}
+			themesList[localeCode]["auto"] = "Auto (System)"
 		}
-	}
-	if _, exists := themes["light/github"]; exists {
-		themes["light"] = themes["light/github"]
-		for localeCode := range themesList {
-			if name, ok := themesList[localeCode]["light/github"]; ok {
-				themesList[localeCode]["light"] = name + " (alias)"
-			}
-		}
-	}
-	// "auto" will be handled by client-side JavaScript
-	themes["auto"] = themes[defaultTheme] // fallback to default
-	for localeCode := range themesList {
-		themesList[localeCode]["auto"] = "Auto (System)"
 	}
 
 	return themes, themesList, nil
@@ -207,6 +203,60 @@ func (themesList ThemesList) getForLocale(req *http.Request) ThemesListPart {
 	// Load default part theme
 	theme, _ := themesList[baseLocale]
 	return theme
+}
+
+// getGroupedForLocale returns themes organised into labeled groups (Auto, Dark, Light, Other)
+// suitable for rendering with <optgroup> in a settings selector.
+func (themesList ThemesList) getGroupedForLocale(req *http.Request) []ThemeGroup {
+	flat := themesList.getForLocale(req)
+
+	auto := ThemeGroup{Label: "Auto"}
+	dark := ThemeGroup{Label: "Dark"}
+	light := ThemeGroup{Label: "Light"}
+	other := ThemeGroup{Label: "Other"}
+
+	for key, name := range flat {
+		item := ThemeGroupItem{Key: key, Name: name}
+		switch {
+		case key == "auto":
+			auto.Items = append(auto.Items, item)
+		case strings.HasPrefix(key, "dark/"):
+			dark.Items = append(dark.Items, item)
+		case strings.HasPrefix(key, "light/"):
+			light.Items = append(light.Items, item)
+		default:
+			other.Items = append(other.Items, item)
+		}
+	}
+
+	// Sort items within each group by name for stable display order
+	sortItems := func(items []ThemeGroupItem) {
+		for i := 1; i < len(items); i++ {
+			for j := i; j > 0 && items[j].Name < items[j-1].Name; j-- {
+				items[j], items[j-1] = items[j-1], items[j]
+			}
+		}
+	}
+	sortItems(auto.Items)
+	sortItems(dark.Items)
+	sortItems(light.Items)
+	sortItems(other.Items)
+
+	// Build result: omit empty groups; Auto always first
+	var groups []ThemeGroup
+	if len(auto.Items) > 0 {
+		groups = append(groups, auto)
+	}
+	if len(dark.Items) > 0 {
+		groups = append(groups, dark)
+	}
+	if len(light.Items) > 0 {
+		groups = append(groups, light)
+	}
+	if len(other.Items) > 0 {
+		groups = append(groups, other)
+	}
+	return groups
 }
 
 func (themes Themes) findTheme(req *http.Request, defaultTheme string) Theme {

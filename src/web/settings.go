@@ -20,6 +20,7 @@ type settingsTmpl struct {
 
 	ThemeCode     string
 	ThemeSelector map[string]string
+	ThemeGroups   []ThemeGroup
 
 	AuthorAllMaxLen int
 	Author          string
@@ -81,6 +82,7 @@ func (data *Data) handleSettings(rw http.ResponseWriter, req *http.Request) erro
 			LanguageSelector: data.LocalesList,
 			ThemeCode:        getCookie(req, "theme"),
 			ThemeSelector:    data.ThemesList.getForLocale(req),
+			ThemeGroups:      data.ThemesList.getGroupedForLocale(req),
 			AuthorAllMaxLen:  netshare.MaxLengthAuthorAll,
 			Author:           getCookie(req, "author"),
 			AuthorEmail:      getCookie(req, "authorEmail"),

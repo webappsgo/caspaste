@@ -30,8 +30,12 @@
 			<label for="theme-select">{{ call .Translate `settings.Theme` }}</label>
 			<select id="theme-select" name="theme" tabindex="2">
 				{{ $theme := .ThemeCode }}
-				{{range $key, $value := .ThemeSelector}}
-				<option value="{{$key}}"{{if eq $key $theme}} selected="selected"{{end}}>{{$value}}</option>
+				{{range .ThemeGroups}}
+				<optgroup label="{{.Label}}">
+					{{range .Items}}
+					<option value="{{.Key}}"{{if eq .Key $theme}} selected="selected"{{end}}>{{.Name}}</option>
+					{{end}}
+				</optgroup>
 				{{end}}
 			</select>
 		</div>
