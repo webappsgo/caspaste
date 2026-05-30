@@ -145,6 +145,9 @@ document.addEventListener("DOMContentLoaded", () => {
         xhrFile.open("POST", "/", true);
         xhrFile.setRequestHeader("X-CSRF-Token", csrfToken);
 
+        // Fall back to native form submit on network error so paste creation still works
+        xhrFile.onerror = () => { createPasteForm.submit(); };
+
         xhrFile.onload = () => {
           if (xhrFile.status != 200) {
             switch (xhrFile.status) {
@@ -206,6 +209,9 @@ document.addEventListener("DOMContentLoaded", () => {
       xhr.open("POST", "/api/v1/pastes", true);
       xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
 
+      // Fall back to native form submit on network error so paste creation still works
+      xhr.onerror = () => { createPasteForm.submit(); };
+
       xhr.onload = () => {
         // Check HTTP code
         if (xhr.status != 200) {
@@ -223,7 +229,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // API response is {"ok": true, "data": {"id": "...", ...}}
-        var paste = xhr.response && xhr.response.data ? xhr.response.data : xhr.response;
+        var paste = (xhr.response && xhr.response.data) ? xhr.response.data : xhr.response;
+
+        // Guard against malformed or missing response — fall back to native submit
+        if (!paste || !paste.id) {
+          createPasteForm.submit();
+          return;
+        }
 
         // Save to history
         if (localStorage.getItem("DisableHistory") != "true") {

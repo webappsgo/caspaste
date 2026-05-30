@@ -6,18 +6,20 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"net"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/casjay-forks/caspaste/src/audit"
 	"github.com/casjay-forks/caspaste/src/netshare"
 )
+
+// csrfContextKey is the request context key used to pass the CSRF token
+// from CSRFMiddleware to GetCSRFToken without server-side storage.
+type csrfContextKey struct{}
 
 // CSRFConfig holds CSRF protection configuration
 type CSRFConfig struct {
@@ -39,26 +41,6 @@ type CSRFConfig struct {
 	ExemptPrefixes []string
 }
 
-// csrfTokenStore manages CSRF tokens per session
-type csrfTokenStore struct {
-	mu     sync.RWMutex
-	tokens map[string]csrfTokenEntry
-}
-
-type csrfTokenEntry struct {
-	token      string
-	createdAt  time.Time
-	lastUsedAt time.Time
-}
-
-var (
-	csrfStore = &csrfTokenStore{
-		tokens: make(map[string]csrfTokenEntry),
-	}
-	// Token validity duration
-	csrfTokenTTL = 24 * time.Hour
-)
-
 // generateCSRFToken generates a cryptographically secure random token
 func generateCSRFToken(length int) (string, error) {
 	bytes := make([]byte, length)
@@ -68,140 +50,25 @@ func generateCSRFToken(length int) (string, error) {
 	return base64.URLEncoding.EncodeToString(bytes), nil
 }
 
-// getOrCreateToken gets existing token or creates new one for the session
-func (s *csrfTokenStore) getOrCreateToken(sessionID string, tokenLength int) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Check for existing valid token
-	if entry, exists := s.tokens[sessionID]; exists {
-		if time.Since(entry.createdAt) < csrfTokenTTL {
-			entry.lastUsedAt = time.Now()
-			s.tokens[sessionID] = entry
-			return entry.token, nil
-		}
-		// Token expired, delete it
-		delete(s.tokens, sessionID)
-	}
-
-	// Generate new token
-	token, err := generateCSRFToken(tokenLength)
-	if err != nil {
-		return "", err
-	}
-
-	s.tokens[sessionID] = csrfTokenEntry{
-		token:      token,
-		createdAt:  time.Now(),
-		lastUsedAt: time.Now(),
-	}
-
-	return token, nil
-}
-
-// validateToken validates a CSRF token for the session
-func (s *csrfTokenStore) validateToken(sessionID, token string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	entry, exists := s.tokens[sessionID]
-	if !exists {
-		return false
-	}
-
-	// Check if token is expired
-	if time.Since(entry.createdAt) >= csrfTokenTTL {
-		return false
-	}
-
-	// Constant-time comparison to prevent timing attacks
-	return subtle.ConstantTimeCompare([]byte(entry.token), []byte(token)) == 1
-}
-
-// cleanupExpiredTokens removes expired tokens from the store
-func (s *csrfTokenStore) cleanupExpiredTokens() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now()
-	for sessionID, entry := range s.tokens {
-		if now.Sub(entry.createdAt) >= csrfTokenTTL {
-			delete(s.tokens, sessionID)
-		}
-	}
-}
-
-// regenerateToken creates a new token for the session (call after login)
-func (s *csrfTokenStore) regenerateToken(sessionID string, tokenLength int) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Delete old token
-	delete(s.tokens, sessionID)
-
-	// Generate new token
-	token, err := generateCSRFToken(tokenLength)
-	if err != nil {
-		return "", err
-	}
-
-	s.tokens[sessionID] = csrfTokenEntry{
-		token:      token,
-		createdAt:  time.Now(),
-		lastUsedAt: time.Now(),
-	}
-
-	return token, nil
-}
-
-// getSessionID extracts or creates a session ID from the request
-func getSessionID(req *http.Request) string {
-	// Try the canonical CasPaste session cookie first
-	if cookie, err := req.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
-		return cookie.Value
-	}
-
-	// Try legacy "session" cookie
-	if cookie, err := req.Cookie("session"); err == nil && cookie.Value != "" {
-		return cookie.Value
-	}
-
-	// Try legacy "auth" cookie
-	if cookie, err := req.Cookie("auth"); err == nil && cookie.Value != "" {
-		return cookie.Value
-	}
-
-	// Use client IP + User-Agent as fallback session identifier
-	// Not ideal but better than nothing for anonymous users
-	ip := req.RemoteAddr
-	// Strip port from RemoteAddr (e.g., "127.0.0.1:45678" -> "127.0.0.1")
-	// RemoteAddr includes port which changes per request, breaking session tracking
-	if host, _, err := net.SplitHostPort(ip); err == nil {
-		ip = host
-	}
-	if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
-		parts := strings.Split(forwardedFor, ",")
-		ip = strings.TrimSpace(parts[0])
-	}
-	ua := req.Header.Get("User-Agent")
-	encoded := base64.URLEncoding.EncodeToString([]byte(ip + ua))
-	// Ensure at least 32 chars by padding if needed
-	for len(encoded) < 32 {
-		encoded += "0"
-	}
-	return encoded[:32]
-}
-
-// CSRFMiddleware creates middleware that protects against CSRF attacks
-// Per AI.md PART 11: All forms MUST have CSRF protection
+// CSRFMiddleware implements the stateless double-submit cookie pattern.
+//
+// On safe methods (GET/HEAD/OPTIONS): the middleware reuses the CSRF cookie
+// when present or generates a fresh token, sets/refreshes the cookie, and
+// injects the token into the request context so templates can include it in
+// hidden form fields — no server-side storage required.
+//
+// On state-changing methods (POST/PUT/DELETE/PATCH): the middleware reads the
+// cookie value and the submitted token (header or form field) and rejects the
+// request if they do not match via constant-time comparison.
+//
+// This pattern survives server restarts and scales horizontally because the
+// CSRF secret lives only in the browser cookie.
 func CSRFMiddleware(config CSRFConfig) func(http.Handler) http.Handler {
 	if !config.Enabled {
-		return func(next http.Handler) http.Handler {
-			return next
-		}
+		return func(next http.Handler) http.Handler { return next }
 	}
 
-	// Set defaults
+	// Apply defaults
 	if config.TokenLength == 0 {
 		config.TokenLength = 32
 	}
@@ -218,60 +85,70 @@ func CSRFMiddleware(config CSRFConfig) func(http.Handler) http.Handler {
 		config.Secure = "auto"
 	}
 
-	// Start cleanup goroutine
-	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-		for range ticker.C {
-			csrfStore.cleanupExpiredTokens()
-		}
-	}()
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Check if path is exempt from CSRF (API endpoints, compat endpoints)
+			// Exempt API and compatibility paths from CSRF
 			if isCSRFExempt(r.URL.Path, config.ExemptPaths, config.ExemptPrefixes) {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			sessionID := getSessionID(r)
-
-			// For safe methods (GET, HEAD, OPTIONS, TRACE), just set the token
 			if isSafeMethod(r.Method) {
-				token, err := csrfStore.getOrCreateToken(sessionID, config.TokenLength)
-				if err != nil {
-					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-					return
+				// Reuse existing cookie token or generate a fresh one.
+				token := ""
+				if cookie, err := r.Cookie(config.CookieName); err == nil && cookie.Value != "" {
+					token = cookie.Value
+				} else {
+					var genErr error
+					token, genErr = generateCSRFToken(config.TokenLength)
+					if genErr != nil {
+						http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+						return
+					}
 				}
 
-				// Set CSRF token cookie
+				// Refresh the cookie on every safe request to extend its lifetime.
 				setCSRFCookie(w, r, config, token)
 
-				// Add token to response header for JavaScript access
+				// Expose via response header for JavaScript clients.
 				w.Header().Set(config.HeaderName, token)
 
-				next.ServeHTTP(w, r)
+				// Inject token into request context so GetCSRFToken can return it
+				// from within template/handler execution without re-reading the cookie.
+				ctx := context.WithValue(r.Context(), csrfContextKey{}, token)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
-			// For state-changing methods, validate the token
-			token := extractCSRFToken(r, config)
-			if token == "" {
+			// State-changing method: validate the double-submit.
+			cookieToken := ""
+			if cookie, err := r.Cookie(config.CookieName); err == nil {
+				cookieToken = cookie.Value
+			}
+
+			if cookieToken == "" {
 				// Log CSRF failure to audit log per AI.md PART 11
 				audit.CSRFFailure(netshare.GetClientAddr(r).String(), r.URL.Path, GetRequestID(r.Context()))
 				http.Error(w, "CSRF token missing", http.StatusForbidden)
 				return
 			}
 
-			if !csrfStore.validateToken(sessionID, token) {
+			requestToken := extractCSRFToken(r, config)
+			if requestToken == "" {
+				// Log CSRF failure to audit log per AI.md PART 11
+				audit.CSRFFailure(netshare.GetClientAddr(r).String(), r.URL.Path, GetRequestID(r.Context()))
+				http.Error(w, "CSRF token missing", http.StatusForbidden)
+				return
+			}
+
+			// Constant-time comparison prevents timing attacks
+			if subtle.ConstantTimeCompare([]byte(cookieToken), []byte(requestToken)) != 1 {
 				// Log CSRF failure to audit log per AI.md PART 11
 				audit.CSRFFailure(netshare.GetClientAddr(r).String(), r.URL.Path, GetRequestID(r.Context()))
 				http.Error(w, "CSRF token invalid", http.StatusForbidden)
 				return
 			}
 
-			// Token is valid, continue
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -287,50 +164,42 @@ func isSafeMethod(method string) bool {
 	}
 }
 
-// isCSRFExempt checks if a path should be exempt from CSRF validation
-// API endpoints and compatibility endpoints are exempt since they use tokens, not cookies
+// isCSRFExempt checks if a path should be exempt from CSRF validation.
+// API endpoints and compatibility endpoints are exempt since they use tokens, not cookies.
 func isCSRFExempt(path string, exemptPaths, exemptPrefixes []string) bool {
-	// Check exact paths
 	for _, exempt := range exemptPaths {
 		if path == exempt {
 			return true
 		}
 	}
-
-	// Check prefixes
 	for _, prefix := range exemptPrefixes {
 		if strings.HasPrefix(path, prefix) {
 			return true
 		}
 	}
-
 	return false
 }
 
-// extractCSRFToken extracts the CSRF token from the request
-// Checks: Header, Form field, Query parameter (in that order)
+// extractCSRFToken extracts the CSRF token from the request.
+// Checks: X-CSRF-Token header, X-XSRF-Token header (Angular), then form field.
 func extractCSRFToken(r *http.Request, config CSRFConfig) string {
-	// Check header first (preferred for AJAX)
+	// Check header first (preferred for AJAX / XHR requests)
 	if token := r.Header.Get(config.HeaderName); token != "" {
 		return token
 	}
 
-	// Check X-XSRF-Token (Angular compatibility)
+	// X-XSRF-Token for Angular compatibility
 	if token := r.Header.Get("X-XSRF-Token"); token != "" {
 		return token
 	}
 
-	// Always attempt multipart parsing — ParseMultipartForm calls ParseForm
-	// internally, so it handles both multipart/form-data and
-	// application/x-www-form-urlencoded.  The check against r.MultipartForm
-	// avoids re-parsing an already-parsed multipart body; the check against
-	// r.Form skips the call for plain URL-encoded requests that were already
-	// parsed by an earlier middleware.
+	// ParseMultipartForm handles both multipart/form-data and
+	// application/x-www-form-urlencoded; skip if already parsed.
 	if r.MultipartForm == nil || r.Form == nil {
 		_ = r.ParseMultipartForm(32 << 20)
 	}
 
-	// Check form field
+	// Form field fallback
 	if token := r.FormValue(config.FieldName); token != "" {
 		return token
 	}
@@ -338,7 +207,8 @@ func extractCSRFToken(r *http.Request, config CSRFConfig) string {
 	return ""
 }
 
-// setCSRFCookie sets the CSRF token cookie
+// setCSRFCookie sets the CSRF token cookie.
+// HttpOnly is false so JavaScript can read the token for XHR requests.
 func setCSRFCookie(w http.ResponseWriter, r *http.Request, config CSRFConfig, token string) {
 	secure := false
 	switch config.Secure {
@@ -347,34 +217,44 @@ func setCSRFCookie(w http.ResponseWriter, r *http.Request, config CSRFConfig, to
 	case "false":
 		secure = false
 	default:
-		// auto: detect from request
+		// auto: detect from TLS or X-Forwarded-Proto
 		secure = r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 	}
 
-	cookie := &http.Cookie{
+	http.SetCookie(w, &http.Cookie{
 		Name:     config.CookieName,
 		Value:    token,
 		Path:     "/",
-		HttpOnly: false, // Must be accessible to JavaScript
+		HttpOnly: false,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int(csrfTokenTTL.Seconds()),
-	}
-	http.SetCookie(w, cookie)
+		MaxAge:   86400,
+	})
 }
 
-// GetCSRFToken returns the current CSRF token for the request
-// This is used by templates to include the token in forms
+// GetCSRFToken returns the CSRF token for the request.
+// Primary source is the request context (set by CSRFMiddleware on GET requests).
+// Falls back to reading the cookie directly for requests that bypass middleware.
 func GetCSRFToken(r *http.Request, tokenLength int) string {
-	sessionID := getSessionID(r)
-	token, _ := csrfStore.getOrCreateToken(sessionID, tokenLength)
+	// Context is set by CSRFMiddleware when it processes a safe-method request
+	if token, ok := r.Context().Value(csrfContextKey{}).(string); ok && token != "" {
+		return token
+	}
+
+	// Fallback: read the CSRF cookie directly (e.g., for exempt paths)
+	if cookie, err := r.Cookie("csrf_token"); err == nil && cookie.Value != "" {
+		return cookie.Value
+	}
+
+	// Last resort: generate an ephemeral token (middleware did not run)
+	token, _ := generateCSRFToken(tokenLength)
 	return token
 }
 
-// RegenerateCSRFToken creates a new CSRF token for the session
-// Call this after successful login to prevent session fixation
+// RegenerateCSRFToken generates a new CSRF token.
+// The caller must set the returned value in a new cookie via setCSRFCookie.
+// Call this after a successful login to prevent session fixation attacks.
 func RegenerateCSRFToken(r *http.Request, tokenLength int) string {
-	sessionID := getSessionID(r)
-	token, _ := csrfStore.regenerateToken(sessionID, tokenLength)
+	token, _ := generateCSRFToken(tokenLength)
 	return token
 }

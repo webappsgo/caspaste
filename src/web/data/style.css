@@ -1094,13 +1094,16 @@ h4 a, h5 a, h6 a {
 	top: 8px;
 }
 
-/* Nav links container - Mobile: hidden by default */
+/* Nav links container - Mobile: hidden by default.
+   order: 10 puts this after header-actions in the flex row so it wraps
+   to its own row (width: 100%) while header-actions stays on row 1. */
 .nav-links {
 	display: none;
 	flex-direction: column;
 	width: 100%;
 	padding-top: 0.5rem;
 	gap: 0.25rem;
+	order: 10;
 }
 
 /* CSS toggle: show nav links when checkbox is checked */
@@ -1130,7 +1133,7 @@ h4 a, h5 a, h6 a {
 	padding: 0.75rem 1rem;
 }
 
-/* Tablet and up: horizontal nav, hide hamburger */
+/* Tablet and up: horizontal nav, hide hamburger, reset flex order */
 @media (min-width: 768px) {
 	.nav-toggle {
 		display: none;
@@ -1143,6 +1146,11 @@ h4 a, h5 a, h6 a {
 		width: auto;
 		padding-top: 0;
 		gap: 0.5rem;
+		order: 0;
+	}
+
+	.header-actions {
+		order: 0;
 	}
 
 	.nav-links a,
@@ -2005,10 +2013,17 @@ input[type="file"]:disabled {
    NOTIFICATION BELL - Per AI.md PART 16
    Required when PART 34 implemented
    ======================================== */
+
+/* On mobile the hamburger nav uses flex-wrap. DOM order is:
+   site-title | nav-toggle | nav-links | header-actions
+   order: 3 keeps header-actions on the same row as the hamburger icon;
+   nav-links uses order: 10 (set in the hamburger section) so it wraps to
+   its own row when the menu is open. */
 .header-actions {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
+	order: 3;
 }
 
 .notification-bell, .profile-menu {
