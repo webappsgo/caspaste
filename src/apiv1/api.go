@@ -130,6 +130,9 @@ func (data *Data) Hand(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleCompat(rw, req)
 	case "/compat", "/paste":
 		err = data.handleCompat(rw, req)
+	// hastebin compatibility
+	case "/documents":
+		err = data.handleCompat(rw, req)
 
 	default:
 		// Support path-based paste ID: GET /api/v1/pastes/{id}

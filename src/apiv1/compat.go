@@ -7,7 +7,7 @@
 package apiv1
 
 // External API Compatibility - Create endpoints only per AI.md PART 14
-// Supports: termbin, sprunge, ix.io, pastebin.com, stikked, microbin, lenpaste
+// Supports: termbin, sprunge, ix.io, pastebin.com, stikked, microbin, lenpaste, hastebin
 //
 // Per AI.md "External API Compatibility":
 // - Match the exact response format of the target service
@@ -30,6 +30,27 @@ import (
 	"github.com/casjay-forks/caspaste/src/storage"
 	"github.com/casjay-forks/caspaste/src/validation"
 )
+
+// lenpasteResponse matches the lenpaste /api/v1/new response exactly (flat, no envelope).
+type lenpasteResponse struct {
+	ID         string `json:"id"`
+	URL        string `json:"url"`
+	Title      string `json:"title"`
+	Syntax     string `json:"syntax"`
+	CreateTime int64  `json:"createTime"`
+	DeleteTime int64  `json:"deleteTime"`
+}
+
+// stikkedResponse matches the stikked /api/create response format.
+type stikkedResponse struct {
+	Status string `json:"status"`
+	URL    string `json:"url"`
+}
+
+// hastebinResponse matches the hastebin /documents response format.
+type hastebinResponse struct {
+	Key string `json:"key"`
+}
 
 // compatResponse holds paste creation response data
 type compatResponse struct {
@@ -85,6 +106,12 @@ func (data *Data) handleCompat(rw http.ResponseWriter, req *http.Request) error 
 	// Original returns: plain text URL
 	case path == "/termbin" || path == "/nc":
 		return data.handleTermbinCompat(rw, req)
+
+	// hastebin compatibility
+	// POST /documents with raw body
+	// Original returns: {"key":"xxxxx"}
+	case path == "/documents":
+		return data.handleHastebinCompat(rw, req)
 
 	// Generic compatibility - accept multiple field names
 	// POST /compat or /paste
@@ -348,20 +375,20 @@ func (data *Data) handleStikkedCompat(rw http.ResponseWriter, req *http.Request)
 		}
 	}
 
-	pasteID, createTime, deleteTime, err := data.DB.PasteAdd(paste)
+	pasteID, _, _, err := data.DB.PasteAdd(paste)
 	if err != nil {
 		return err
 	}
 
-	resp := compatResponse{
-		ID:         pasteID,
-		URL:        netshare.BuildPasteURL(req, pasteID),
-		CreateTime: createTime,
-		DeleteTime: deleteTime,
+	// stikked returns {"status":"success","url":"..."} — flat JSON, no envelope
+	resp := stikkedResponse{
+		Status: "success",
+		URL:    netshare.BuildPasteURL(req, pasteID),
 	}
-
-	// stikked returns JSON by default
-	writeCompatResponse(rw, req, resp, httputil.FormatJSON)
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+	jsonData, _ := json.MarshalIndent(resp, "", "  ")
+	rw.Write(jsonData)
+	rw.Write([]byte("\n"))
 	return nil
 }
 
@@ -418,27 +445,35 @@ func (data *Data) handleMicrobinCompat(rw http.ResponseWriter, req *http.Request
 		}
 	}
 
-	pasteID, createTime, deleteTime, err := data.DB.PasteAdd(paste)
+	pasteID, _, _, err := data.DB.PasteAdd(paste)
 	if err != nil {
 		return err
 	}
 
-	resp := compatResponse{
-		ID:         pasteID,
-		URL:        netshare.BuildPasteURL(req, pasteID),
-		CreateTime: createTime,
-		DeleteTime: deleteTime,
+	pasteURL := netshare.BuildPasteURL(req, pasteID)
+
+	// microbin web form posts return a 303 redirect to the new paste URL.
+	// JSON API clients (Accept: application/json) get a JSON body instead.
+	if strings.Contains(req.Header.Get("Accept"), "application/json") {
+		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+		jsonData, _ := json.MarshalIndent(map[string]string{"id": pasteID, "url": pasteURL}, "", "  ")
+		rw.Write(jsonData)
+		rw.Write([]byte("\n"))
+		return nil
 	}
 
-	// microbin returns plain text for CLI, but we use content negotiation
-	writeCompatResponse(rw, req, resp, httputil.FormatText)
+	http.Redirect(rw, req, pasteURL, http.StatusSeeOther)
 	return nil
 }
 
-// handleLenpasteCompat handles lenpaste style paste creation
+// handleLenpasteCompat handles lenpaste style paste creation.
 // POST /api/v1/new
-// Original returns: JSON
-// Supports both body text and file uploads
+// lenpaste returns a flat JSON object (no envelope) with fields:
+//
+//	{"id","url","title","syntax","createTime","deleteTime"}
+//
+// Expiration: "lifetime" field is a Go duration string ("1h", "10m", "0"=never).
+// Falls back to "expiration" as integer seconds for backward compat.
 func (data *Data) handleLenpasteCompat(rw http.ResponseWriter, req *http.Request) error {
 	if req.Method != "POST" {
 		return netshare.ErrMethodNotAllowed
@@ -453,8 +488,15 @@ func (data *Data) handleLenpasteCompat(rw http.ResponseWriter, req *http.Request
 	req.ParseForm()
 	req.ParseMultipartForm(52428800)
 
+	syntax := req.PostFormValue("syntax")
+	if syntax == "" {
+		syntax = "plaintext"
+	}
+	syntax = normalizeSyntax(syntax, data.Lexers)
+
 	paste := storage.Paste{
 		Title:     req.PostFormValue("title"),
+		Syntax:    syntax,
 		OneUse:    validation.IsTruthy(req.PostFormValue("oneUse")),
 		Author:    req.PostFormValue("author"),
 		AuthorURL: req.PostFormValue("authorURL"),
@@ -465,48 +507,32 @@ func (data *Data) handleLenpasteCompat(rw http.ResponseWriter, req *http.Request
 	if fileErr == nil {
 		defer file.Close()
 
-		// Read file contents
 		fileData, err := io.ReadAll(file)
 		if err != nil {
 			return err
 		}
 
-		// Set file fields
 		paste.IsFile = true
 		paste.FileName = handler.Filename
 		paste.MimeType = handler.Header.Get("Content-Type")
 		if paste.MimeType == "" {
 			paste.MimeType = "application/octet-stream"
 		}
-
-		// Store as base64
 		paste.Body = base64.StdEncoding.EncodeToString(fileData)
-
-		// Default syntax for files
-		syntax := req.PostFormValue("syntax")
-		if syntax == "" {
-			syntax = "plaintext"
-		}
-		paste.Syntax = normalizeSyntax(syntax, data.Lexers)
 	} else {
-		// No file, use body parameter
 		body := req.PostFormValue("body")
 		if body == "" {
 			return netshare.ErrBadRequest
 		}
-
-		syntax := req.PostFormValue("syntax")
-		if syntax == "" {
-			syntax = "plaintext"
-		}
-
 		paste.Body = lineend.UnknownToUnix(body)
-		paste.Syntax = normalizeSyntax(syntax, data.Lexers)
 	}
 
-	// Parse expiration
-	expireStr := req.PostFormValue("expiration")
-	if expireStr != "" {
+	// Parse expiration: "lifetime" is a Go duration string; fallback to "expiration" seconds.
+	if lifetimeStr := req.PostFormValue("lifetime"); lifetimeStr != "" && lifetimeStr != "0" {
+		if d, err := time.ParseDuration(lifetimeStr); err == nil && d > 0 {
+			paste.DeleteTime = time.Now().Unix() + int64(d.Seconds())
+		}
+	} else if expireStr := req.PostFormValue("expiration"); expireStr != "" {
 		if seconds, err := strconv.ParseInt(expireStr, 10, 64); err == nil && seconds > 0 {
 			paste.DeleteTime = time.Now().Unix() + seconds
 		}
@@ -517,15 +543,19 @@ func (data *Data) handleLenpasteCompat(rw http.ResponseWriter, req *http.Request
 		return err
 	}
 
-	resp := compatResponse{
+	// lenpaste returns a flat JSON object — no "ok"/"data" envelope.
+	resp := lenpasteResponse{
 		ID:         pasteID,
 		URL:        netshare.BuildPasteURL(req, pasteID),
+		Title:      paste.Title,
+		Syntax:     paste.Syntax,
 		CreateTime: createTime,
 		DeleteTime: deleteTime,
 	}
-
-	// lenpaste returns JSON by default
-	writeCompatResponse(rw, req, resp, httputil.FormatJSON)
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+	jsonData, _ := json.MarshalIndent(resp, "", "  ")
+	rw.Write(jsonData)
+	rw.Write([]byte("\n"))
 	return nil
 }
 
@@ -771,6 +801,49 @@ func parsePastebinExpire(s string) int64 {
 	default:
 		return 0
 	}
+}
+
+// handleHastebinCompat handles hastebin style paste creation.
+// POST /documents — raw body (Content-Type agnostic).
+// Original returns: {"key":"xxxxx"}
+func (data *Data) handleHastebinCompat(rw http.ResponseWriter, req *http.Request) error {
+	if req.Method != "POST" {
+		return netshare.ErrMethodNotAllowed
+	}
+
+	err := data.RateLimitNew.CheckAndUse(netshare.GetClientAddr(req))
+	if err != nil {
+		return err
+	}
+
+	// Hastebin POSTs the raw paste body — no form encoding.
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
+	body := string(bodyBytes)
+	if body == "" {
+		return netshare.ErrBadRequest
+	}
+
+	paste := storage.Paste{
+		Body:   lineend.UnknownToUnix(body),
+		Syntax: "plaintext",
+	}
+
+	pasteID, _, _, err := data.DB.PasteAdd(paste)
+	if err != nil {
+		return err
+	}
+
+	// Hastebin returns {"key":"xxxxx"} — flat JSON, no envelope.
+	resp := hastebinResponse{Key: pasteID}
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+	jsonData, _ := json.MarshalIndent(resp, "", "  ")
+	rw.Write(jsonData)
+	rw.Write([]byte("\n"))
+	return nil
 }
 
 // writeCompatError writes an error response for compat endpoints
