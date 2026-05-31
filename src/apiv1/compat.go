@@ -32,19 +32,11 @@ import (
 )
 
 // lenpasteResponse matches the lenpaste /api/v1/new response exactly (flat, no envelope).
+// Only id, createTime, deleteTime are returned — no url, title, or syntax fields.
 type lenpasteResponse struct {
 	ID         string `json:"id"`
-	URL        string `json:"url"`
-	Title      string `json:"title"`
-	Syntax     string `json:"syntax"`
 	CreateTime int64  `json:"createTime"`
 	DeleteTime int64  `json:"deleteTime"`
-}
-
-// stikkedResponse matches the stikked /api/create response format.
-type stikkedResponse struct {
-	Status string `json:"status"`
-	URL    string `json:"url"`
 }
 
 // hastebinResponse matches the hastebin /documents response format.
@@ -320,7 +312,7 @@ func (data *Data) handlePastebinCompat(rw http.ResponseWriter, req *http.Request
 
 // handleStikkedCompat handles stikked/stiqued style paste creation
 // POST /api/create
-// Original returns: JSON with url field
+// Original returns: plain text full URL
 func (data *Data) handleStikkedCompat(rw http.ResponseWriter, req *http.Request) error {
 	if req.Method != "POST" {
 		return netshare.ErrMethodNotAllowed
@@ -379,15 +371,10 @@ func (data *Data) handleStikkedCompat(rw http.ResponseWriter, req *http.Request)
 		return err
 	}
 
-	// stikked returns {"status":"success","url":"..."} — flat JSON, no envelope
-	resp := stikkedResponse{
-		Status: "success",
-		URL:    netshare.BuildPasteURL(req, pasteID),
-	}
-	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
-	jsonData, _ := json.MarshalIndent(resp, "", "  ")
-	rw.Write(jsonData)
-	rw.Write([]byte("\n"))
+	// stikked returns plain text full URL — no JSON wrapper.
+	pasteURL := netshare.BuildPasteURL(req, pasteID)
+	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	rw.Write([]byte(pasteURL + "\n"))
 	return nil
 }
 
@@ -543,11 +530,9 @@ func (data *Data) handleLenpasteCompat(rw http.ResponseWriter, req *http.Request
 	}
 
 	// lenpaste returns a flat JSON object — no "ok"/"data" envelope.
+	// Fields: id, createTime, deleteTime only (no url, title, syntax).
 	resp := lenpasteResponse{
 		ID:         pasteID,
-		URL:        netshare.BuildPasteURL(req, pasteID),
-		Title:      paste.Title,
-		Syntax:     paste.Syntax,
 		CreateTime: createTime,
 		DeleteTime: deleteTime,
 	}
