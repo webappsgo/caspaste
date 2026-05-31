@@ -2355,8 +2355,11 @@ func main() {
 	mux.HandleFunc("/paste", func(rw http.ResponseWriter, req *http.Request) {
 		apiv1Data.Hand(rw, req)
 	})
-	// hastebin compatibility: POST /documents with raw body → {"key":"xxxxx"}
+	// hastebin compatibility: POST /documents → {"key":"xxxxx"}, GET /documents/{key} → {"key","data"}
 	mux.HandleFunc("/documents", func(rw http.ResponseWriter, req *http.Request) {
+		apiv1Data.Hand(rw, req)
+	})
+	mux.HandleFunc("/documents/", func(rw http.ResponseWriter, req *http.Request) {
 		apiv1Data.Hand(rw, req)
 	})
 
@@ -2484,7 +2487,7 @@ func main() {
 			"/termbin", "/nc",
 			"/upload", "/p",
 			"/compat", "/paste",
-			"/documents",
+			"/documents", "/documents/",
 		},
 		ExemptPrefixes: []string{
 			"/api/",

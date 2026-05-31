@@ -108,9 +108,8 @@ func (data *Data) handleCompat(rw http.ResponseWriter, req *http.Request) error 
 		return data.handleTermbinCompat(rw, req)
 
 	// hastebin compatibility
-	// POST /documents with raw body
-	// Original returns: {"key":"xxxxx"}
-	case path == "/documents":
+	// POST /documents — create; GET /documents/{key} — retrieve
+	case path == "/documents" || strings.HasPrefix(path, "/documents/"):
 		return data.handleHastebinCompat(rw, req)
 
 	// Generic compatibility - accept multiple field names
@@ -803,14 +802,32 @@ func parsePastebinExpire(s string) int64 {
 	}
 }
 
-// handleHastebinCompat handles hastebin style paste creation.
-// POST /documents — raw body (Content-Type agnostic).
-// Original returns: {"key":"xxxxx"}
+// hastebinGetResponse is the response body for GET /documents/{key}.
+type hastebinGetResponse struct {
+	Key  string `json:"key"`
+	Data string `json:"data"`
+}
+
+// handleHastebinCompat handles hastebin-compatible paste creation and retrieval.
+//
+// POST /documents — raw body → {"key":"xxxxx"}
+// GET  /documents/{key}    → {"key":"xxxxx","data":"paste content"}
+//
+// Note: GET /raw/{key} is already handled by the existing /raw/ handler,
+// which returns the raw paste body as plain text — identical to hastebin /raw/{key}.
 func (data *Data) handleHastebinCompat(rw http.ResponseWriter, req *http.Request) error {
-	if req.Method != "POST" {
+	switch req.Method {
+	case "POST":
+		return data.hastebinCreate(rw, req)
+	case "GET":
+		return data.hastebinGet(rw, req)
+	default:
 		return netshare.ErrMethodNotAllowed
 	}
+}
 
+// hastebinCreate handles POST /documents (raw body → {"key":"xxxxx"}).
+func (data *Data) hastebinCreate(rw http.ResponseWriter, req *http.Request) error {
 	err := data.RateLimitNew.CheckAndUse(netshare.GetClientAddr(req))
 	if err != nil {
 		return err
@@ -839,6 +856,39 @@ func (data *Data) handleHastebinCompat(rw http.ResponseWriter, req *http.Request
 
 	// Hastebin returns {"key":"xxxxx"} — flat JSON, no envelope.
 	resp := hastebinResponse{Key: pasteID}
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+	jsonData, _ := json.MarshalIndent(resp, "", "  ")
+	rw.Write(jsonData)
+	rw.Write([]byte("\n"))
+	return nil
+}
+
+// hastebinGet handles GET /documents/{key} → {"key":"xxxxx","data":"paste content"}.
+func (data *Data) hastebinGet(rw http.ResponseWriter, req *http.Request) error {
+	err := data.RateLimitGet.CheckAndUse(netshare.GetClientAddr(req))
+	if err != nil {
+		return err
+	}
+
+	// Extract key from path: /documents/{key}
+	key := strings.TrimPrefix(req.URL.Path, "/documents/")
+	key = strings.TrimSuffix(key, "/")
+	if key == "" {
+		return netshare.ErrBadRequest
+	}
+
+	paste, err := data.DB.PasteGet(key)
+	if err != nil {
+		return err
+	}
+
+	// Burn-after-reading: delete after first view
+	if paste.OneUse {
+		_ = data.DB.PasteDelete(key)
+	}
+
+	// Hastebin returns {"key":"xxxxx","data":"content"} — flat JSON, no envelope.
+	resp := hastebinGetResponse{Key: key, Data: paste.Body}
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 	jsonData, _ := json.MarshalIndent(resp, "", "  ")
 	rw.Write(jsonData)

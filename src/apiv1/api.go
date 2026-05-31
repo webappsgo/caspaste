@@ -135,10 +135,14 @@ func (data *Data) Hand(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleCompat(rw, req)
 
 	default:
+		switch {
 		// Support path-based paste ID: GET /api/v1/pastes/{id}
-		if strings.HasPrefix(routePath, apiBase+"/pastes/") {
+		case strings.HasPrefix(routePath, apiBase+"/pastes/"):
 			err = data.handlePastes(rw, req)
-		} else {
+		// hastebin: GET /documents/{key}
+		case strings.HasPrefix(routePath, "/documents/"):
+			err = data.handleCompat(rw, req)
+		default:
 			err = netshare.ErrNotFound
 		}
 	}
