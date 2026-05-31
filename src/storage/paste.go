@@ -294,7 +294,8 @@ type PasteListItem struct {
 
 func (db DB) PasteList(limit int, offset int) ([]PasteListItem, error) {
 	if limit <= 0 || limit > 100 {
-		limit = 50 // Default limit
+		// Default limit
+		limit = 50
 	}
 	if offset < 0 {
 		offset = 0

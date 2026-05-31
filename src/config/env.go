@@ -54,7 +54,8 @@ func parseAddress(addr string) (fqdn, listen, port string) {
 		// IPv6 format: [ip]:port or [ip]
 		closeBracket := strings.Index(addr, "]")
 		if closeBracket == -1 {
-			return // Invalid format
+			// Invalid format
+			return
 		}
 		ipv6 := addr[1:closeBracket]
 		rest := addr[closeBracket+1:]

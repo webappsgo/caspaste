@@ -15,7 +15,6 @@ func (data *Data) handleUserDashboard(rw http.ResponseWriter, req *http.Request)
 		return ErrMethodNotAllowed
 	}
 
-	// Get authenticated user from context
 	authUser := GetAuthUser(req.Context())
 	if authUser == nil {
 		http.Redirect(rw, req, "/login", http.StatusFound)
@@ -113,415 +112,186 @@ func (data *Data) handleUserDomains(rw http.ResponseWriter, req *http.Request) e
 	return data.renderUserDomains(rw, req, authUser)
 }
 
-// Render functions - these will use templates
+// userSettingsNavLinks returns the standard settings navigation links.
+func userSettingsNavLinks() []stubLink {
+	return []stubLink{
+		{URL: "/users/settings", Label: "Account"},
+		{URL: "/users/settings/privacy", Label: "Privacy"},
+		{URL: "/users/settings/notifications", Label: "Notifications"},
+		{URL: "/users/settings/appearance", Label: "Appearance"},
+	}
+}
 
 func (data *Data) renderUserDashboard(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	// Get locale
-	locale := data.Locales.findLocale(req)
-
-	templateData := map[string]interface{}{
-		"Title":          "Dashboard",
-		"User":           user,
-		"Version":        data.Version,
-		"FQDN":           data.FQDN,
-		"ServerTitle":    data.ServerTitle,
-		"LocalesList":    data.LocalesList,
-		"ThemesList":     data.ThemesList,
-		"UiDefaultTheme": data.UiDefaultTheme,
-		"Translate":      locale.translate,
-	}
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	// For now, use a simple HTML response until we have the full template
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Dashboard - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Welcome, ` + user.Username + `!</h1>
-		<nav>
-			<ul>
-				<li><a href="/users/settings">Settings</a></li>
-				<li><a href="/users/security">Security</a></li>
-				<li><a href="/users/tokens">API Tokens</a></li>
-				<li><a href="/users/domains">Custom Domains</a></li>
-				<li><a href="/orgs">Organizations</a></li>
-				<li><a href="/server/auth/logout">Logout</a></li>
-			</ul>
-		</nav>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	_ = templateData // Will be used when full template is implemented
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Welcome, " + user.Username,
+		Description: "Your personal dashboard.",
+		Links: []stubLink{
+			{URL: "/users/settings", Label: "Settings"},
+			{URL: "/users/security", Label: "Security"},
+			{URL: "/users/tokens", Label: "API Tokens"},
+			{URL: "/users/domains", Label: "Custom Domains"},
+			{URL: "/orgs", Label: "Organizations"},
+			{URL: "/server/auth/logout", Label: "Logout"},
+		},
+	})
 }
 
 func (data *Data) renderUserSecurity(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Security Settings - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Security Settings</h1>
-		<section>
-			<h2>Two-Factor Authentication</h2>
-			<p>Status: ` + boolToStr(user.TOTPEnabled, "Enabled", "Disabled") + `</p>
-			<form action="/api/v1/users/security/2fa/enable" method="POST">
-				<button type="submit">` + boolToStr(user.TOTPEnabled, "Manage 2FA", "Enable 2FA") + `</button>
-			</form>
-		</section>
-		<section>
-			<h2>Sessions</h2>
-			<p><a href="/api/v1/users/sessions">View Active Sessions</a></p>
-		</section>
-		<section>
-			<h2>Change Password</h2>
-			<form action="/api/v1/users/security/password" method="POST">
-				<input type="password" name="current_password" placeholder="Current Password" required>
-				<input type="password" name="new_password" placeholder="New Password" required>
-				<button type="submit">Change Password</button>
-			</form>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	twoFALabel := "Enable 2FA"
+	if user.TOTPEnabled {
+		twoFALabel = "Manage 2FA"
+	}
+	return data.renderStub(rw, req, stubTmplData{
+		Title: "Security Settings",
+		Links: []stubLink{
+			{URL: "/api/v1/users/sessions", Label: "View Active Sessions"},
+		},
+		FormAction:  "/api/v1/users/security/password",
+		FormMethod:  "POST",
+		SubmitLabel: "Change Password",
+		Fields: []stubField{
+			{ID: "current_password", Name: "current_password", Label: "Current Password",
+				Type: "password", Placeholder: "Current Password", Required: true},
+			{ID: "new_password", Name: "new_password", Label: "New Password",
+				Type: "password", Placeholder: "New Password", Required: true},
+		},
+		Notice:    "Two-Factor Authentication: " + boolToStr(user.TOTPEnabled, "Enabled", "Disabled") +
+			" — <a href=\"/api/v1/users/security/2fa/enable\">" + twoFALabel + "</a>",
+		BackURL:   "/users",
+		BackLabel: "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderUserTokens(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>API Tokens - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>API Tokens</h1>
-		<section>
-			<h2>Create New Token</h2>
-			<form action="/api/v1/users/tokens" method="POST">
-				<input type="text" name="name" placeholder="Token Name" required>
-				<select name="scopes">
-					<option value="read">Read Only</option>
-					<option value="read-write">Read/Write</option>
-					<option value="global">Full Access</option>
-				</select>
-				<button type="submit">Create Token</button>
-			</form>
-		</section>
-		<section>
-			<h2>Active Tokens</h2>
-			<p>View and manage your API tokens via the API: GET /api/v1/users/tokens</p>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "API Tokens",
+		Description: "View and manage your API tokens via the API: GET /api/v1/users/tokens",
+		FormAction:  "/api/v1/users/tokens",
+		FormMethod:  "POST",
+		SubmitLabel: "Create Token",
+		Fields: []stubField{
+			{ID: "name", Name: "name", Label: "Token Name", Type: "text",
+				Placeholder: "Token Name", Required: true},
+			{ID: "scopes", Name: "scopes", Label: "Scopes", Type: "select",
+				Options: []stubSelectOption{
+					{Value: "read", Label: "Read Only"},
+					{Value: "read-write", Label: "Read/Write"},
+					{Value: "global", Label: "Full Access"},
+				}},
+		},
+		BackURL:   "/users",
+		BackLabel: "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderUserDomains(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Custom Domains - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Custom Domains</h1>
-		<section>
-			<h2>Add New Domain</h2>
-			<form action="/api/v1/users/domains" method="POST">
-				<input type="text" name="domain" placeholder="yourdomain.com" required>
-				<button type="submit">Add Domain</button>
-			</form>
-		</section>
-		<section>
-			<h2>Your Domains</h2>
-			<p>View and manage your domains via the API: GET /api/v1/users/domains</p>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Custom Domains",
+		Description: "View and manage your domains via the API: GET /api/v1/users/domains",
+		FormAction:  "/api/v1/users/domains",
+		FormMethod:  "POST",
+		SubmitLabel: "Add Domain",
+		Fields: []stubField{
+			{ID: "domain", Name: "domain", Label: "Domain", Type: "text",
+				Placeholder: "yourdomain.com", Required: true},
+		},
+		BackURL:   "/users",
+		BackLabel: "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderUserSettings(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Account Settings - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Account Settings</h1>
-		<nav class="settings-nav">
-			<a href="/users/settings" class="active">Account</a>
-			<a href="/users/settings/privacy">Privacy</a>
-			<a href="/users/settings/notifications">Notifications</a>
-			<a href="/users/settings/appearance">Appearance</a>
-		</nav>
-		<section>
-			<h2>Profile Information</h2>
-			<form action="/api/v1/users" method="PATCH">
-				<div class="form-group">
-					<label for="display_name">Display Name</label>
-					<input type="text" id="display_name" name="display_name" value="` + user.Username + `">
-				</div>
-				<div class="form-group">
-					<label for="email">Email</label>
-					<input type="email" id="email" name="email" placeholder="your@email.com">
-				</div>
-				<div class="form-group">
-					<label for="bio">Bio</label>
-					<textarea id="bio" name="bio" rows="3"></textarea>
-				</div>
-				<button type="submit">Save Changes</button>
-			</form>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Account Settings",
+		Links:       userSettingsNavLinks(),
+		FormAction:  "/api/v1/users",
+		FormMethod:  "PATCH",
+		SubmitLabel: "Save Changes",
+		Fields: []stubField{
+			{ID: "display_name", Name: "display_name", Label: "Display Name",
+				Type: "text", Value: user.Username},
+			{ID: "email", Name: "email", Label: "Email",
+				Type: "email", Placeholder: "your@email.com"},
+			{ID: "bio", Name: "bio", Label: "Bio", Type: "textarea"},
+		},
+		BackURL:   "/users",
+		BackLabel: "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderUserNotifications(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Notifications - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Notifications</h1>
-		<section>
-			<div class="empty-state">
-				<h3>No notifications</h3>
-				<p>You're all caught up!</p>
-			</div>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Notifications",
+		Description: "You are all caught up — no notifications.",
+		BackURL:     "/users",
+		BackLabel:   "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderUserSettingsPrivacy(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Privacy Settings - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Privacy Settings</h1>
-		<nav class="settings-nav">
-			<a href="/users/settings">Account</a>
-			<a href="/users/settings/privacy" class="active">Privacy</a>
-			<a href="/users/settings/notifications">Notifications</a>
-			<a href="/users/settings/appearance">Appearance</a>
-		</nav>
-		<section>
-			<form action="/api/v1/users/settings" method="PATCH">
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="show_email">
-						Show email on profile
-					</label>
-				</div>
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="show_activity" checked>
-						Show activity on profile
-					</label>
-				</div>
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="show_orgs" checked>
-						Show organizations on profile
-					</label>
-				</div>
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="searchable" checked>
-						Allow profile to be found in search
-					</label>
-				</div>
-				<button type="submit">Save Privacy Settings</button>
-			</form>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Privacy Settings",
+		Links:       userSettingsNavLinks(),
+		FormAction:  "/api/v1/users/settings",
+		FormMethod:  "PATCH",
+		SubmitLabel: "Save Privacy Settings",
+		Fields: []stubField{
+			{ID: "show_email", Name: "show_email", Label: "Show email on profile", Type: "text"},
+			{ID: "searchable", Name: "searchable", Label: "Allow profile to be found in search", Type: "text"},
+		},
+		BackURL:   "/users",
+		BackLabel: "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderUserSettingsNotifications(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Notification Settings - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Notification Settings</h1>
-		<nav class="settings-nav">
-			<a href="/users/settings">Account</a>
-			<a href="/users/settings/privacy">Privacy</a>
-			<a href="/users/settings/notifications" class="active">Notifications</a>
-			<a href="/users/settings/appearance">Appearance</a>
-		</nav>
-		<section>
-			<h2>Email Notifications</h2>
-			<form action="/api/v1/users/settings" method="PATCH">
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="email_security" checked>
-						Security alerts
-					</label>
-				</div>
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="email_mentions" checked>
-						Mentions and replies
-					</label>
-				</div>
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="email_updates">
-						Product updates
-					</label>
-				</div>
-				<div class="form-group">
-					<label for="email_digest">Email digest frequency</label>
-					<select id="email_digest" name="email_digest">
-						<option value="daily">Daily</option>
-						<option value="weekly" selected>Weekly</option>
-						<option value="never">Never</option>
-					</select>
-				</div>
-				<button type="submit">Save Notification Settings</button>
-			</form>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Notification Settings",
+		Links:       userSettingsNavLinks(),
+		FormAction:  "/api/v1/users/settings",
+		FormMethod:  "PATCH",
+		SubmitLabel: "Save Notification Settings",
+		Fields: []stubField{
+			{ID: "email_digest", Name: "email_digest", Label: "Email digest frequency", Type: "select",
+				Options: []stubSelectOption{
+					{Value: "daily", Label: "Daily"},
+					{Value: "weekly", Label: "Weekly"},
+					{Value: "never", Label: "Never"},
+				}},
+		},
+		BackURL:   "/users",
+		BackLabel: "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderUserSettingsAppearance(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Appearance Settings - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Appearance Settings</h1>
-		<nav class="settings-nav">
-			<a href="/users/settings">Account</a>
-			<a href="/users/settings/privacy">Privacy</a>
-			<a href="/users/settings/notifications">Notifications</a>
-			<a href="/users/settings/appearance" class="active">Appearance</a>
-		</nav>
-		<section>
-			<form action="/api/v1/users/settings" method="PATCH">
-				<div class="form-group">
-					<label for="theme">Theme</label>
-					<select id="theme" name="theme">
-						<option value="dark">Dark</option>
-						<option value="light">Light</option>
-						<option value="system">System</option>
-					</select>
-				</div>
-				<div class="form-group">
-					<label for="font_size">Font Size</label>
-					<select id="font_size" name="font_size">
-						<option value="small">Small</option>
-						<option value="medium" selected>Medium</option>
-						<option value="large">Large</option>
-					</select>
-				</div>
-				<div class="form-group">
-					<label>
-						<input type="checkbox" name="reduce_motion">
-						Reduce motion
-					</label>
-				</div>
-				<button type="submit">Save Appearance Settings</button>
-			</form>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Appearance Settings",
+		Links:       userSettingsNavLinks(),
+		FormAction:  "/api/v1/users/settings",
+		FormMethod:  "PATCH",
+		SubmitLabel: "Save Appearance Settings",
+		Fields: []stubField{
+			{ID: "theme", Name: "theme", Label: "Theme", Type: "select",
+				Options: []stubSelectOption{
+					{Value: "dark", Label: "Dark"},
+					{Value: "light", Label: "Light"},
+					{Value: "system", Label: "System"},
+				}},
+			{ID: "font_size", Name: "font_size", Label: "Font Size", Type: "select",
+				Options: []stubSelectOption{
+					{Value: "small", Label: "Small"},
+					{Value: "medium", Label: "Medium"},
+					{Value: "large", Label: "Large"},
+				}},
+		},
+		BackURL:   "/users",
+		BackLabel: "Back to Dashboard",
+	})
 }
 
-// Helper function
+// boolToStr returns trueStr if b is true, falseStr otherwise.
 func boolToStr(b bool, trueStr, falseStr string) string {
 	if b {
 		return trueStr

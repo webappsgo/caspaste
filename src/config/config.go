@@ -80,6 +80,9 @@ type Config struct {
 	// "production" or "development"
 	Mode string
 
+	// Path to the application data directory; used for disk health check
+	DataDir string
+
 	// Branding/description (from yaml server.tagline, server.description)
 	ServerTagline     string
 	ServerDescription string

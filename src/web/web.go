@@ -71,11 +71,15 @@ type Data struct {
 	EmbeddedPage     *template.Template
 	EmbeddedHelpPage *template.Template
 	Login            *template.Template
+	StubPage         *template.Template
 
 	Version     string
 	Mode        string
 	BuildCommit string
 	BuildDate   string
+
+	// DataDir is the application data directory path; used for disk health check
+	DataDir string
 
 	ServerTagline     string
 	ServerDescription string
@@ -167,6 +171,7 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.Mode = cfg.Mode
 	data.BuildCommit = cfg.BuildCommit
 	data.BuildDate = cfg.BuildDate
+	data.DataDir = cfg.DataDir
 	data.ServerTagline = cfg.ServerTagline
 	data.ServerDescription = cfg.ServerDescription
 
@@ -403,6 +408,12 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 		return nil, err
 	}
 
+	// stub.tmpl - shared template for placeholder/stub pages (auth, user, org)
+	data.StubPage, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/stub.tmpl")
+	if err != nil {
+		return nil, err
+	}
+
 	return &data, nil
 }
 
@@ -480,7 +491,8 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 	case "/server/about/security":
 		err = data.handleSecurityPolicy(rw, req)
 	case "/server/help":
-		err = data.handleDocs(rw, req) // Help redirects to docs
+		// Help redirects to docs
+		err = data.handleDocs(rw, req)
 	// Legacy /about routes - 301 redirect to /server/about
 	case "/about":
 		http.Redirect(rw, req, "/server/about", http.StatusMovedPermanently)
@@ -498,7 +510,8 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleDocsAPIv1(rw, req)
 	case "/docs/libraries":
 		err = data.handleDocsLibraries(rw, req)
-	case "/docs/api_libs": // Redirect old URL
+	// Redirect old URL
+	case "/docs/api_libs":
 		http.Redirect(rw, req, "/docs/libraries", http.StatusMovedPermanently)
 	case "/docs/customize":
 		err = data.handleDocsCustomize(rw, req)

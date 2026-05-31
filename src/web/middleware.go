@@ -69,7 +69,8 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-		w.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
+		// 24 hours
+		w.Header().Set("Access-Control-Max-Age", "86400")
 
 		// Handle preflight requests
 		if r.Method == "OPTIONS" {
@@ -90,7 +91,8 @@ func MaintenanceMiddleware(dataDir string, next http.Handler) http.Handler {
 		if _, err := os.Stat(maintenanceFile); err == nil {
 			// Maintenance mode is enabled
 			w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-			w.Header().Set("Retry-After", "3600") // Retry after 1 hour
+			// Retry after 1 hour
+			w.Header().Set("Retry-After", "3600")
 			w.WriteHeader(http.StatusServiceUnavailable)
 
 			html := `<!DOCTYPE html>

@@ -32,7 +32,8 @@ var (
 
 type DB struct {
 	pool       *sql.DB
-	backupPool *sql.DB // SQLite backup/cache when using postgres/mysql
+	// SQLite backup/cache when using postgres/mysql
+	backupPool *sql.DB
 	driver     string
 }
 
@@ -55,8 +56,10 @@ func NewPool(driverName string, dataSourceName string, maxOpenConns int, maxIdle
 	db.pool.SetMaxIdleConns(maxIdleConns)
 
 	// Set connection lifetime and idle timeouts to prevent stale connections
-	db.pool.SetConnMaxLifetime(3600 * 1000000000) // 1 hour in nanoseconds
-	db.pool.SetConnMaxIdleTime(600 * 1000000000)  // 10 minutes in nanoseconds
+	// 1 hour in nanoseconds
+	db.pool.SetConnMaxLifetime(3600 * 1000000000)
+	// 10 minutes in nanoseconds
+	db.pool.SetConnMaxIdleTime(600 * 1000000000)
 
 	// If using a remote driver, also open SQLite backup/cache for local operations
 	if driverName == "postgres" || driverName == "mysql" || driverName == "mariadb" || driverName == "libsql" {
@@ -133,6 +136,12 @@ func isRunningAsRoot() bool {
 	return os.Geteuid() == 0
 }
 
+// Pool returns the underlying *sql.DB connection pool.
+// Used by ancillary services (session, token) that operate on the same database.
+func (db DB) Pool() *sql.DB {
+	return db.pool
+}
+
 func (db DB) Close() error {
 	// Close backup pool first if it exists
 	if db.backupPool != nil {
@@ -201,9 +210,12 @@ func (db DB) queryRowSQL(ctx context.Context, query string, args ...interface{})
 
 // sqlFrags holds driver-specific DDL fragments
 type sqlFrags struct {
-	AutoIncPK   string // full "id" column type+constraints
-	NowDefault  string // DEFAULT expression for unix-timestamp columns (with parens)
-	TableSuffix string // appended after closing ) of CREATE TABLE, before ;
+	// full "id" column type+constraints
+	AutoIncPK string
+	// DEFAULT expression for unix-timestamp columns (with parens)
+	NowDefault string
+	// appended after closing ) of CREATE TABLE, before ;
+	TableSuffix string
 }
 
 // sqlFragsFor returns DDL fragments for the given driver.
@@ -221,7 +233,8 @@ func sqlFragsFor(driver string) sqlFrags {
 			NowDefault:  "(UNIX_TIMESTAMP())",
 			TableSuffix: " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 		}
-	default: // sqlite, libsql
+	// sqlite, libsql
+	default:
 		return sqlFrags{
 			AutoIncPK:   "INTEGER PRIMARY KEY AUTOINCREMENT",
 			NowDefault:  "(strftime('%s', 'now'))",

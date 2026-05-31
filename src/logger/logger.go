@@ -280,7 +280,8 @@ func (cfg Logger) HttpRequest(req *http.Request, code int) {
 			fmt.Fprintf(cfg.accessFile, "%s %s %s %s %d %s\n",
 				timestamp, clientIP, method, path, code, userAgent)
 			
-		default: // "apache" or unspecified
+		// "apache" or unspecified
+		default:
 			// Apache Combined Log Format (default)
 			timestamp := time.Now().Format("02/Jan/2006:15:04:05 -0700")
 			fmt.Fprintf(cfg.accessFile, "%s - - [%s] \"%s %s %s\" %d - \"%s\" \"%s\"\n",

@@ -48,5 +48,6 @@ func IsRunningAsService() bool {
 	// Check if INVOCATION_ID is set (systemd sets this)
 	// Or check if PPID is 1 (init/systemd)
 	// This is a heuristic, not perfect
-	return false // Conservative default
+	// Conservative default
+	return false
 }

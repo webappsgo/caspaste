@@ -76,11 +76,13 @@ func (data *Data) handleDownload(rw http.ResponseWriter, req *http.Request) erro
 		contentType = "application/octet-stream"
 
 		// Get file extension from lexer (if available)
-		fileExt := ".txt" // Default extension
+		// Default extension
+		fileExt := ".txt"
 		if lexer := chromaLexers.Get(paste.Syntax); lexer != nil {
 			config := lexer.Config()
 			if config != nil && len(config.Filenames) > 0 {
-				fileExt = config.Filenames[0][1:] // Strip the leading "*"
+				// Strip the leading "*"
+				fileExt = config.Filenames[0][1:]
 			}
 		}
 		if !strings.HasSuffix(fileName, fileExt) {

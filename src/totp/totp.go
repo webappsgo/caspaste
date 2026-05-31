@@ -22,15 +22,19 @@ import (
 
 // TOTP constants
 const (
-	DefaultPeriod     = 30 // seconds
+	// seconds
+	DefaultPeriod     = 30
 	DefaultDigits     = 6
-	DefaultSecretSize = 20 // bytes
+	// bytes
+	DefaultSecretSize = 20
 )
 
 // TOTPSetup contains data needed for TOTP setup
 type TOTPSetup struct {
-	Secret    string `json:"secret"`     // Base32-encoded secret
-	QRCodeURL string `json:"qr_code_url"`  // otpauth:// URL for QR code
+	// Base32-encoded secret
+	Secret string `json:"secret"`
+	// otpauth:// URL for QR code generation
+	QRCodeURL string `json:"qr_code_url"`
 	Issuer    string `json:"issuer"`
 	Account   string `json:"account"`
 }
@@ -152,7 +156,8 @@ func VerifyRecoveryKeyFormat(key string) bool {
 	// Check all characters are hex
 	for i, c := range key {
 		if i == 8 {
-			continue // Skip hyphen
+			// Skip hyphen
+			continue
 		}
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return false

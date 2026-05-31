@@ -83,7 +83,8 @@ func EnsureUser() (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	gid := uid // Use same number for GID
+	// Use same number for GID
+	gid := uid
 
 	// Try groupadd first (standard Linux)
 	cmd := exec.Command("groupadd", "--gid", strconv.Itoa(gid), "--system", CasPasteGroup)

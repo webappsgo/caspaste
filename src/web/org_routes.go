@@ -30,7 +30,6 @@ func (data *Data) handleOrgNew(rw http.ResponseWriter, req *http.Request) error 
 	}
 
 	if req.Method == http.MethodPost {
-		// Handle form submission - redirect to API
 		http.Redirect(rw, req, "/api/v1/orgs", http.StatusSeeOther)
 		return nil
 	}
@@ -93,17 +92,14 @@ func (data *Data) handleOrgDomains(rw http.ResponseWriter, req *http.Request, sl
 func (data *Data) routeOrgs(rw http.ResponseWriter, req *http.Request) error {
 	path := req.URL.Path
 
-	// /orgs
 	if path == "/orgs" || path == "/orgs/" {
 		return data.handleOrgsList(rw, req)
 	}
 
-	// /orgs/new
 	if path == "/orgs/new" {
 		return data.handleOrgNew(rw, req)
 	}
 
-	// /orgs/{slug}/*
 	parts := strings.Split(strings.TrimPrefix(path, "/orgs/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
 		return data.handleOrgsList(rw, req)
@@ -111,276 +107,147 @@ func (data *Data) routeOrgs(rw http.ResponseWriter, req *http.Request) error {
 
 	slug := parts[0]
 
-	// /orgs/{slug}
 	if len(parts) == 1 {
 		return data.handleOrgView(rw, req, slug)
 	}
 
-	// /orgs/{slug}/settings
-	if parts[1] == "settings" {
+	switch parts[1] {
+	case "settings":
 		return data.handleOrgSettings(rw, req, slug)
-	}
-
-	// /orgs/{slug}/members
-	if parts[1] == "members" {
+	case "members":
 		return data.handleOrgMembers(rw, req, slug)
-	}
-
-	// /orgs/{slug}/tokens
-	if parts[1] == "tokens" {
+	case "tokens":
 		return data.handleOrgTokens(rw, req, slug)
-	}
-
-	// /orgs/{slug}/domains
-	if parts[1] == "domains" {
+	case "domains":
 		return data.handleOrgDomains(rw, req, slug)
 	}
 
 	return data.handleOrgView(rw, req, slug)
 }
 
-// Render functions
+// orgNavLinks returns the standard navigation links for an org page.
+func orgNavLinks(slug string) []stubLink {
+	return []stubLink{
+		{URL: "/orgs/" + slug + "/settings", Label: "Settings"},
+		{URL: "/orgs/" + slug + "/members", Label: "Members"},
+		{URL: "/orgs/" + slug + "/tokens", Label: "API Tokens"},
+		{URL: "/orgs/" + slug + "/domains", Label: "Custom Domains"},
+	}
+}
 
 func (data *Data) renderOrgsList(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Organizations - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Organizations</h1>
-		<p><a href="/orgs/new" class="button">Create Organization</a></p>
-		<section>
-			<h2>Your Organizations</h2>
-			<p>View your organizations via the API: GET /api/v1/orgs</p>
-		</section>
-		<p><a href="/users">Back to Dashboard</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Organizations",
+		Description: "Manage your organizations.",
+		Notice:      "<a href=\"/orgs/new\" class=\"button\">Create Organization</a>",
+		BackURL:     "/users",
+		BackLabel:   "Back to Dashboard",
+	})
 }
 
 func (data *Data) renderOrgNew(rw http.ResponseWriter, req *http.Request, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Create Organization - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Create Organization</h1>
-		<form action="/api/v1/orgs" method="POST">
-			<div>
-				<label for="slug">Slug (URL-friendly name):</label>
-				<input type="text" id="slug" name="slug" pattern="[a-z0-9-]+" required>
-				<small>Lowercase letters, numbers, and hyphens only</small>
-			</div>
-			<div>
-				<label for="name">Display Name:</label>
-				<input type="text" id="name" name="name" required>
-			</div>
-			<div>
-				<label for="description">Description:</label>
-				<textarea id="description" name="description"></textarea>
-			</div>
-			<div>
-				<label for="visibility">Visibility:</label>
-				<select id="visibility" name="visibility">
-					<option value="public">Public</option>
-					<option value="private">Private</option>
-				</select>
-			</div>
-			<button type="submit">Create Organization</button>
-		</form>
-		<p><a href="/orgs">Cancel</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Create Organization",
+		FormAction:  "/api/v1/orgs",
+		FormMethod:  "POST",
+		SubmitLabel: "Create Organization",
+		Fields: []stubField{
+			{ID: "slug", Name: "slug", Label: "Slug (URL-friendly name)", Type: "text",
+				Pattern: "[a-z0-9-]+", Required: true,
+				Hint: "Lowercase letters, numbers, and hyphens only"},
+			{ID: "name", Name: "name", Label: "Display Name", Type: "text", Required: true},
+			{ID: "description", Name: "description", Label: "Description", Type: "textarea"},
+			{ID: "visibility", Name: "visibility", Label: "Visibility", Type: "select",
+				Options: []stubSelectOption{
+					{Value: "public", Label: "Public"},
+					{Value: "private", Label: "Private"},
+				}},
+		},
+		BackURL:   "/orgs",
+		BackLabel: "Cancel",
+	})
 }
 
 func (data *Data) renderOrgView(rw http.ResponseWriter, req *http.Request, slug string, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>` + slug + ` - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>` + slug + `</h1>
-		<nav>
-			<ul>
-				<li><a href="/orgs/` + slug + `/settings">Settings</a></li>
-				<li><a href="/orgs/` + slug + `/members">Members</a></li>
-				<li><a href="/orgs/` + slug + `/tokens">API Tokens</a></li>
-				<li><a href="/orgs/` + slug + `/domains">Custom Domains</a></li>
-			</ul>
-		</nav>
-		<p>View organization details via the API: GET /api/v1/orgs/` + slug + `</p>
-		<p><a href="/orgs">Back to Organizations</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       slug,
+		Description: "Organization overview. Use the API to manage this organization: GET /api/v1/orgs/" + slug,
+		Links:       orgNavLinks(slug),
+		BackURL:     "/orgs",
+		BackLabel:   "Back to Organizations",
+	})
 }
 
 func (data *Data) renderOrgSettings(rw http.ResponseWriter, req *http.Request, slug string, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Settings - ` + slug + ` - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Settings: ` + slug + `</h1>
-		<form action="/api/v1/orgs/` + slug + `" method="POST">
-			<div>
-				<label for="name">Display Name:</label>
-				<input type="text" id="name" name="name">
-			</div>
-			<div>
-				<label for="description">Description:</label>
-				<textarea id="description" name="description"></textarea>
-			</div>
-			<button type="submit">Save Changes</button>
-		</form>
-		<p><a href="/orgs/` + slug + `">Back to Organization</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Settings: " + slug,
+		FormAction:  "/api/v1/orgs/" + slug,
+		FormMethod:  "POST",
+		SubmitLabel: "Save Changes",
+		Fields: []stubField{
+			{ID: "name", Name: "name", Label: "Display Name", Type: "text"},
+			{ID: "description", Name: "description", Label: "Description", Type: "textarea"},
+		},
+		BackURL:   "/orgs/" + slug,
+		BackLabel: "Back to Organization",
+	})
 }
 
 func (data *Data) renderOrgMembers(rw http.ResponseWriter, req *http.Request, slug string, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Members - ` + slug + ` - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Members: ` + slug + `</h1>
-		<section>
-			<h2>Add Member</h2>
-			<form action="/api/v1/orgs/` + slug + `/members" method="POST">
-				<input type="text" name="username" placeholder="Username" required>
-				<select name="role">
-					<option value="member">Member</option>
-					<option value="admin">Admin</option>
-				</select>
-				<button type="submit">Add Member</button>
-			</form>
-		</section>
-		<section>
-			<h2>Current Members</h2>
-			<p>View members via the API: GET /api/v1/orgs/` + slug + `/members</p>
-		</section>
-		<p><a href="/orgs/` + slug + `">Back to Organization</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Members: " + slug,
+		Description: "View members via the API: GET /api/v1/orgs/" + slug + "/members",
+		FormAction:  "/api/v1/orgs/" + slug + "/members",
+		FormMethod:  "POST",
+		SubmitLabel: "Add Member",
+		Fields: []stubField{
+			{ID: "username", Name: "username", Label: "Username", Type: "text",
+				Placeholder: "Username", Required: true},
+			{ID: "role", Name: "role", Label: "Role", Type: "select",
+				Options: []stubSelectOption{
+					{Value: "member", Label: "Member"},
+					{Value: "admin", Label: "Admin"},
+				}},
+		},
+		BackURL:   "/orgs/" + slug,
+		BackLabel: "Back to Organization",
+	})
 }
 
 func (data *Data) renderOrgTokens(rw http.ResponseWriter, req *http.Request, slug string, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>API Tokens - ` + slug + ` - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>API Tokens: ` + slug + `</h1>
-		<section>
-			<h2>Create Token</h2>
-			<form action="/api/v1/orgs/` + slug + `/tokens" method="POST">
-				<input type="text" name="name" placeholder="Token Name" required>
-				<select name="scopes">
-					<option value="read">Read Only</option>
-					<option value="read-write">Read/Write</option>
-					<option value="global">Full Access</option>
-				</select>
-				<button type="submit">Create Token</button>
-			</form>
-		</section>
-		<section>
-			<h2>Active Tokens</h2>
-			<p>View tokens via the API: GET /api/v1/orgs/` + slug + `/tokens</p>
-		</section>
-		<p><a href="/orgs/` + slug + `">Back to Organization</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "API Tokens: " + slug,
+		Description: "View tokens via the API: GET /api/v1/orgs/" + slug + "/tokens",
+		FormAction:  "/api/v1/orgs/" + slug + "/tokens",
+		FormMethod:  "POST",
+		SubmitLabel: "Create Token",
+		Fields: []stubField{
+			{ID: "name", Name: "name", Label: "Token Name", Type: "text",
+				Placeholder: "Token Name", Required: true},
+			{ID: "scopes", Name: "scopes", Label: "Scopes", Type: "select",
+				Options: []stubSelectOption{
+					{Value: "read", Label: "Read Only"},
+					{Value: "read-write", Label: "Read/Write"},
+					{Value: "global", Label: "Full Access"},
+				}},
+		},
+		BackURL:   "/orgs/" + slug,
+		BackLabel: "Back to Organization",
+	})
 }
 
 func (data *Data) renderOrgDomains(rw http.ResponseWriter, req *http.Request, slug string, user *AuthUser) error {
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Custom Domains - ` + slug + ` - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Custom Domains: ` + slug + `</h1>
-		<section>
-			<h2>Add Domain</h2>
-			<form action="/api/v1/orgs/` + slug + `/domains" method="POST">
-				<input type="text" name="domain" placeholder="yourdomain.com" required>
-				<button type="submit">Add Domain</button>
-			</form>
-		</section>
-		<section>
-			<h2>Current Domains</h2>
-			<p>View domains via the API: GET /api/v1/orgs/` + slug + `/domains</p>
-		</section>
-		<p><a href="/orgs/` + slug + `">Back to Organization</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Custom Domains: " + slug,
+		Description: "View domains via the API: GET /api/v1/orgs/" + slug + "/domains",
+		FormAction:  "/api/v1/orgs/" + slug + "/domains",
+		FormMethod:  "POST",
+		SubmitLabel: "Add Domain",
+		Fields: []stubField{
+			{ID: "domain", Name: "domain", Label: "Domain", Type: "text",
+				Placeholder: "yourdomain.com", Required: true},
+		},
+		BackURL:   "/orgs/" + slug,
+		BackLabel: "Back to Organization",
+	})
 }

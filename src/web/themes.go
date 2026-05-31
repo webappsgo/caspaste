@@ -43,7 +43,8 @@ func loadThemes(hostThemeDir string, localesList LocalesList, defaultTheme strin
 	themeAliases := map[string]string{
 		"dark":  "dark/dracula",
 		"light": "light/github",
-		"auto":  "dark/dracula", // fallback for auto
+		// fallback for auto
+		"auto":  "dark/dracula",
 	}
 	if normalized, exists := themeAliases[defaultTheme]; exists {
 		defaultTheme = normalized

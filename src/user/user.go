@@ -577,7 +577,8 @@ func HashPassword(password string) string {
 	// Argon2id parameters (OWASP recommended)
 	salt := generateSalt()
 	time := uint32(3)
-	memory := uint32(64 * 1024) // 64 MB
+	// 64 MB
+	memory := uint32(64 * 1024)
 	threads := uint8(4)
 	keyLen := uint32(32)
 

@@ -62,9 +62,12 @@ type Token struct {
 
 // TokenInfo contains information about a validated token
 type TokenInfo struct {
-	Type      string // "user", "org", "admin"
-	OwnerID   int64  // User ID for user tokens, Org ID for org tokens
-	UserID    int64  // User ID (for org tokens, this is the user who created it)
+	// "user", "org", "admin"
+	Type    string
+	// User ID for user tokens, Org ID for org tokens
+	OwnerID int64
+	// User ID (for org tokens, this is the user who created it)
+	UserID  int64
 	Scopes    []string
 	Token     *Token
 }
@@ -576,6 +579,19 @@ func (s *Service) CountOrgTokens(orgID int64) (int, error) {
 	var count int
 	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM org_tokens WHERE org_id = ?", orgID).Scan(&count)
 	return count, err
+}
+
+// CleanupExpired deletes all expired tokens from user_tokens and org_tokens tables.
+func (s *Service) CleanupExpired() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	now := time.Now().Unix()
+	_, err := s.db.ExecContext(ctx, "DELETE FROM user_tokens WHERE expires_at IS NOT NULL AND expires_at < ?", now)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, "DELETE FROM org_tokens WHERE expires_at IS NOT NULL AND expires_at < ?", now)
+	return err
 }
 
 // generateRawToken generates a cryptographically secure random token

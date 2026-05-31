@@ -46,6 +46,8 @@ import (
 	"github.com/casjay-forks/caspaste/src/raw"
 	"github.com/casjay-forks/caspaste/src/scheduler"
 	"github.com/casjay-forks/caspaste/src/service"
+	"github.com/casjay-forks/caspaste/src/session"
+	"github.com/casjay-forks/caspaste/src/token"
 	"github.com/casjay-forks/caspaste/src/storage"
 	"github.com/casjay-forks/caspaste/src/swagger"
 	"github.com/casjay-forks/caspaste/src/template"
@@ -503,7 +505,8 @@ func handleUpdateCommand(command, currentVersion string) {
 	// Configuration for updates
 	cfg := updater.Config{
 		CurrentVersion: currentVersion,
-		Branch:         "stable", // Default branch
+		// Default branch
+		Branch:         "stable",
 		GithubOwner:    "casjay-forks",
 		GithubRepo:     "caspaste",
 		BinaryName:     "caspaste",
@@ -1463,7 +1466,8 @@ func main() {
 
 		// Run health check and exit
 		checkStatus(cfg.Database.Driver, cfg.Database.Source, *flagAddress)
-		os.Exit(0) // Explicit exit if checkStatus doesn't
+		// Explicit exit if checkStatus doesn't
+		os.Exit(0)
 	}
 
 	// Handle --service command early (before heavy setup)
@@ -2045,7 +2049,8 @@ func main() {
 	templateVars := template.Variables{
 		FQDN:                 fqdn,
 		Version:              Version,
-		Protocol:             "https", // Default to HTTPS for security
+		// Default to HTTPS for security
+		Protocol:             "https",
 		ServerTitle:          yamlCfg.Server.Title,
 		ServerAdminName:      yamlCfg.Server.Administrator.Name,
 		ServerAdminEmail:     adminEmail,
@@ -2192,18 +2197,23 @@ func main() {
 	
 	// Create logger with format configuration
 	log := logger.New("2006/01/02 15:04:05")
-	log.SetLevel(yamlCfg.Logging.Level)         // Set log level: info, warn, error (affects stdout only)
+	// Set log level: info, warn, error (affects stdout only)
+	log.SetLevel(yamlCfg.Logging.Level)
 	log.SetFormat(logger.LogFormat{
 		Access: yamlCfg.Logging.Access.Format,
 		Error:  yamlCfg.Logging.Error.Format,
 		Server: yamlCfg.Logging.Server.Format,
 		Debug:  yamlCfg.Logging.Debug.Format,
 	})
-	log.SetFileWriters(serverLogFd, errorLogFd)   // Files - always written regardless of level
-	log.SetWriters(consoleStdout, consoleStderr)  // Console - filtered by level
-	log.SetAccessLogWriter(accessFileWriter)       // HTTP access logs
+	// Files - always written regardless of level
+	log.SetFileWriters(serverLogFd, errorLogFd)
+	// Console - filtered by level
+	log.SetWriters(consoleStdout, consoleStderr)
+	// HTTP access logs
+	log.SetAccessLogWriter(accessFileWriter)
 	if debugLogFd != nil {
-		log.SetDebugWriter(debugLogFd)            // Debug logs
+		// Debug logs
+		log.SetDebugWriter(debugLogFd)
 	}
 	log.SetDebugMode(*flagDebug)
 	
@@ -2270,6 +2280,7 @@ func main() {
 		UiThemesDir:          yamlCfg.Web.UI.ThemesDir,
 		Public:               yamlCfg.Server.Public,
 		CasPasswdFile:        yamlCfg.Security.PasswordFile,
+		DataDir:              dataDir,
 	}
 
 	apiv1Data := apiv1.Load(db, cfg)
@@ -2282,9 +2293,12 @@ func main() {
 		func() error {
 			return storage.InitDB(yamlCfg.Database.Driver, yamlCfg.Database.Source)
 		},
-		10,                    // max 10 attempts
-		1*time.Second,         // start with 1 second
-		30*time.Second,        // max 30 seconds between retries
+		// max 10 attempts
+		10,
+		// start with 1 second
+		1*time.Second,
+		// max 30 seconds between retries
+		30*time.Second,
 		"Database initialization",
 	)
 	if err != nil {
@@ -2552,6 +2566,7 @@ func main() {
 	})
 
 	// Add session cleanup task per AI.md PART 19
+	sessionSvc := session.NewService(db.Pool())
 	sched.AddTask(&scheduler.Task{
 		ID:          "session_cleanup",
 		Name:        "Session Cleanup",
@@ -2560,12 +2575,20 @@ func main() {
 		Enabled:     true,
 		Skippable:   false,
 		Handler: func(ctx context.Context) error {
-			// Session cleanup - will be fully implemented with PART 34 integration
+			count, err := sessionSvc.CleanupExpired()
+			if err != nil {
+				log.Error(errors.New("Session cleanup: " + err.Error()))
+				return err
+			}
+			if count > 0 {
+				log.Info("Deleted " + strconv.FormatInt(count, 10) + " expired sessions")
+			}
 			return nil
 		},
 	})
 
 	// Add token cleanup task per AI.md PART 19
+	tokenSvc := token.NewService(db.Pool())
 	sched.AddTask(&scheduler.Task{
 		ID:          "token_cleanup",
 		Name:        "Token Cleanup",
@@ -2574,7 +2597,11 @@ func main() {
 		Enabled:     true,
 		Skippable:   false,
 		Handler: func(ctx context.Context) error {
-			// Token cleanup - will be fully implemented with PART 34 integration
+			err := tokenSvc.CleanupExpired()
+			if err != nil {
+				log.Error(errors.New("Token cleanup: " + err.Error()))
+				return err
+			}
 			return nil
 		},
 	})
@@ -2593,6 +2620,14 @@ func main() {
 			return err
 		},
 	})
+
+	// Wire scheduler health check into apiv1Data now that sched is ready
+	apiv1Data.SchedulerStatus = func() string {
+		if sched.IsRunning() {
+			return "ok"
+		}
+		return "error: scheduler not running"
+	}
 
 	// Start the scheduler per AI.md PART 19
 	if err := sched.Start(); err != nil {
@@ -2654,7 +2689,8 @@ func main() {
 	// Convert listen address ("all" → "::", or use as-is)
 	listenAddr := yamlCfg.Server.Listen
 	if listenAddr == "all" || listenAddr == "" {
-		listenAddr = "::" // IPv4 + IPv6 dual stack
+		// IPv4 + IPv6 dual stack
+		listenAddr = "::"
 	}
 
 	// Create HTTP listener (must be done as root for ports < 1024 on Unix)
@@ -2710,7 +2746,8 @@ func main() {
 
 	// Create HTTP server with timeouts
 	srv := &http.Server{
-		Handler:      handler, // Custom mux with middleware
+		// Custom mux with middleware
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -2795,7 +2832,8 @@ func main() {
 		
 		// Configure TLS security settings
 		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12, // Default to TLS 1.2
+			// Default to TLS 1.2
+			MinVersion: tls.VersionTLS12,
 			CipherSuites: []uint16{
 				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,

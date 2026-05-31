@@ -37,5 +37,6 @@ func RestartService(serviceName string) error {
 // IsRunningAsService checks if running as a launchd service
 func IsRunningAsService() bool {
 	// This is a heuristic, not perfect
-	return false // Conservative default
+	// Conservative default
+	return false
 }

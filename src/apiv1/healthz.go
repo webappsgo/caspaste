@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -152,6 +153,29 @@ func formatUptime(totalSeconds int64) string {
 	return strings.Join(parts, " ")
 }
 
+// checkDisk verifies the data directory is writable by creating and removing a temp file.
+func (data *Data) checkDisk() string {
+	dir := data.DataDir
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	f, err := os.CreateTemp(dir, ".healthz-*")
+	if err != nil {
+		return "error: " + err.Error()
+	}
+	f.Close()
+	os.Remove(f.Name())
+	return "ok"
+}
+
+// checkScheduler returns the scheduler health string.
+func (data *Data) checkScheduler() string {
+	if data.SchedulerStatus != nil {
+		return data.SchedulerStatus()
+	}
+	return "ok"
+}
+
 // buildHealthz assembles the healthz response, performing live checks
 func (data *Data) buildHealthz() healthzResponse {
 	status := "healthy"
@@ -161,6 +185,16 @@ func (data *Data) buildHealthz() healthzResponse {
 	if err != nil {
 		status = "degraded"
 		dbStatus = "error"
+	}
+
+	diskStatus := data.checkDisk()
+	if diskStatus != "ok" {
+		status = "degraded"
+	}
+
+	schedulerStatus := data.checkScheduler()
+	if schedulerStatus != "ok" {
+		status = "degraded"
 	}
 
 	var pastesTotal int64
@@ -199,9 +233,9 @@ func (data *Data) buildHealthz() healthzResponse {
 		},
 		Checks: healthzChecks{
 			Database:  dbStatus,
-			Cache:     "ok",
-			Disk:      "ok",
-			Scheduler: "ok",
+			Cache:     "n/a",
+			Disk:      diskStatus,
+			Scheduler: schedulerStatus,
 		},
 		Stats: healthzStats{
 			RequestsTotal:     0,

@@ -15,47 +15,24 @@ func (data *Data) handleRegisterPage(rw http.ResponseWriter, req *http.Request) 
 	if req.Method != http.MethodGet {
 		return ErrMethodNotAllowed
 	}
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Register - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Register</h1>
-		<form action="/api/v1/auth/register" method="POST">
-			<div>
-				<label for="username">Username:</label>
-				<input type="text" id="username" name="username" required pattern="[a-z0-9_-]+" minlength="3" maxlength="32">
-				<small>3-32 characters, lowercase letters, numbers, underscores, hyphens</small>
-			</div>
-			<div>
-				<label for="email">Email:</label>
-				<input type="email" id="email" name="email" required>
-			</div>
-			<div>
-				<label for="password">Password:</label>
-				<input type="password" id="password" name="password" required minlength="8">
-				<small>Minimum 8 characters</small>
-			</div>
-			<div>
-				<label for="display_name">Display Name (optional):</label>
-				<input type="text" id="display_name" name="display_name">
-			</div>
-			<button type="submit">Register</button>
-		</form>
-		<p>Already have an account? <a href="/server/auth/login">Login</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Register",
+		FormAction:  "/api/v1/auth/register",
+		FormMethod:  "POST",
+		SubmitLabel: "Register",
+		Fields: []stubField{
+			{ID: "username", Name: "username", Label: "Username", Type: "text",
+				Required: true, MinLength: 3, MaxLength: 32, Pattern: "[a-z0-9_-]+",
+				Hint: "3-32 characters, lowercase letters, numbers, underscores, hyphens"},
+			{ID: "email", Name: "email", Label: "Email", Type: "email", Required: true},
+			{ID: "password", Name: "password", Label: "Password", Type: "password",
+				Required: true, MinLength: 8, Hint: "Minimum 8 characters"},
+			{ID: "display_name", Name: "display_name", Label: "Display Name (optional)", Type: "text"},
+		},
+		Notice:    "Already have an account? <a href=\"/server/auth/login\">Login</a>",
+		BackURL:   "/server/auth/login",
+		BackLabel: "Back to Login",
+	})
 }
 
 // handlePasswordForgotPage handles GET /auth/password/forgot
@@ -63,33 +40,18 @@ func (data *Data) handlePasswordForgotPage(rw http.ResponseWriter, req *http.Req
 	if req.Method != http.MethodGet {
 		return ErrMethodNotAllowed
 	}
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Forgot Password - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Forgot Password</h1>
-		<form action="/api/v1/auth/password/forgot" method="POST">
-			<div>
-				<label for="email">Email:</label>
-				<input type="email" id="email" name="email" required>
-			</div>
-			<button type="submit">Send Reset Link</button>
-		</form>
-		<p><a href="/server/auth/login">Back to Login</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Forgot Password",
+		Description: "Enter your email address to receive a password reset link.",
+		FormAction:  "/api/v1/auth/password/forgot",
+		FormMethod:  "POST",
+		SubmitLabel: "Send Reset Link",
+		Fields: []stubField{
+			{ID: "email", Name: "email", Label: "Email", Type: "email", Required: true},
+		},
+		BackURL:   "/server/auth/login",
+		BackLabel: "Back to Login",
+	})
 }
 
 // handlePasswordResetPage handles GET /auth/password/reset/{token}
@@ -97,37 +59,21 @@ func (data *Data) handlePasswordResetPage(rw http.ResponseWriter, req *http.Requ
 	if req.Method != http.MethodGet {
 		return ErrMethodNotAllowed
 	}
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Reset Password - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Reset Password</h1>
-		<form action="/api/v1/auth/password/reset" method="POST">
-			<input type="hidden" name="token" value="` + token + `">
-			<div>
-				<label for="password">New Password:</label>
-				<input type="password" id="password" name="new_password" required minlength="8">
-			</div>
-			<div>
-				<label for="password_confirm">Confirm Password:</label>
-				<input type="password" id="password_confirm" required minlength="8">
-			</div>
-			<button type="submit">Reset Password</button>
-		</form>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Reset Password",
+		FormAction:  "/api/v1/auth/password/reset",
+		FormMethod:  "POST",
+		SubmitLabel: "Reset Password",
+		HiddenFields: []stubHiddenField{
+			{Name: "token", Value: token},
+		},
+		Fields: []stubField{
+			{ID: "new_password", Name: "new_password", Label: "New Password", Type: "password",
+				Required: true, MinLength: 8},
+			{ID: "password_confirm", Name: "password_confirm", Label: "Confirm Password",
+				Type: "password", Required: true, MinLength: 8},
+		},
+	})
 }
 
 // handle2FAPage handles GET /auth/2fa
@@ -135,33 +81,19 @@ func (data *Data) handle2FAPage(rw http.ResponseWriter, req *http.Request) error
 	if req.Method != http.MethodGet {
 		return ErrMethodNotAllowed
 	}
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Two-Factor Authentication - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Two-Factor Authentication</h1>
-		<form action="/api/v1/auth/login" method="POST">
-			<div>
-				<label for="totp_code">Enter your 2FA code:</label>
-				<input type="text" id="totp_code" name="totp_code" pattern="[0-9]{6}" required autocomplete="one-time-code">
-			</div>
-			<button type="submit">Verify</button>
-		</form>
-		<p><a href="/server/auth/recovery/use">Use a recovery key instead</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Two-Factor Authentication",
+		FormAction:  "/api/v1/auth/login",
+		FormMethod:  "POST",
+		SubmitLabel: "Verify",
+		Fields: []stubField{
+			{ID: "totp_code", Name: "totp_code", Label: "Enter your 2FA code",
+				Type: "text", Pattern: "[0-9]{6}", Required: true, Autocomplete: "one-time-code"},
+		},
+		Notice:    "<a href=\"/server/auth/recovery/use\">Use a recovery key instead</a>",
+		BackURL:   "/server/auth/login",
+		BackLabel: "Back to Login",
+	})
 }
 
 // handleRecoveryPage handles GET /auth/recovery/use
@@ -169,67 +101,36 @@ func (data *Data) handleRecoveryPage(rw http.ResponseWriter, req *http.Request) 
 	if req.Method != http.MethodGet {
 		return ErrMethodNotAllowed
 	}
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Recovery Key - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Use Recovery Key</h1>
-		<p>If you've lost access to your authenticator app, you can use a recovery key to regain access to your account.</p>
-		<form action="/api/v1/auth/recovery/use" method="POST">
-			<div>
-				<label for="identifier">Username or Email:</label>
-				<input type="text" id="identifier" name="identifier" required>
-			</div>
-			<div>
-				<label for="recovery_key">Recovery Key:</label>
-				<input type="text" id="recovery_key" name="recovery_key" pattern="[a-f0-9]{8}-[a-f0-9]{4}" required placeholder="xxxxxxxx-xxxx">
-			</div>
-			<button type="submit">Use Recovery Key</button>
-		</form>
-		<p><strong>Note:</strong> Using a recovery key will disable 2FA on your account. You can re-enable it after logging in.</p>
-		<p><a href="/server/auth/login">Back to Login</a></p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title: "Use Recovery Key",
+		Description: "If you have lost access to your authenticator app, " +
+			"you can use a recovery key to regain access to your account.",
+		FormAction:  "/api/v1/auth/recovery/use",
+		FormMethod:  "POST",
+		SubmitLabel: "Use Recovery Key",
+		Fields: []stubField{
+			{ID: "identifier", Name: "identifier", Label: "Username or Email",
+				Type: "text", Required: true},
+			{ID: "recovery_key", Name: "recovery_key", Label: "Recovery Key",
+				Type: "text", Pattern: "[a-f0-9]{8}-[a-f0-9]{4}", Required: true,
+				Placeholder: "xxxxxxxx-xxxx"},
+		},
+		Notice:    "Using a recovery key will disable 2FA on your account. You can re-enable it after logging in.",
+		BackURL:   "/server/auth/login",
+		BackLabel: "Back to Login",
+	})
 }
 
 // handleVerifyEmailPage handles GET /auth/verify-email/{token}
+// Redirects automatically to the API verify endpoint after a brief delay.
 func (data *Data) handleVerifyEmailPage(rw http.ResponseWriter, req *http.Request, token string) error {
-	// This page will automatically trigger verification via JavaScript
-	// or redirect to the API endpoint
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Verify Email - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-	<meta http-equiv="refresh" content="3;url=/api/v1/auth/verify-email?token=` + token + `">
-</head>
-<body>
-	<div class="container">
-		<h1>Verifying Email...</h1>
-		<p>Please wait while we verify your email address.</p>
-		<p>If you are not redirected automatically, <a href="/api/v1/auth/verify-email?token=` + token + `">click here</a>.</p>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:         "Verifying Email...",
+		Description:   "Please wait while we verify your email address.",
+		RedirectURL:   "/api/v1/auth/verify-email?token=" + token,
+		RedirectDelay: 3,
+		Notice:        "If you are not redirected automatically, <a href=\"/api/v1/auth/verify-email?token=" + token + "\">click here</a>.",
+	})
 }
 
 // handleInvitePage handles GET /auth/invite/{token}
@@ -237,42 +138,23 @@ func (data *Data) handleInvitePage(rw http.ResponseWriter, req *http.Request, to
 	if req.Method != http.MethodGet {
 		return ErrMethodNotAllowed
 	}
-
-	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
-
-	html := `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Accept Invitation - ` + data.ServerTitle + `</title>
-	<link rel="stylesheet" href="/style.css">
-</head>
-<body>
-	<div class="container">
-		<h1>Accept Invitation</h1>
-		<p>You've been invited to join ` + data.ServerTitle + `!</p>
-		<form action="/api/v1/auth/register" method="POST">
-			<input type="hidden" name="invite_code" value="` + token + `">
-			<div>
-				<label for="username">Username:</label>
-				<input type="text" id="username" name="username" required pattern="[a-z0-9_-]+" minlength="3" maxlength="32">
-			</div>
-			<div>
-				<label for="email">Email:</label>
-				<input type="email" id="email" name="email" required>
-			</div>
-			<div>
-				<label for="password">Password:</label>
-				<input type="password" id="password" name="password" required minlength="8">
-			</div>
-			<button type="submit">Create Account</button>
-		</form>
-	</div>
-</body>
-</html>`
-
-	_, err := rw.Write([]byte(html))
-	return err
+	return data.renderStub(rw, req, stubTmplData{
+		Title:       "Accept Invitation",
+		Description: "You have been invited to join " + data.ServerTitle + "!",
+		FormAction:  "/api/v1/auth/register",
+		FormMethod:  "POST",
+		SubmitLabel: "Create Account",
+		HiddenFields: []stubHiddenField{
+			{Name: "invite_code", Value: token},
+		},
+		Fields: []stubField{
+			{ID: "username", Name: "username", Label: "Username", Type: "text",
+				Required: true, MinLength: 3, MaxLength: 32, Pattern: "[a-z0-9_-]+"},
+			{ID: "email", Name: "email", Label: "Email", Type: "email", Required: true},
+			{ID: "password", Name: "password", Label: "Password", Type: "password",
+				Required: true, MinLength: 8},
+		},
+	})
 }
 
 // routeAuth routes /auth/* paths
@@ -305,7 +187,6 @@ func (data *Data) routeAuth(rw http.ResponseWriter, req *http.Request) error {
 		return data.handleInvitePage(rw, req, token)
 
 	default:
-		// Redirect unknown auth paths to login
 		http.Redirect(rw, req, "/server/auth/login", http.StatusFound)
 		return nil
 	}

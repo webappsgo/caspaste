@@ -35,7 +35,8 @@ func (m *Manager) install() error {
 			m.config.Name,
 			m.config.Description,
 		}
-		runCommand("sc", descArgs...) // Ignore error as description is optional
+		// Ignore error as description is optional
+		runCommand("sc", descArgs...)
 	}
 
 	fmt.Printf("Service %s installed successfully\n", m.config.Name)

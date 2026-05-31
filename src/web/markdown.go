@@ -25,7 +25,8 @@ func init() {
 	// Initialize goldmark with extensions and syntax highlighting
 	markdownRenderer = goldmark.New(
 		goldmark.WithExtensions(
-			extension.GFM, // GitHub Flavored Markdown (tables, strikethrough, autolinks)
+			// GitHub Flavored Markdown (tables, strikethrough, autolinks)
+			extension.GFM,
 			extension.Typographer,
 			highlighting.NewHighlighting(
 				highlighting.WithStyle("dracula"),
@@ -41,7 +42,8 @@ func init() {
 		goldmark.WithRendererOptions(
 			gmhtml.WithHardWraps(),
 			gmhtml.WithXHTML(),
-			gmhtml.WithUnsafe(), // Allow raw HTML in markdown
+			// Allow raw HTML in markdown
+			gmhtml.WithUnsafe(),
 		),
 	)
 }

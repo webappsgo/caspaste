@@ -73,5 +73,6 @@ func RestartSelf() error {
 
 	// Exit current process
 	os.Exit(0)
-	return nil // unreachable
+	// unreachable
+	return nil
 }

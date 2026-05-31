@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -47,8 +48,23 @@ type healthzTmplData struct {
 	User          *AuthUser
 }
 
+// checkWebDisk verifies the data directory is writable by creating and removing a temp file.
+func (data *Data) checkWebDisk() string {
+	dir := data.DataDir
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	f, err := os.CreateTemp(dir, ".healthz-*")
+	if err != nil {
+		return "error: " + err.Error()
+	}
+	f.Close()
+	os.Remove(f.Name())
+	return "ok"
+}
+
 // buildWebHealthz assembles the healthz struct used by all response formats
-func (data *Data) buildWebHealthz() (status, dbStatus string, pastesTotal int64) {
+func (data *Data) buildWebHealthz() (status, dbStatus, diskStatus string, pastesTotal int64) {
 	status = "healthy"
 	dbStatus = "ok"
 	_, err := data.DB.PasteDeleteExpired()
@@ -56,7 +72,11 @@ func (data *Data) buildWebHealthz() (status, dbStatus string, pastesTotal int64)
 		status = "degraded"
 		dbStatus = "error"
 	}
-	return status, dbStatus, 0
+	diskStatus = data.checkWebDisk()
+	if diskStatus != "ok" {
+		status = "degraded"
+	}
+	return status, dbStatus, diskStatus, 0
 }
 
 // Pattern: /healthz and /server/healthz
@@ -65,7 +85,7 @@ func (data *Data) buildWebHealthz() (status, dbStatus string, pastesTotal int64)
 //   - Accept: text/plain or path ends in .txt → plain text
 //   - Otherwise → HTML via healthz.tmpl
 func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error {
-	status, dbStatus, pastesTotal := data.buildWebHealthz()
+	status, dbStatus, diskStatus, pastesTotal := data.buildWebHealthz()
 
 	uptimeSecs := int64(time.Since(startTime).Seconds())
 	uptimeStr := formatUptime(uptimeSecs)
@@ -162,8 +182,8 @@ func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error
 			},
 			Checks: checksInfo{
 				Database:  dbStatus,
-				Cache:     "ok",
-				Disk:      "ok",
+				Cache:     "n/a",
+				Disk:      diskStatus,
 				Scheduler: "ok",
 			},
 			Stats: statsInfo{
@@ -188,8 +208,8 @@ func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error
 		fmt.Fprintf(rw, "uptime: %s\n", uptimeStr)
 		fmt.Fprintf(rw, "mode: %s\n", data.Mode)
 		fmt.Fprintf(rw, "database: %s\n", dbStatus)
-		fmt.Fprintf(rw, "cache: ok\n")
-		fmt.Fprintf(rw, "disk: ok\n")
+		fmt.Fprintf(rw, "cache: n/a\n")
+		fmt.Fprintf(rw, "disk: %s\n", diskStatus)
 		fmt.Fprintf(rw, "scheduler: ok\n")
 		fmt.Fprintf(rw, "pastes_total: %d\n", pastesTotal)
 		return nil

@@ -18,7 +18,8 @@ func RestartService(serviceName string) error {
 	// Windows uses sc.exe for service control
 	// Stop the service
 	stopCmd := exec.Command("sc.exe", "stop", serviceName)
-	stopCmd.Run() // Ignore error, service might not be running
+	// Ignore error, service might not be running
+	stopCmd.Run()
 
 	// Start the service
 	startCmd := exec.Command("sc.exe", "start", serviceName)
@@ -32,5 +33,6 @@ func RestartService(serviceName string) error {
 // IsRunningAsService checks if running as a Windows service
 func IsRunningAsService() bool {
 	// This is a heuristic, not perfect
-	return false // Conservative default
+	// Conservative default
+	return false
 }

@@ -643,7 +643,8 @@ func (s *Service) HandleVerifyOrgDomain(w http.ResponseWriter, r *http.Request, 
 func matchDomain(domain, pattern string) bool {
 	if strings.HasPrefix(pattern, "*.") {
 		// Wildcard match
-		suffix := pattern[1:] // e.g., ".local"
+		// e.g., ".local"
+		suffix := pattern[1:]
 		return strings.HasSuffix(domain, suffix)
 	}
 	return domain == pattern

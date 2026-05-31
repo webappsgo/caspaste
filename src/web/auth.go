@@ -355,12 +355,18 @@ func IsPublicPath(path string) bool {
 
 	// Prefix match paths - public info and auth pages
 	publicPrefixes := []string{
-		"/server/auth",  // /server/auth/login, /server/auth/register, /server/auth/password/*, etc.
-		"/auth",         // Legacy /auth/* prefix
-		"/server/about", // /server/about, /server/about/authors, /server/about/license
-		"/about",        // Legacy redirect support
-		"/docs",         // /docs, /docs/apiv1, /docs/libraries, /docs/customize
-		"/terms",        // /terms
+		// /server/auth/login, /server/auth/register, /server/auth/password/*, etc.
+		"/server/auth",
+		// Legacy /auth/* prefix
+		"/auth",
+		// /server/about, /server/about/authors, /server/about/license
+		"/server/about",
+		// Legacy redirect support
+		"/about",
+		// /docs, /docs/apiv1, /docs/libraries, /docs/customize
+		"/docs",
+		// /terms
+		"/terms",
 	}
 
 	for _, prefix := range publicPrefixes {

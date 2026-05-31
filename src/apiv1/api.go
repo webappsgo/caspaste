@@ -35,6 +35,12 @@ type Data struct {
 	BuildDate   string
 	Mode        string
 
+	// DataDir is the application data directory path; used for disk health check
+	DataDir string
+
+	// SchedulerStatus returns the current scheduler health string ("ok" or "error: …")
+	SchedulerStatus func() string
+
 	ServerTagline     string
 	ServerDescription string
 
@@ -78,6 +84,7 @@ func Load(db storage.DB, cfg config.Config) *Data {
 		BuildCommit:       cfg.BuildCommit,
 		BuildDate:         cfg.BuildDate,
 		Mode:              cfg.Mode,
+		DataDir:           cfg.DataDir,
 		ServerTagline:     cfg.ServerTagline,
 		ServerDescription: cfg.ServerDescription,
 		TitleMaxLen:       cfg.TitleMaxLen,

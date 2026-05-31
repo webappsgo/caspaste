@@ -1,0 +1,73 @@
+{{/*
+   Copyright (C) 2024 CasjaysDev.
+
+   This file is part of CasPaste.
+
+   CasPaste is free software released under the MIT License.
+   See LICENSE file for details.
+*/}}
+
+{{define "titlePrefix"}}{{.Title}} | {{end}}
+{{define "headAppend"}}
+{{if .RedirectURL}}<meta http-equiv="refresh" content="{{.RedirectDelay}};url={{.RedirectURL}}">{{end}}
+{{end}}
+{{define "article"}}
+<div class="stub-container">
+	<div class="stub-header">
+		<h1>{{.Title}}</h1>
+		{{if .Description}}<p class="stub-description">{{.Description}}</p>{{end}}
+	</div>
+
+	{{if .Links}}
+	<nav class="stub-nav">
+		<ul>
+			{{range .Links}}<li><a href="{{.URL}}">{{.Label}}</a></li>{{end}}
+		</ul>
+	</nav>
+	{{end}}
+
+	{{if .FormAction}}
+	<form class="stub-form" action="{{.FormAction}}" method="{{.FormMethod}}">
+		<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+		{{range .HiddenFields}}
+		<input type="hidden" name="{{.Name}}" value="{{.Value}}">
+		{{end}}
+		{{range .Fields}}
+		<div class="form-group">
+			<label for="{{.ID}}">{{.Label}}</label>
+			{{if eq .Type "textarea"}}
+			<textarea id="{{.ID}}" name="{{.Name}}" placeholder="{{.Placeholder}}">{{.Value}}</textarea>
+			{{else if eq .Type "select"}}
+			<select id="{{.ID}}" name="{{.Name}}">
+				{{range .Options}}<option value="{{.Value}}">{{.Label}}</option>{{end}}
+			</select>
+			{{else}}
+			<input
+				type="{{.Type}}"
+				id="{{.ID}}"
+				name="{{.Name}}"
+				placeholder="{{.Placeholder}}"
+				value="{{.Value}}"
+				{{if .Required}}required{{end}}
+				{{if .MinLength}}minlength="{{.MinLength}}"{{end}}
+				{{if .MaxLength}}maxlength="{{.MaxLength}}"{{end}}
+				{{if .Pattern}}pattern="{{.Pattern}}"{{end}}
+				{{if .Autocomplete}}autocomplete="{{.Autocomplete}}"{{end}}
+			>
+			{{end}}
+			{{if .Hint}}<small>{{.Hint}}</small>{{end}}
+		</div>
+		{{end}}
+		<button type="submit" class="button-green">{{.SubmitLabel}}</button>
+	</form>
+	{{end}}
+
+	{{if .Notice}}<div class="stub-notice">{{.Notice}}</div>{{end}}
+
+	{{if .BackURL}}
+	<div class="back-link">
+		<a href="{{.BackURL}}">{{.BackLabel}}</a>
+	</div>
+	{{end}}
+</div>
+{{end}}

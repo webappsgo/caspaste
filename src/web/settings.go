@@ -12,7 +12,8 @@ import (
 	"net/http"
 )
 
-const cookieMaxAge = 60 * 60 * 24 * 360 * 50 // 50 year
+// 50 year
+const cookieMaxAge = 60 * 60 * 24 * 360 * 50
 
 type settingsTmpl struct {
 	LanguageCode     string
