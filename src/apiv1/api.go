@@ -30,7 +30,13 @@ type Data struct {
 
 	Lexers []string
 
-	Version string
+	Version     string
+	BuildCommit string
+	BuildDate   string
+	Mode        string
+
+	ServerTagline     string
+	ServerDescription string
 
 	TitleMaxLen int
 	BodyMaxLen  int
@@ -40,8 +46,9 @@ type Data struct {
 	ServerRules      string
 	ServerTermsOfUse string
 
-	AdminName string
-	AdminMail string
+	ServerTitle string
+	AdminName   string
+	AdminMail   string
 
 	// true = open/public, false = auth required
 	Public        bool
@@ -68,12 +75,18 @@ func Load(db storage.DB, cfg config.Config) *Data {
 		RateLimitGet:      cfg.RateLimitGet,
 		Lexers:            lexers,
 		Version:           cfg.Version,
+		BuildCommit:       cfg.BuildCommit,
+		BuildDate:         cfg.BuildDate,
+		Mode:              cfg.Mode,
+		ServerTagline:     cfg.ServerTagline,
+		ServerDescription: cfg.ServerDescription,
 		TitleMaxLen:       cfg.TitleMaxLen,
 		BodyMaxLen:        cfg.BodyMaxLen,
 		MaxLifeTime:       cfg.MaxLifeTime,
 		ServerAbout:       cfg.ServerAbout,
 		ServerRules:       cfg.ServerRules,
 		ServerTermsOfUse:  cfg.ServerTermsOfUse,
+		ServerTitle:       cfg.ServerTitle,
 		AdminName:         cfg.AdminName,
 		AdminMail:         cfg.AdminMail,
 		Public:            cfg.Public,
@@ -100,7 +113,7 @@ func (data *Data) Hand(rw http.ResponseWriter, req *http.Request) {
 	// Route API requests
 	switch routePath {
 	// Health check per AI.md PART 13
-	case apiBase + "/healthz":
+	case apiBase + "/server/healthz":
 		err = data.handleHealthz(rw, req)
 	// API v1 endpoints per AI.md PART 14 (noun-based REST routes)
 	case apiBase + "/pastes":

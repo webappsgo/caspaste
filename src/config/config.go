@@ -74,7 +74,15 @@ type Config struct {
 	APIVersion string
 	AdminPath  string
 
-	Version string
+	Version     string
+	BuildCommit string
+	BuildDate   string
+	// "production" or "development"
+	Mode string
+
+	// Branding/description (from yaml server.tagline, server.description)
+	ServerTagline     string
+	ServerDescription string
 
 	TitleMaxLen int
 	BodyMaxLen  int

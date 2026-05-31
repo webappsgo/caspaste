@@ -1,0 +1,144 @@
+{{/*
+   This file is part of CasPaste.
+
+   CasPaste is free software released under the MIT License.
+   See LICENSE file for details.
+*/}}
+
+{{define "titlePrefix"}}{{ call .Translate `healthz.Title` }} | {{end}}
+{{define "headAppend"}}
+<style>
+.status-banner {
+	padding: 1rem 1.5rem;
+	border-radius: 6px;
+	margin-bottom: 1.5rem;
+	font-size: 1.1rem;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.status-banner.status-ok {
+	background: var(--color-success-bg, #c6f6d5);
+	color: var(--color-success-text, #22543d);
+	border: 1px solid var(--color-success-border, #9ae6b4);
+}
+.status-banner.status-error {
+	background: var(--color-error-bg, #fed7d7);
+	color: var(--color-error-text, #742a2a);
+	border: 1px solid var(--color-error-border, #fc8181);
+}
+.section-card {
+	border: 1px solid var(--color-border, #e2e8f0);
+	border-radius: 6px;
+	padding: 1rem 1.5rem;
+	margin-bottom: 1.25rem;
+}
+.section-card h3 {
+	margin: 0 0 0.75rem 0;
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--color-muted, #718096);
+}
+.info-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.4rem 1.25rem;
+}
+.info-list dt {
+	font-weight: 600;
+	color: var(--color-muted, #718096);
+	white-space: nowrap;
+}
+.info-list dd {
+	margin: 0;
+	font-family: monospace;
+}
+.badge {
+	display: inline-block;
+	padding: 0.15rem 0.5rem;
+	border-radius: 4px;
+	font-size: 0.8rem;
+	font-weight: 600;
+}
+.badge-ok {
+	background: var(--color-success-bg, #c6f6d5);
+	color: var(--color-success-text, #22543d);
+}
+.badge-error {
+	background: var(--color-error-bg, #fed7d7);
+	color: var(--color-error-text, #742a2a);
+}
+.badge-off {
+	background: var(--color-neutral-bg, #edf2f7);
+	color: var(--color-neutral-text, #4a5568);
+}
+</style>
+{{end}}
+{{define "article"}}
+<h2>{{ call .Translate `healthz.Heading` }}</h2>
+
+<div class="status-banner {{if eq .Status "healthy"}}status-ok{{else}}status-error{{end}}">
+	{{if eq .Status "healthy"}}&#x2713; {{ call .Translate `healthz.StatusHealthy` }}{{else}}&#x26a0; {{ call .Translate `healthz.StatusDegraded` }}{{end}}
+</div>
+
+<div class="section-card">
+	<h3>{{ call .Translate `healthz.SectionProject` }}</h3>
+	<dl class="info-list">
+		<dt>{{ call .Translate `healthz.FieldName` }}</dt><dd>{{.ProjectName}}</dd>
+		{{if .ProjectTagline}}<dt>{{ call .Translate `healthz.FieldTagline` }}</dt><dd>{{.ProjectTagline}}</dd>{{end}}
+		{{if .ProjectDescription}}<dt>{{ call .Translate `healthz.FieldDescription` }}</dt><dd>{{.ProjectDescription}}</dd>{{end}}
+	</dl>
+</div>
+
+<div class="section-card">
+	<h3>{{ call .Translate `healthz.SectionRuntime` }}</h3>
+	<dl class="info-list">
+		<dt>{{ call .Translate `healthz.FieldVersion` }}</dt><dd>{{.Version}}</dd>
+		<dt>{{ call .Translate `healthz.FieldGoVersion` }}</dt><dd>{{.GoVersion}}</dd>
+		<dt>{{ call .Translate `healthz.FieldUptime` }}</dt><dd>{{.Uptime}}</dd>
+		<dt>{{ call .Translate `healthz.FieldMode` }}</dt><dd><span class="badge {{if eq .Mode "production"}}badge-ok{{else}}badge-off{{end}}">{{.Mode}}</span></dd>
+		<dt>{{ call .Translate `healthz.FieldTimestamp` }}</dt><dd>{{.Timestamp}}</dd>
+	</dl>
+</div>
+
+<div class="section-card">
+	<h3>{{ call .Translate `healthz.SectionBuild` }}</h3>
+	<dl class="info-list">
+		<dt>{{ call .Translate `healthz.FieldCommit` }}</dt><dd>{{.BuildCommit}}</dd>
+		<dt>{{ call .Translate `healthz.FieldDate` }}</dt><dd>{{.BuildDate}}</dd>
+	</dl>
+</div>
+
+<div class="section-card">
+	<h3>{{ call .Translate `healthz.SectionChecks` }}</h3>
+	<dl class="info-list">
+		<dt>{{ call .Translate `healthz.FieldDatabase` }}</dt><dd><span class="badge {{if eq .DBStatus "ok"}}badge-ok{{else}}badge-error{{end}}">{{.DBStatus}}</span></dd>
+		<dt>{{ call .Translate `healthz.FieldCache` }}</dt><dd><span class="badge badge-ok">ok</span></dd>
+		<dt>{{ call .Translate `healthz.FieldDisk` }}</dt><dd><span class="badge badge-ok">ok</span></dd>
+		<dt>{{ call .Translate `healthz.FieldScheduler` }}</dt><dd><span class="badge badge-ok">ok</span></dd>
+	</dl>
+</div>
+
+<div class="section-card">
+	<h3>{{ call .Translate `healthz.SectionFeatures` }}</h3>
+	<dl class="info-list">
+		<dt>{{ call .Translate `healthz.FieldTor` }}</dt><dd><span class="badge badge-off">disabled</span></dd>
+		<dt>{{ call .Translate `healthz.FieldGeoIP` }}</dt><dd><span class="badge badge-off">disabled</span></dd>
+		<dt>{{ call .Translate `healthz.FieldSyntaxHighlighting` }}</dt><dd><span class="badge badge-ok">enabled</span></dd>
+		<dt>{{ call .Translate `healthz.FieldMultiUser` }}</dt><dd><span class="badge badge-off">disabled</span></dd>
+		<dt>{{ call .Translate `healthz.FieldCluster` }}</dt><dd><span class="badge badge-off">disabled</span></dd>
+	</dl>
+</div>
+
+<div class="section-card">
+	<h3>{{ call .Translate `healthz.SectionStats` }}</h3>
+	<dl class="info-list">
+		<dt>{{ call .Translate `healthz.FieldPastesTotal` }}</dt><dd>{{.PastesTotal}}</dd>
+	</dl>
+</div>
+{{end}}

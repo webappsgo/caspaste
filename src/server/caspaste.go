@@ -2236,6 +2236,16 @@ func main() {
 		RateLimitGet:      netshare.NewRateLimitSystem(yamlCfg.Limits.RateLimit.GetPastes.Per5Min, yamlCfg.Limits.RateLimit.GetPastes.Per15Min, yamlCfg.Limits.RateLimit.GetPastes.Per1Hour),
 		RateLimitNew:      netshare.NewRateLimitSystem(yamlCfg.Limits.RateLimit.NewPastes.Per5Min, yamlCfg.Limits.RateLimit.NewPastes.Per15Min, yamlCfg.Limits.RateLimit.NewPastes.Per1Hour),
 		Version:           Version,
+		BuildCommit:       CommitID,
+		BuildDate:         BuildDate,
+		Mode: func() string {
+			if *flagDebug {
+				return "development"
+			}
+			return "production"
+		}(),
+		ServerTagline:     yamlCfg.Server.TagLine,
+		ServerDescription: yamlCfg.Server.Description,
 		TitleMaxLen:       yamlCfg.Limits.TitleMaxLength,
 		BodyMaxLen:        yamlCfg.Limits.BodyMaxLength,
 		MaxLifeTime:       maxLifeTime,

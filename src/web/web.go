@@ -60,6 +60,8 @@ type Data struct {
 	SourceCodePage *template.Template
 	SecurityPolicy *template.Template
 
+	HealthzPage *template.Template
+
 	Docs            *template.Template
 	DocsApiV1       *template.Template
 	DocsLibraries   *template.Template
@@ -70,7 +72,13 @@ type Data struct {
 	EmbeddedHelpPage *template.Template
 	Login            *template.Template
 
-	Version string
+	Version     string
+	Mode        string
+	BuildCommit string
+	BuildDate   string
+
+	ServerTagline     string
+	ServerDescription string
 
 	TitleMaxLen int
 	BodyMaxLen  int
@@ -156,6 +164,11 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.RateLimitGet = cfg.RateLimitGet
 
 	data.Version = cfg.Version
+	data.Mode = cfg.Mode
+	data.BuildCommit = cfg.BuildCommit
+	data.BuildDate = cfg.BuildDate
+	data.ServerTagline = cfg.ServerTagline
+	data.ServerDescription = cfg.ServerDescription
 
 	data.TitleMaxLen = cfg.TitleMaxLen
 	data.BodyMaxLen = cfg.BodyMaxLen
@@ -384,6 +397,12 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 		return nil, err
 	}
 
+	// healthz.tmpl
+	data.HealthzPage, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/healthz.tmpl")
+	if err != nil {
+		return nil, err
+	}
+
 	return &data, nil
 }
 
@@ -403,9 +422,11 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 
 	switch req.URL.Path {
 	// Health checks per AI.md PART 13
-	// /healthz - HTML frontend with emojis
-	// /api/v1/healthz - JSON API (handled by apiv1 package)
+	// /healthz and /server/healthz — content-negotiated (HTML/JSON/text)
+	// /api/v1/server/healthz — JSON API (handled by apiv1 package)
 	case "/healthz":
+		err = data.handleHealthz(rw, req)
+	case "/server/healthz":
 		err = data.handleHealthz(rw, req)
 	// Search engines
 	case "/robots.txt":

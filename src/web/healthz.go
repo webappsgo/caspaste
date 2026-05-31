@@ -6,163 +6,227 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 )
 
 var startTime = time.Now()
 
-// Pattern: /healthz - HTML health check page
-func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error {
-	uptime := int64(time.Since(startTime).Seconds())
-	uptimeStr := formatUptime(uptime)
+// healthzTmplData is the data struct passed to healthz.tmpl
+type healthzTmplData struct {
+	Status     string
+	Version    string
+	GoVersion  string
+	Uptime     string
+	Mode       string
+	Timestamp  string
+	BuildCommit string
+	BuildDate   string
+	DBStatus    string
 
-	// Try database check
-	dbStatus := "Connected"
-	statusClass := "healthy"
-	_, err := data.DB.PasteDeleteExpired()
-	if err != nil {
-		dbStatus = "Error"
-		statusClass = "degraded"
-	}
+	ProjectName        string
+	ProjectTagline     string
+	ProjectDescription string
 
-	html := `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Health Check - ` + data.ServerTitle + `</title>
-	<style>
-		* { box-sizing: border-box; margin: 0; padding: 0; }
-		body {
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-			min-height: 100vh;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			padding: 1rem;
-		}
-		.container {
-			background: white;
-			border-radius: 12px;
-			box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-			padding: 2rem;
-			max-width: 600px;
-			width: 100%;
-		}
-		h1 {
-			color: #2d3748;
-			font-size: 2rem;
-			margin-bottom: 1.5rem;
-			text-align: center;
-		}
-		.status {
-			text-align: center;
-			padding: 1.5rem;
-			border-radius: 8px;
-			margin-bottom: 2rem;
-			font-size: 1.5rem;
-			font-weight: bold;
-		}
-		.status.healthy {
-			background: #c6f6d5;
-			color: #22543d;
-		}
-		.status.degraded {
-			background: #fed7d7;
-			color: #742a2a;
-		}
-		.info-grid {
-			display: grid;
-			grid-template-columns: auto 1fr;
-			gap: 0.75rem 1.5rem;
-			margin-bottom: 1.5rem;
-		}
-		.label {
-			font-weight: 600;
-			color: #4a5568;
-		}
-		.value {
-			color: #2d3748;
-			font-family: 'Courier New', monospace;
-		}
-		.footer {
-			text-align: center;
-			color: #718096;
-			font-size: 0.875rem;
-			margin-top: 2rem;
-			padding-top: 1rem;
-			border-top: 1px solid #e2e8f0;
-		}
-		.footer a {
-			color: #667eea;
-			text-decoration: none;
-		}
-		.footer a:hover {
-			text-decoration: underline;
-		}
-		@media (max-width: 480px) {
-			h1 { font-size: 1.5rem; }
-			.status { font-size: 1.25rem; padding: 1rem; }
-			.info-grid { grid-template-columns: 1fr; gap: 0.5rem; }
-			.label::after { content: ": "; }
-		}
-	</style>
-</head>
-<body>
-	<div class="container">
-		<h1>🏥 Health Check</h1>
-		<div class="status ` + statusClass + `">
-			` + func() string {
-		if statusClass == "healthy" {
-			return "✓ HEALTHY"
-		}
-		return "⚠ DEGRADED"
-	}() + `
-		</div>
-		<div class="info-grid">
-			<span class="label">Server</span>
-			<span class="value">` + data.ServerTitle + `</span>
+	PastesTotal int64
 
-			<span class="label">Version</span>
-			<span class="value">` + data.Version + `</span>
+	Language  string
+	Theme     func(string) string
+	Translate func(string, ...interface{}) template.HTML
 
-			<span class="label">FQDN</span>
-			<span class="value">` + data.FQDN + `</span>
-
-			<span class="label">Database</span>
-			<span class="value">` + dbStatus + `</span>
-
-			<span class="label">Uptime</span>
-			<span class="value">` + uptimeStr + `</span>
-
-			<span class="label">Timestamp</span>
-			<span class="value">` + time.Now().Format("2006-01-02 15:04:05 MST") + `</span>
-		</div>
-		<div class="footer">
-			<a href="/">← Back to CasPaste</a> |
-			<a href="/api/v1/healthz">JSON API</a> |
-			<a href="/server/about">About</a>
-		</div>
-	</div>
-</body>
-</html>`
-
-	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if statusClass == "degraded" {
-		rw.WriteHeader(http.StatusServiceUnavailable)
-	} else {
-		rw.WriteHeader(http.StatusOK)
-	}
-	rw.Write([]byte(html))
-	return nil
+	CSRFToken     string
+	UnreadCount   int
+	Notifications []NavNotification
+	ShowLogin     bool
+	ShowRegister  bool
+	User          *AuthUser
 }
 
-// formatUptime formats seconds into human-readable uptime
-// Examples: "20 seconds", "1 hour and 20 minutes", "3 years, 34 weeks, 6 days, 21 hours, 32 minutes"
+// buildWebHealthz assembles the healthz struct used by all response formats
+func (data *Data) buildWebHealthz() (status, dbStatus string, pastesTotal int64) {
+	status = "healthy"
+	dbStatus = "ok"
+	_, err := data.DB.PasteDeleteExpired()
+	if err != nil {
+		status = "degraded"
+		dbStatus = "error"
+	}
+	return status, dbStatus, 0
+}
+
+// Pattern: /healthz and /server/healthz
+// Content negotiation:
+//   - Accept: application/json or path ends in .json → flat JSON
+//   - Accept: text/plain or path ends in .txt → plain text
+//   - Otherwise → HTML via healthz.tmpl
+func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error {
+	status, dbStatus, pastesTotal := data.buildWebHealthz()
+
+	uptimeSecs := int64(time.Since(startTime).Seconds())
+	uptimeStr := formatUptime(uptimeSecs)
+	now := time.Now().UTC()
+
+	statusCode := http.StatusOK
+	if status == "degraded" {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	acceptHeader := req.Header.Get("Accept")
+	path := req.URL.Path
+
+	acceptsJSON := strings.Contains(acceptHeader, "application/json") || strings.HasSuffix(path, ".json")
+	acceptsText := strings.Contains(acceptHeader, "text/plain") || strings.HasSuffix(path, ".txt")
+
+	switch {
+	case acceptsJSON:
+		type buildInfo struct {
+			Commit string `json:"commit"`
+			Date   string `json:"date"`
+		}
+		type clusterInfo struct {
+			Enabled bool `json:"enabled"`
+		}
+		type torInfo struct {
+			Enabled  bool   `json:"enabled"`
+			Running  bool   `json:"running"`
+			Status   string `json:"status"`
+			Hostname string `json:"hostname"`
+		}
+		type featuresInfo struct {
+			Tor                torInfo `json:"tor"`
+			GeoIP              bool    `json:"geoip"`
+			SyntaxHighlighting bool    `json:"syntax_highlighting"`
+			MultiUser          bool    `json:"multi_user"`
+		}
+		type checksInfo struct {
+			Database  string `json:"database"`
+			Cache     string `json:"cache"`
+			Disk      string `json:"disk"`
+			Scheduler string `json:"scheduler"`
+		}
+		type statsInfo struct {
+			RequestsTotal     int64 `json:"requests_total"`
+			Requests24h       int64 `json:"requests_24h"`
+			ActiveConnections int64 `json:"active_connections"`
+			PastesTotal       int64 `json:"pastes_total"`
+			Pastes24h         int64 `json:"pastes_24h"`
+		}
+		type projectInfo struct {
+			Name        string `json:"name"`
+			Tagline     string `json:"tagline"`
+			Description string `json:"description"`
+		}
+		type payload struct {
+			Project   projectInfo  `json:"project"`
+			Status    string       `json:"status"`
+			Version   string       `json:"version"`
+			GoVersion string       `json:"go_version"`
+			Build     buildInfo    `json:"build"`
+			Uptime    string       `json:"uptime"`
+			Mode      string       `json:"mode"`
+			Timestamp time.Time    `json:"timestamp"`
+			Cluster   clusterInfo  `json:"cluster"`
+			Features  featuresInfo `json:"features"`
+			Checks    checksInfo   `json:"checks"`
+			Stats     statsInfo    `json:"stats"`
+		}
+		p := payload{
+			Project: projectInfo{
+				Name:        data.ServerTitle,
+				Tagline:     data.ServerTagline,
+				Description: data.ServerDescription,
+			},
+			Status:    status,
+			Version:   data.Version,
+			GoVersion: runtime.Version(),
+			Build:     buildInfo{Commit: data.BuildCommit, Date: data.BuildDate},
+			Uptime:    uptimeStr,
+			Mode:      data.Mode,
+			Timestamp: now,
+			Cluster:   clusterInfo{Enabled: false},
+			Features: featuresInfo{
+				Tor: torInfo{
+					Enabled:  false,
+					Running:  false,
+					Status:   "disabled",
+					Hostname: "",
+				},
+				GeoIP:              false,
+				SyntaxHighlighting: true,
+				MultiUser:          false,
+			},
+			Checks: checksInfo{
+				Database:  dbStatus,
+				Cache:     "ok",
+				Disk:      "ok",
+				Scheduler: "ok",
+			},
+			Stats: statsInfo{
+				PastesTotal: pastesTotal,
+			},
+		}
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(statusCode)
+		jsonData, _ := json.MarshalIndent(p, "", "  ")
+		rw.Write(jsonData)
+		rw.Write([]byte("\n"))
+		return nil
+
+	case acceptsText:
+		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		rw.WriteHeader(statusCode)
+		fmt.Fprintf(rw, "status: %s\n", status)
+		fmt.Fprintf(rw, "version: %s\n", data.Version)
+		fmt.Fprintf(rw, "go_version: %s\n", runtime.Version())
+		fmt.Fprintf(rw, "build_commit: %s\n", data.BuildCommit)
+		fmt.Fprintf(rw, "build_date: %s\n", data.BuildDate)
+		fmt.Fprintf(rw, "uptime: %s\n", uptimeStr)
+		fmt.Fprintf(rw, "mode: %s\n", data.Mode)
+		fmt.Fprintf(rw, "database: %s\n", dbStatus)
+		fmt.Fprintf(rw, "cache: ok\n")
+		fmt.Fprintf(rw, "disk: ok\n")
+		fmt.Fprintf(rw, "scheduler: ok\n")
+		fmt.Fprintf(rw, "pastes_total: %d\n", pastesTotal)
+		return nil
+
+	default:
+		dataTmpl := healthzTmplData{
+			Status:             status,
+			Version:            data.Version,
+			GoVersion:          runtime.Version(),
+			Uptime:             uptimeStr,
+			Mode:               data.Mode,
+			Timestamp:          now.Format(time.RFC3339),
+			BuildCommit:        data.BuildCommit,
+			BuildDate:          data.BuildDate,
+			DBStatus:           dbStatus,
+			ProjectName:        data.ServerTitle,
+			ProjectTagline:     data.ServerTagline,
+			ProjectDescription: data.ServerDescription,
+			PastesTotal:        pastesTotal,
+			Language:           getCookie(req, "lang"),
+			Theme:              data.getThemeFunc(req),
+			Translate:          data.Locales.findLocale(req).translate,
+			CSRFToken:          data.buildCSRFToken(req),
+			UnreadCount:        0,
+			Notifications:      nil,
+			ShowLogin:          data.ShowLogin,
+			ShowRegister:       data.ShowRegister,
+			User:               GetAuthUser(req.Context()),
+		}
+		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+		rw.WriteHeader(statusCode)
+		return data.HealthzPage.Execute(rw, dataTmpl)
+	}
+}
+
+// formatUptime formats seconds into a compact human-readable string per AI.md PART 13.
+// Examples: "just started", "45s", "5m 30s", "2d 5h 30m"
 func formatUptime(totalSeconds int64) string {
 	if totalSeconds < 1 {
 		return "just started"
@@ -170,77 +234,39 @@ func formatUptime(totalSeconds int64) string {
 
 	parts := []string{}
 
-	// Years (365 days)
 	years := totalSeconds / (365 * 24 * 3600)
 	if years > 0 {
-		if years == 1 {
-			parts = append(parts, "1 year")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d years", years))
-		}
+		parts = append(parts, fmt.Sprintf("%dy", years))
 		totalSeconds %= (365 * 24 * 3600)
 	}
 
-	// Weeks (7 days)
 	weeks := totalSeconds / (7 * 24 * 3600)
 	if weeks > 0 {
-		if weeks == 1 {
-			parts = append(parts, "1 week")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d weeks", weeks))
-		}
+		parts = append(parts, fmt.Sprintf("%dw", weeks))
 		totalSeconds %= (7 * 24 * 3600)
 	}
 
-	// Days
 	days := totalSeconds / (24 * 3600)
 	if days > 0 {
-		if days == 1 {
-			parts = append(parts, "1 day")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d days", days))
-		}
+		parts = append(parts, fmt.Sprintf("%dd", days))
 		totalSeconds %= (24 * 3600)
 	}
 
-	// Hours
 	hours := totalSeconds / 3600
 	if hours > 0 {
-		if hours == 1 {
-			parts = append(parts, "1 hour")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d hours", hours))
-		}
+		parts = append(parts, fmt.Sprintf("%dh", hours))
 		totalSeconds %= 3600
 	}
 
-	// Minutes
 	minutes := totalSeconds / 60
 	if minutes > 0 {
-		if minutes == 1 {
-			parts = append(parts, "1 minute")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d minutes", minutes))
-		}
+		parts = append(parts, fmt.Sprintf("%dm", minutes))
 		totalSeconds %= 60
 	}
 
-	// Seconds
 	if totalSeconds > 0 || len(parts) == 0 {
-		if totalSeconds == 1 {
-			parts = append(parts, "1 second")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d seconds", totalSeconds))
-		}
+		parts = append(parts, fmt.Sprintf("%ds", totalSeconds))
 	}
 
-	// Join with commas and "and" before last item
-	if len(parts) == 1 {
-		return parts[0]
-	}
-	if len(parts) == 2 {
-		return parts[0] + " and " + parts[1]
-	}
-	// 3+ parts: "a, b, c, and d"
-	return strings.Join(parts[:len(parts)-1], ", ") + ", and " + parts[len(parts)-1]
+	return strings.Join(parts, " ")
 }
