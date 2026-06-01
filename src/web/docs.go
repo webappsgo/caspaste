@@ -14,6 +14,7 @@ import (
 
 type docsTmpl struct {
 	ServerURL string
+	Version   string
 	User      *AuthUser
 
 	Language string
@@ -110,6 +111,7 @@ func (data *Data) handleDocsCustomize(rw http.ResponseWriter, req *http.Request)
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return data.DocsCustomize.Execute(rw, docsTmpl{
 		ServerURL:     serverBaseURL(req),
+		Version:       data.Version,
 		User:          GetAuthUser(req.Context()),
 		Language:      getCookie(req, "lang"),
 		Theme:         data.getThemeFunc(req),

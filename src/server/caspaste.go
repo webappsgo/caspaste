@@ -31,6 +31,7 @@ import (
 
 	"github.com/casjay-forks/caspaste/src/admin"
 	"github.com/casjay-forks/caspaste/src/apiv1"
+	"github.com/casjay-forks/caspaste/src/compat"
 	"github.com/casjay-forks/caspaste/src/audit"
 	"github.com/casjay-forks/caspaste/src/caspasswd"
 	"github.com/casjay-forks/caspaste/src/cli"
@@ -2287,6 +2288,27 @@ func main() {
 
 	rawData := raw.Load(db, cfg)
 
+	// Build compat base URL from FQDN + TLS flag (https when certs are configured).
+	compatScheme := "http"
+	if yamlCfg.Security.TLS.CertFile != "" {
+		compatScheme = "https"
+	}
+	compatBaseURL := compatScheme + "://" + fqdn
+	compatData := compat.Load(
+		db,
+		log,
+		Version,
+		compatBaseURL,
+		yamlCfg.Server.Title,
+		yamlCfg.Server.Administrator.Name,
+		yamlCfg.Server.Administrator.Email,
+		serverAbout,
+		serverRules,
+		yamlCfg.Limits.TitleMaxLength,
+		yamlCfg.Limits.BodyMaxLength,
+		maxLifeTime,
+	)
+
 	// Init database with retry logic (for when Postgres/MySQL isn't ready yet)
 	log.Debug("Initializing database schema...")
 	err = retryWithBackoff(
@@ -2506,16 +2528,31 @@ func main() {
 		Secure:      yamlCfg.Security.CSRF.Secure,
 		// Exempt API and compatibility endpoints from CSRF (they use tokens, not cookies)
 		ExemptPaths: []string{
+			// Legacy compat stubs
 			"/sprunge", "/sprunge/",
 			"/ix", "/ix/",
 			"/termbin", "/nc",
 			"/upload", "/p",
 			"/compat", "/paste",
+			// Hastebin compat
 			"/documents", "/documents/",
+			// Stikked compat
+			"/api/create", "/api/paste", "/api/recent", "/api/trending", "/api/langs",
+			"/lists", "/trends",
+			// Microbin compat
+			"/list", "/archive",
+			// Pastebin.com compat
+			"/api/api_post.php", "/api/api_raw.php",
 		},
 		ExemptPrefixes: []string{
 			"/api/",
 			"/raw/",
+			// Stikked view redirects
+			"/view/",
+			// Stikked list pages
+			"/lists/", "/trends/",
+			// Microbin compat
+			"/pasta/", "/rawpasta/",
 		},
 	}
 
@@ -2534,7 +2571,8 @@ func main() {
 						web.SecurityHeadersMiddleware(securityHeadersCfg)(
 							web.CORSMiddleware(
 								web.CSRFMiddleware(csrfCfg)(
-									web.MaintenanceMiddleware(dataDirectory, mux)))))))))
+									web.MaintenanceMiddleware(dataDir,
+										compatData.Middleware(mux))))))))))
 
 	// Initialize built-in scheduler per AI.md PART 19
 	// ALL projects MUST have a built-in scheduler that is ALWAYS RUNNING

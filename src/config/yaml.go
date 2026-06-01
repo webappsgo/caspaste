@@ -33,6 +33,11 @@ type YAMLConfig struct {
 		// Server description (longer description for meta tags)
 		Description string `yaml:"description"`
 
+		// API compatibility mode: native (default), lenpaste, stikked, microbin,
+		// hastebin, pastebin, termbin. Also set via CASPASTE_API_MODE env var.
+		// When empty, mode is auto-detected per-request from the Host header.
+		APIMode string `yaml:"api_mode"`
+
 		Proxy struct {
 			// Additional trusted proxy IPs/CIDRs (appended to default private ranges)
 			Allowed []string `yaml:"allowed"`

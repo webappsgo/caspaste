@@ -327,6 +327,11 @@ func ApplyEnvironmentOverrides(cfg *YAMLConfig) {
 	if val := getEnv("LOGS_DIR"); val != "" {
 		cfg.Directories.Logs = val
 	}
+
+	// API compatibility mode — also readable directly by the compat package via os.Getenv.
+	if val := getEnv("API_MODE"); val != "" {
+		cfg.Server.APIMode = val
+	}
 }
 
 // ApplyCriticalOverrides applies security-critical environment variables on EVERY run
