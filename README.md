@@ -192,15 +192,19 @@ caspaste --data /var/lib/caspaste
 
 **PostgreSQL**
 ```bash
-caspaste --db-driver postgres \
-  --db-source "postgres://user:pass@localhost:5432/caspaste?sslmode=require"
+CASPASTE_DB_DRIVER=postgres \
+CASPASTE_DB_SOURCE="postgres://user:pass@localhost:5432/caspaste?sslmode=require" \
+caspaste
 ```
 
 **MariaDB/MySQL**
 ```bash
-caspaste --db-driver mysql \
-  --db-source "user:pass@tcp(localhost:3306)/caspaste?charset=utf8mb4&parseTime=true"
+CASPASTE_DB_DRIVER=mysql \
+CASPASTE_DB_SOURCE="user:pass@tcp(localhost:3306)/caspaste?charset=utf8mb4&parseTime=true" \
+caspaste
 ```
+
+Database driver and source can also be set in `server.yml` under the `database:` section, or via environment variables (CLI flags for these are not supported — use env vars or config file).
 
 ---
 
@@ -410,8 +414,12 @@ Any CIDRs in `server.proxy.allowed` are **appended** to these defaults.
 | `CASPASTE_DB_DIR` | Database directory | `/data/db/sqlite` |
 | `CASPASTE_LOGS_DIR` | Logs directory | `/data/log/caspaste` |
 | `CASPASTE_BACKUP_DIR` | Backup directory | `/data/backups` |
-| `CASPASTE_PUBLIC` | Public instance | `true`, `false` |
-| `PORT` | Port (Docker/PaaS) | `80` |
+| `CASPASTE_PUBLIC` | Public instance (overrides on every run) | `true`, `false` |
+| `CASPASTE_DB_DRIVER` | Database driver | `sqlite`, `postgres`, `mysql` |
+| `CASPASTE_DB_SOURCE` | Database connection string | `postgres://...`, `caspaste.db` |
+| `CASPASTE_PORT` | Listen port | `8080` |
+| `CASPASTE_ADDRESS` | Smart address parsing | `:8080`, `paste.example.com:80` |
+| `PORT` | Port (Docker/PaaS, alias) | `80` |
 
 ### Themes
 

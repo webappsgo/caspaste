@@ -1,7 +1,7 @@
 # CasPaste — AI.md Compliance TODO
 
-Last audited: 2026-05-31
-Last updated: 2026-05-31 (round 2 fixes)
+Last audited: 2026-05-31 (round 3 re-audit)
+Last updated: 2026-05-31 (round 3 fixes)
 
 ## Legend
 - [x] Done
@@ -210,11 +210,34 @@ Last updated: 2026-05-31 (round 2 fixes)
 
 ---
 
-## Summary (updated 2026-05-31 round 2)
+## Summary (updated 2026-05-31 round 3)
 
 - Total [!] violations: 0 (all resolved)
 - Total [ ] pending items: 11
 - Total [x] confirmed: 84+
+
+### Round 3 re-audit verification (2026-05-31)
+
+All round-2 [x] claims spot-checked against current code:
+- src/totp/totp.go:36 — inline comment fix confirmed (now line 36 is a doc comment above the field, no trailing `//`)
+- src/config/bool.go exists and re-exports `validation.ParseBool` (confirmed)
+- No `strconv.ParseBool` anywhere in src/ (confirmed: 0 matches)
+- All 4 workflow files use full commit SHAs (confirmed: 0 tag-pinned third-party actions)
+- src/web/{auth_routes,org_routes,user_routes}.go all use `renderStub()` with `stub.tmpl` (confirmed: 0 raw HTML strings)
+- src/server/caspaste.go:2412/2415 — adminPanel.Handler() + APIHandler() both mounted (confirmed)
+- No TODO/FIXME/HACK comments outside src/audit/audit.go:58 doc-comment placeholder (confirmed)
+- src/session/session.go:218 + src/token/token.go:585 — both `CleanupExpired()` methods exist (confirmed)
+- src/server/caspaste.go:2578/2600/2625 — wired into scheduler and SchedulerStatus exposed (confirmed)
+- Audit log usage limited to ServerStarted/Stopped + CSRFFailure (confirmed; matches "limited coverage" pending item)
+
+### Round 3 new finding (fixed)
+
+- README.md documented non-existent CLI flags `--db-driver` and `--db-source` for postgres/mysql examples — replaced with `CASPASTE_DB_DRIVER` / `CASPASTE_DB_SOURCE` env-var form (these env vars DO exist in src/config/env.go:209/212). Added `CASPASTE_DB_DRIVER`, `CASPASTE_DB_SOURCE`, `CASPASTE_PORT`, `CASPASTE_ADDRESS` to env-var table in README.
+
+### Round 3 confirmed pending items (unchanged from round 2)
+
+The 11 pending items remain accurate. None have been silently resolved or silently added.
+CLI subcommands `delete`, `update`, `logout` confirmed absent in src/client/main.go:161-177 dispatch.
 
 ## Remaining pending items
 
