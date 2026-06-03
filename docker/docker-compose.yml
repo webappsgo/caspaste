@@ -9,6 +9,27 @@ x-logging: &default-logging
   driver: json-file
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: caspaste-postgres
+    hostname: caspaste-postgres
+    restart: always
+    logging: *default-logging
+    environment:
+      - POSTGRES_USER=${DB_USER:-caspaste}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-caspaste}
+      - POSTGRES_DB=${DB_NAME:-caspaste}
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-caspaste}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - caspaste
+
   app:
     image: ghcr.io/casjay-forks/caspaste:latest
     container_name: caspaste
@@ -26,12 +47,16 @@ services:
       - CASPASTE_ADMIN_NAME=${APP_ORG_NAME:-CasPaste}
       - CASPASTE_UI_DEFAULT_LIFETIME=never
       - CASPASTE_UI_DEFAULT_THEME=dark
-      - CASPASTE_DB_DRIVER=sqlite
+      - CASPASTE_DB_DRIVER=postgres
+      - CASPASTE_DB_SOURCE=postgres://${DB_USER:-caspaste}:${DB_PASSWORD:-caspaste}@caspaste-postgres:5432/${DB_NAME:-caspaste}?sslmode=disable
     ports:
       - '64580:80'
     volumes:
       - './rootfs/config:/config:z'
       - './rootfs/data:/data:z'
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "caspaste", "--status"]
       interval: 30s
@@ -40,6 +65,9 @@ services:
       start_period: 90s
     networks:
       - caspaste
+
+volumes:
+  postgres-data:
 
 networks:
   caspaste:
