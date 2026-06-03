@@ -19,14 +19,14 @@ ARG COMMIT_ID
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -tags netgo \
-    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://lp.pste.us -extldflags '-static'" \
+    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://pste.us -extldflags '-static'" \
     -o /caspaste \
     ./src/server
 
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -tags netgo \
-    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://lp.pste.us -extldflags '-static'" \
+    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://pste.us -extldflags '-static'" \
     -o /caspaste-cli \
     ./src/client
 
@@ -63,7 +63,7 @@ COPY --from=builder /caspaste /usr/local/bin/caspaste
 COPY --from=builder /caspaste-cli /usr/local/bin/caspaste-cli
 
 # Copy entrypoint and filesystem overlay
-COPY docker/file_system/ /
+COPY docker/rootfs/ /
 
 # Create directories
 RUN mkdir -p /config/caspaste /data/caspaste /data/log/caspaste && \
