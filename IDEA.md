@@ -11,7 +11,7 @@ Target users:
 - Self-hosters wanting simple, lightweight paste and URL shortening
 - CLI users piping content from existing tools (sprunge, ix, termbin, pastebin workflows)
 
-Current codebase state: Go server with embedded HTML templates, CSS/JS, locale files, and Chroma lexers. SQLite default database with optional PostgreSQL and MySQL backends. Supports multi-user mode (optional, off by default), organization support (optional, off by default), and custom domain mapping (optional, off by default). External API compatibility layer allows existing pastebin client tools to work by changing only the endpoint URL.
+Current codebase state: Go server with embedded HTML templates, CSS/JS, locale files, and Chroma lexers. SQLite default database with optional PostgreSQL and MySQL backends. Anonymous/single-password pastebin — no multi-user accounts, no organizations, no custom domains. Per-request API compatibility layer allows existing pastebin client tooling (sprunge, ix, termbin, pastebin.com, stikked, microbin, lenpaste, hastebin) to work by changing only the endpoint URL; mode is detected automatically from the Host header or set via CASPASTE_API_MODE.
 
 ---
 
@@ -49,17 +49,19 @@ log_dir:              /var/log/casjay-forks/caspaste
 - Private pastes: excluded from public listing
 - Paste expiration: never (0), 10 min, 1 hour, 1 day, 1 week, 1 month, 1 year
 - Editable pastes: update content after creation (when `is_editable` is true)
-- Public/private server mode: `server.public=true` means open access, `false` means password auth required
-- Multi-user mode (optional): accounts, roles, API tokens, registration modes
-- Organization support (optional, PART 35): group ownership of pastes
-- Custom domain support (optional, PART 36): per-user/per-org domain mapping
+- Public/private server mode: `server.public=true` means open access, `false` means password auth required (single shared password via caspasswd)
+- Admin panel: full server management at `/server/{admin_path}/config/` (PART 17)
+- API keys: admin-managed tokens for API access without session cookie
 - Localization: en, de, bn_IN, ru
 - PWA support: service worker, manifest
 - QR code generation for paste URLs
 - Embedded pastes (`/emb/{id}`) for iframe inclusion
-- External API compatibility: clients that expect sprunge/ix/pastebin/stikked/microbin/lenpaste/hastebin/termbin behavior work unchanged
+- External API compatibility: full per-request compat layer — clients that expect sprunge/ix/pastebin/stikked/microbin/lenpaste/hastebin/termbin behavior work without modification
 
 **Not in scope:**
+- Multi-user accounts, registration, profiles, or per-user tokens
+- Organizations or group ownership
+- Custom domain mapping
 - Email delivery or notifications
 - Chat or real-time collaboration
 - General file hosting beyond paste context (no CDN, no directory listing)
@@ -68,24 +70,23 @@ log_dir:              /var/log/casjay-forks/caspaste
 
 ### Roles & permissions
 
-**Single-password mode (server.public=false, multi-user disabled):**
+**Single-password mode (server.public=false):**
 - Anonymous: no access — redirected to login
 - Authenticated (server password): full access to create, view, list, manage pastes
 
-**Public mode (server.public=true, multi-user disabled):**
+**Public mode (server.public=true):**
 - Anonymous: create public pastes, view public pastes, view raw, download
 - No listing of private pastes to anonymous users
 
-**Multi-user mode (users.enabled=true):**
-- Anonymous: create public pastes (if server.public=true), view public pastes
-- Authenticated user: create pastes (public or private), view own private pastes, edit/delete own pastes, manage API tokens, update profile
-- Admin: full access to all pastes, user management, organization management, domain management
-- Registration modes: `public` (open), `private` (invite only), `disabled`
-- API tokens: users may generate tokens (max 5 per user by default); tokens authenticate API requests
+**Admin:**
+- Separate admin credential stored in `admins` table
+- Access only via `/server/{admin_path}/config/` routes
+- Full server management: config, SSL, email, scheduler, logs, backup, updates, API tokens, firewall, GeoIP, Tor
+- Admin API token: authenticates requests to `/api/v1/server/{admin_path}/config/*`
 
 **Paste visibility:**
 - Public paste: visible to all (listed publicly)
-- Private paste (`is_private=true`): only visible to owner or admin; excluded from `/list`
+- Private paste (`is_private=true`): excluded from `/list`; direct URL still accessible
 - Burn-after-reading (`one_use=true`): deleted on first view regardless of auth state
 
 ### Data model & sensitivity
@@ -130,18 +131,19 @@ log_dir:              /var/log/casjay-forks/caspaste
 **Browser ↔ Server:**
 - Browser is untrusted; all state-changing requests require CSRF protection
 - Exception: compat endpoints are CSRF-exempt (see Security decisions & exceptions)
-- Auth state carried in session cookie (single-password mode) or session token (multi-user mode)
+- Auth state carried in session cookie (single-password mode)
 
 **API clients ↔ Server:**
-- API clients authenticate via session token or API token (Bearer)
-- Unauthenticated API requests permitted only when `server.public=true` or on CSRF-exempt compat endpoints
+- API clients authenticate via admin API token (Bearer) for admin endpoints
+- Unauthenticated API requests permitted on public paste endpoints when `server.public=true`, or on CSRF-exempt compat endpoints
 - Trusted proxy headers (`X-Forwarded-For`, etc.) honored only from IPs in `server.trusted_proxies`
 
 **External API compatibility layer:**
-- Inbound: clients that were targeting sprunge/ix/pastebin/stikked/microbin/lenpaste/hastebin/termbin
+- Inbound: clients targeting sprunge/ix/pastebin/stikked/microbin/lenpaste/hastebin/termbin
+- Mode detected per-request from Host header leftmost label, or set globally via `CASPASTE_API_MODE`; `CASPASTE_FORCE_HOST` (default `yes`) controls priority
 - These clients are untrusted external sources; all compat inputs are validated and rate-limited
 - Response format exactly matches the target service (plain text URL, JSON object, or redirect) — no CasPaste envelope
-- The compatibility layer is create-only for most services; hastebin also supports GET /documents/{key}
+- Full API surface emulated per service: lenpaste (create/get/serverInfo), stikked (create/get/recent/trending/langs/lists/view redirects), microbin (create/list/archive/get/edit/delete), hastebin (create/get), pastebin.com (paste/delete/list/trends/raw), termbin (raw POST), sprunge/ix/generic (plain text POST)
 
 **Database:**
 - Internal trusted component; no network exposure
@@ -160,7 +162,7 @@ log_dir:              /var/log/casjay-forks/caspaste
 **Primary assets being protected:**
 - Paste content (user data — may contain secrets, credentials, PII)
 - Server availability (against resource exhaustion)
-- User accounts (in multi-user mode)
+- Admin credentials and admin panel
 - Private pastes (visibility must not leak)
 
 **Trusted vs untrusted inputs:**
@@ -195,15 +197,17 @@ log_dir:              /var/log/casjay-forks/caspaste
 
 ### Security decisions & exceptions
 
-- **Compat endpoints are CSRF-exempt**: `/sprunge`, `/ix`, `/termbin`, `/nc`, `/api/api_post.php`, `/api/create`, `/upload`, `/p`, `/api/v1/new`, `/compat`, `/paste`, `/documents`, `/documents/{key}`. Rationale: these endpoints are consumed by CLI tools and scripts that have no mechanism to obtain or send a CSRF token. All are POST-only (create) or rate-limited GET (hastebin). Accepted risk: a crafted form on a third-party page could trigger a paste creation — this is acceptable because paste creation is low-stakes and rate-limited.
+- **Compat endpoints are CSRF-exempt**: all paths listed in the compat route table below plus their prefix variants (`/pasta/`, `/rawpasta/`, `/view/`, `/lists/`, `/trends/`). Rationale: these endpoints are consumed by CLI tools and scripts that have no mechanism to obtain or send a CSRF token. Accepted risk: a crafted form on a third-party page could trigger paste creation — acceptable because creation is low-stakes and rate-limited.
 
 - **Anonymous paste creation is intentional in public server mode**: `server.public=true` deliberately allows unauthenticated paste creation. This is the product's design for open self-hosted instances. Operators who want auth-required mode set `server.public=false`.
 
 - **Burn-after-reading delete occurs before response returns**: the DELETE db call is made before writing the HTTP response body. This is intentional — it prevents a race condition where two near-simultaneous readers both receive the paste before either deletion completes.
 
-- **Hastebin GET /documents/{key} is read-only and rate-limited**: the GET path on the hastebin compat endpoint uses `RateLimitGet`, not `RateLimitNew`. Read-only access to an existing paste by key is accepted as compatible with the hastebin protocol.
+- **Compat GET endpoints are read-only and rate-limited**: hastebin `GET /documents/{key}`, microbin `GET /api/{id}`, pastebin `GET /api/api_raw.php`, stikked `GET /api/paste` — all use `RateLimitGet`, not `RateLimitNew`.
 
-- **All compat endpoints return the exact response format of the target service**: sprunge/ix/termbin return plain text URL; pastebin returns plain text key; stikked returns plain text URL; microbin returns 303 redirect (or JSON if `Accept: application/json`); lenpaste returns flat JSON `{id, createTime, deleteTime}` with no envelope; hastebin returns `{"key":"..."}` on create and `{"key":"...","data":"..."}` on get. CasPaste's standard `{ok, data}` envelope is NOT used on compat routes.
+- **All compat endpoints return the exact response format of the target service**: sprunge/ix/termbin return plain text URL; pastebin returns plain text URL or XML list; stikked returns plain text URL or JSON; microbin returns 303 redirect on create or JSON on API; lenpaste returns flat JSON `{id, createTime, deleteTime}` with no envelope; hastebin returns `{"key":"..."}` on create and `{"key":"...","data":"..."}` on get. CasPaste's standard `{ok, data}` envelope is NOT used on compat routes.
+
+- **Compat mode is per-request**: the `src/compat` middleware runs inside the existing CSRF/security-headers chain. Mode is resolved per request — the same server instance can serve native, lenpaste, stikked, etc. clients simultaneously on different virtual hostnames.
 
 - **BuildCommit/BuildDate/Version exposed in /server/healthz**: these fields are public-safe operational metadata. They are intentionally included in the health check response for monitoring and debugging visibility.
 
@@ -251,16 +255,6 @@ checks.storage:                database read/write probe (ok / degraded / down)
 | GET    | /server/auth/login              | Login page                                   |
 | POST   | /server/auth/login              | Login form submit                            |
 | GET    | /server/auth/logout             | Logout                                       |
-| GET    | /server/auth/register           | Registration page (multi-user mode)          |
-| GET    | /users                          | User dashboard (multi-user mode)             |
-| GET    | /users/notifications            | User notifications                           |
-| GET    | /users/settings                 | User settings                                |
-| GET    | /users/settings/privacy         | Privacy settings                             |
-| GET    | /users/settings/notifications   | Notification settings                        |
-| GET    | /users/settings/appearance      | Appearance settings                          |
-| GET    | /users/security                 | Security settings (2FA, password)            |
-| GET    | /users/tokens                   | API token management                         |
-| GET    | /users/domains                  | Custom domain management                     |
 | GET    | /dl/{id}                        | Download paste as attachment                 |
 | GET    | /emb/{id}                       | Embedded paste (iframe)                      |
 | GET    | /emb_help/{id}                  | Embedded paste help                          |
@@ -286,23 +280,81 @@ checks.storage:                database read/write probe (ok / degraded / down)
 | GET    | /api/v1/pastes                | List pastes                                |
 | GET    | /api/v1/pastes/{id}           | Get paste by ID                            |
 
-**External API compatibility routes (create-only except hastebin GET):**
+**External API compatibility routes:**
 
-| Method | Path                      | Emulates          | Response format         |
-|--------|---------------------------|-------------------|-------------------------|
-| POST   | /sprunge                  | sprunge.us        | Plain text URL          |
-| POST   | /ix                       | ix.io             | Plain text URL          |
-| POST   | /termbin                  | termbin.com       | Plain text URL          |
-| POST   | /nc                       | netcat/termbin    | Plain text URL          |
-| POST   | /api/api_post.php         | pastebin.com      | Plain text URL          |
-| POST   | /api/create               | stikked/stiqued   | Plain text URL          |
-| POST   | /upload                   | microbin          | 303 redirect or JSON    |
-| POST   | /p                        | microbin          | 303 redirect or JSON    |
-| POST   | /api/v1/new               | lenpaste          | Flat JSON               |
-| POST   | /documents                | hastebin          | `{"key":"..."}`         |
-| GET    | /documents/{key}          | hastebin          | `{"key":"...","data":"..."}` |
-| POST   | /compat                   | generic           | Content-negotiated      |
-| POST   | /paste                    | generic           | Content-negotiated      |
+Mode is selected per-request (Host header or `CASPASTE_API_MODE`). Upstream forks/references: lenpaste → https://github.com/forksmgr/lcomrade-lenpaste; stikked → https://github.com/claudehohl/Stikked; microbin → https://github.com/szabodanika/microbin; hastebin → https://github.com/toptal/haste-server.
+
+*Always-active (native stubs, no mode required):*
+
+| Method   | Path                      | Emulates           | Response format              |
+|----------|---------------------------|--------------------|------------------------------|
+| POST     | /sprunge                  | sprunge.us         | Plain text URL               |
+| POST     | /ix                       | ix.io              | Plain text URL               |
+| POST     | /termbin                  | termbin.com        | Plain text URL               |
+| POST     | /nc                       | netcat/termbin     | Plain text URL               |
+| POST     | /compat                   | generic            | Content-negotiated           |
+| POST     | /paste                    | generic            | Content-negotiated           |
+
+*lenpaste mode (`CASPASTE_API_MODE=lenpaste` or Host `lp.*`/`lenpaste.*`):*
+
+| Method | Path                      | Description                              | Response            |
+|--------|---------------------------|------------------------------------------|---------------------|
+| POST   | /api/v1/new               | Create paste                             | `{"id":"..."}`      |
+| GET    | /api/v1/get?id=           | Get paste (optionally consume one-use)   | Paste JSON          |
+| GET    | /api/v1/getServerInfo     | Server metadata                          | Server info JSON    |
+
+*stikked mode (`CASPASTE_API_MODE=stikked` or Host `sk.*`/`stikked.*`/`stikq.*`):*
+
+| Method | Path                      | Description                              | Response            |
+|--------|---------------------------|------------------------------------------|---------------------|
+| POST   | /api/create               | Create paste                             | Plain text URL      |
+| GET    | /api/paste?id=            | Get paste                                | JSON                |
+| GET    | /api/recent               | 20 most recent public pastes             | JSON array          |
+| GET    | /api/trending             | 20 recent (no hit counter)               | JSON array          |
+| GET    | /api/langs                | Supported syntaxes                       | JSON array          |
+| GET    | /lists[/{page}]           | Paginated public paste list              | JSON array          |
+| GET    | /trends                   | Alias of /api/trending                   | JSON array          |
+| GET    | /view/{id}                | Redirect to /{id}                        | 302                 |
+| GET    | /view/raw/{id}            | Redirect to /raw/{id}                    | 302                 |
+| GET    | /view/download/{id}       | Redirect to /dl/{id}                     | 302                 |
+| GET    | /view/embed/{id}          | Redirect to /emb/{id}                    | 302                 |
+
+*microbin mode (`CASPASTE_API_MODE=microbin` or Host `mb.*`/`microbin.*`):*
+
+| Method   | Path                      | Description                              | Response            |
+|----------|---------------------------|------------------------------------------|---------------------|
+| POST     | /upload                   | Create paste (multipart form)            | 303 → /pasta/{id}   |
+| GET      | /list                     | Public paste list                        | JSON array          |
+| GET      | /archive                  | Alias of /list                           | JSON array          |
+| GET      | /pasta/{id}               | Redirect to /{id}                        | 302                 |
+| GET      | /rawpasta/{id}            | Redirect to /raw/{id}                    | 302                 |
+| GET      | /api/{id}                 | Get paste                                | JSON                |
+| POST     | /api/{id}                 | Edit paste (update fields)               | JSON                |
+| DELETE   | /api/{id}                 | Delete paste                             | 204                 |
+
+*hastebin mode (`CASPASTE_API_MODE=hastebin` or Host `haste.*`/`hastebin.*`):*
+
+| Method | Path                      | Description                              | Response                          |
+|--------|---------------------------|------------------------------------------|-----------------------------------|
+| POST   | /documents                | Create paste (raw body)                  | `{"key":"..."}`                   |
+| GET    | /documents/{key}          | Get paste                                | `{"key":"...","data":"..."}`      |
+
+*pastebin.com mode (`CASPASTE_API_MODE=pastebin` or Host `pb.*`/`pastebin.*`):*
+
+| Method | Path                      | api_option  | Description                  | Response            |
+|--------|---------------------------|-------------|------------------------------|---------------------|
+| POST   | /api/api_post.php         | paste       | Create paste                 | Plain text URL      |
+| POST   | /api/api_post.php         | delete      | Delete paste by key          | Plain text          |
+| POST   | /api/api_post.php         | list        | 50 most recent public pastes | XML                 |
+| POST   | /api/api_post.php         | trends      | 18 most recent (trending)    | XML                 |
+| GET    | /api/api_raw.php?i=       | —           | Raw paste text               | Plain text          |
+
+*termbin mode (`CASPASTE_API_MODE=termbin` or Host `tb.*`/`termbin.*`/`nc.*`):*
+
+| Method | Path                      | Description                              | Response            |
+|--------|---------------------------|------------------------------------------|---------------------|
+| POST   | /                         | Create paste (raw body or multipart `c`) | Plain text URL      |
+| POST   | /termbin                  | Same as above                            | Plain text URL      |
 
 **Legacy redirects (301):**
 
