@@ -286,17 +286,15 @@ func PathSecurityMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// Context keys for authentication (PART 34, 35, 36)
-type (
-	UserContextKey      struct{}
-	SessionContextKey   struct{}
-	TokenInfoContextKey struct{}
-	CustomDomainKey     struct{}
-	OrgContextKey       struct{}
-	OrgMemberRoleKey    struct{}
-)
+// UserContextKey is the context key for the (optional) authenticated user.
+// CasPaste is an anonymous pastebin; this exists only so templates that
+// already reference .User keep working — GetAuthUser will always return nil
+// in the anonymous flow.
+type UserContextKey struct{}
 
-// AuthUser represents an authenticated user in the request context
+// AuthUser represents an authenticated user in the request context.
+// Retained as a no-op type so existing page-data structs and templates
+// (e.g., {{if .User}}) continue to compile and render.
 type AuthUser struct {
 	ID            int64
 	Username      string
@@ -308,106 +306,10 @@ type AuthUser struct {
 	TOTPEnabled   bool
 }
 
-// GetAuthUser retrieves the authenticated user from context
+// GetAuthUser retrieves the authenticated user from context, or nil.
 func GetAuthUser(ctx context.Context) *AuthUser {
 	if user, ok := ctx.Value(UserContextKey{}).(*AuthUser); ok {
 		return user
 	}
 	return nil
-}
-
-// GetSessionToken retrieves the session token from context
-func GetSessionToken(ctx context.Context) string {
-	if token, ok := ctx.Value(SessionContextKey{}).(string); ok {
-		return token
-	}
-	return ""
-}
-
-// GetCustomDomain retrieves the custom domain from context
-func GetCustomDomain(ctx context.Context) interface{} {
-	return ctx.Value(CustomDomainKey{})
-}
-
-// GetOrgContext retrieves the organization from context
-func GetOrgContext(ctx context.Context) interface{} {
-	return ctx.Value(OrgContextKey{})
-}
-
-// GetOrgMemberRole retrieves the user's role in the current org context
-func GetOrgMemberRole(ctx context.Context) string {
-	if role, ok := ctx.Value(OrgMemberRoleKey{}).(string); ok {
-		return role
-	}
-	return ""
-}
-
-// SetAuthUser sets the authenticated user in context
-func SetAuthUser(ctx context.Context, user *AuthUser) context.Context {
-	return context.WithValue(ctx, UserContextKey{}, user)
-}
-
-// SetSessionToken sets the session token in context
-func SetSessionToken(ctx context.Context, token string) context.Context {
-	return context.WithValue(ctx, SessionContextKey{}, token)
-}
-
-// SetCustomDomain sets the custom domain in context
-func SetCustomDomain(ctx context.Context, domain interface{}) context.Context {
-	return context.WithValue(ctx, CustomDomainKey{}, domain)
-}
-
-// SetOrgContext sets the organization in context
-func SetOrgContext(ctx context.Context, org interface{}) context.Context {
-	return context.WithValue(ctx, OrgContextKey{}, org)
-}
-
-// SetOrgMemberRole sets the user's role in the org context
-func SetOrgMemberRole(ctx context.Context, role string) context.Context {
-	return context.WithValue(ctx, OrgMemberRoleKey{}, role)
-}
-
-// IsAuthenticated checks if the request has an authenticated user
-func IsAuthenticated(ctx context.Context) bool {
-	return GetAuthUser(ctx) != nil
-}
-
-// RequireAuth returns 401 if not authenticated
-func RequireAuth(w http.ResponseWriter, r *http.Request) bool {
-	if !IsAuthenticated(r.Context()) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return false
-	}
-	return true
-}
-
-// RequireRole returns 403 if user doesn't have the required role
-func RequireRole(w http.ResponseWriter, r *http.Request, requiredRole string) bool {
-	user := GetAuthUser(r.Context())
-	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return false
-	}
-	if user.Role != requiredRole && user.Role != "admin" {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return false
-	}
-	return true
-}
-
-// RequireOrgRole returns 403 if user doesn't have the required org role
-func RequireOrgRole(w http.ResponseWriter, r *http.Request, minRole string) bool {
-	role := GetOrgMemberRole(r.Context())
-	if role == "" {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return false
-	}
-
-	// Role hierarchy: owner > admin > member
-	roleRank := map[string]int{"owner": 3, "admin": 2, "member": 1}
-	if roleRank[role] < roleRank[minRole] {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return false
-	}
-	return true
 }

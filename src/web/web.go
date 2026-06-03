@@ -71,7 +71,6 @@ type Data struct {
 	EmbeddedPage     *template.Template
 	EmbeddedHelpPage *template.Template
 	Login            *template.Template
-	StubPage         *template.Template
 
 	Version     string
 	Mode        string
@@ -181,10 +180,10 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.UiDefaultLifeTime = cfg.UiDefaultLifetime
 	data.UiDefaultTheme = cfg.UiDefaultTheme
 	data.Public = cfg.Public
-	// Show login link only when the multi-user feature is enabled (accounts exist to log into)
-	data.ShowLogin = cfg.Users.Enabled
-	// Show register link when multi-user is enabled and registration is open
-	data.ShowRegister = cfg.Users.Enabled && (cfg.Users.Registration.Mode == "open" || cfg.Users.Registration.Mode == "public")
+	// Anonymous pastebin: no multi-user, so registration link never shown.
+	// Login link shown only when an htpasswd file is configured (server.public=false).
+	data.ShowLogin = cfg.CasPasswdFile != ""
+	data.ShowRegister = false
 	data.CasPasswdFile = cfg.CasPasswdFile
 
 	// Initialize brute force protection for login
@@ -408,12 +407,6 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 		return nil, err
 	}
 
-	// stub.tmpl - shared template for placeholder/stub pages (auth, user, org)
-	data.StubPage, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/stub.tmpl")
-	if err != nil {
-		return nil, err
-	}
-
 	return &data, nil
 }
 
@@ -450,12 +443,8 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 	case "/.well-known/security.txt":
 		err = data.handleSecurityTxt(rw, req)
 	case "/.well-known/change-password":
-		// Per AI.md PART 34 - redirect to password change page
-		if data.isAuthenticated(req) {
-			http.Redirect(rw, req, "/users/security", http.StatusFound)
-		} else {
-			http.Redirect(rw, req, "/auth/password/forgot", http.StatusFound)
-		}
+		// Anonymous pastebin has no user-managed passwords; redirect to login.
+		http.Redirect(rw, req, "/auth/login", http.StatusFound)
 		return
 	// Resources
 	case "/style.css":
@@ -526,32 +515,11 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		}
 	case "/server/auth/logout":
 		err = data.handleLogout(rw, req)
-	case "/server/auth/register":
-		err = data.handleRegisterPage(rw, req)
 	// Legacy auth redirects
 	case "/login":
 		http.Redirect(rw, req, "/server/auth/login", http.StatusMovedPermanently)
 	case "/logout":
 		http.Redirect(rw, req, "/server/auth/logout", http.StatusMovedPermanently)
-	// User routes (PART 34)
-	case "/users":
-		err = data.handleUserDashboard(rw, req)
-	case "/users/notifications":
-		err = data.handleUserNotifications(rw, req)
-	case "/users/settings":
-		err = data.handleUserSettings(rw, req)
-	case "/users/settings/privacy":
-		err = data.handleUserSettingsPrivacy(rw, req)
-	case "/users/settings/notifications":
-		err = data.handleUserSettingsNotifications(rw, req)
-	case "/users/settings/appearance":
-		err = data.handleUserSettingsAppearance(rw, req)
-	case "/users/security":
-		err = data.handleUserSecurity(rw, req)
-	case "/users/tokens":
-		err = data.handleUserTokens(rw, req)
-	case "/users/domains":
-		err = data.handleUserDomains(rw, req)
 	// Pages
 	case "/":
 		err = data.handleNewPaste(rw, req)
@@ -580,19 +548,6 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 
 		} else if strings.HasPrefix(req.URL.Path, "/edit/") {
 			err = data.handleEditPaste(rw, req)
-
-		} else if strings.HasPrefix(req.URL.Path, "/server/auth/") {
-			// Canonical auth routes per AI.md PART 34 — rewrite to /auth/ prefix for routeAuth
-			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/server")
-			err = data.routeAuth(rw, req)
-
-		} else if strings.HasPrefix(req.URL.Path, "/auth/") {
-			// Legacy /auth/* prefix — still supported
-			err = data.routeAuth(rw, req)
-
-		} else if strings.HasPrefix(req.URL.Path, "/orgs") {
-			// Organization routes (PART 35)
-			err = data.routeOrgs(rw, req)
 
 		} else {
 			err = data.handleGetPaste(rw, req)

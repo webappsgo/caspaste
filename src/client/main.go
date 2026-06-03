@@ -44,11 +44,10 @@ type Config struct {
 	Password  string `yaml:"password,omitempty"`
 }
 
-// Runtime flags for token and user context override per AI.md PART 33
+// Runtime flags for token override per AI.md PART 33
 var (
 	flagToken     string
 	flagTokenFile string
-	flagUser      string
 )
 
 // APIResponse is the unified response wrapper per AI.md PART 16
@@ -249,8 +248,6 @@ Usage: %s [global options] <command> [options]
 Global Options:
   --token TOKEN       API token for authentication
   --token-file FILE   Read token from file
-  --user NAME         Target user or org context (server auto-detects)
-                      Use @NAME to force user, +NAME to force org
   --color MODE        Color output: always, never, auto (default: auto)
 
 Commands:
@@ -293,12 +290,6 @@ Examples:
   # Use API token for authentication
   %s --token usr_abc123 new -f file.txt
 
-  # Create paste in org context (PART 34/35)
-  %s --user myorg new -f file.txt
-
-  # Force user context with @ prefix
-  %s --user @alice list
-
 Configuration:
   Config file: ~/.config/casjay-forks/caspaste/cli.yml
 
@@ -314,7 +305,7 @@ Configuration:
     CASPASTE_USERNAME=admin
     CASPASTE_PASSWORD=secret
 
-`, Version, binName, binName, binName, binName, binName, binName, binName, binName, binName, binName)
+`, Version, binName, binName, binName, binName, binName, binName, binName, binName)
 }
 
 // getConfigPath returns the path to the config file
@@ -385,7 +376,7 @@ func saveConfig(cfg Config) error {
 }
 
 // parseGlobalFlags extracts global flags before command processing per AI.md PART 33
-// Global flags: --token, --token-file, --user, --color
+// Global flags: --token, --token-file, --color
 // Returns remaining args after extracting global flags
 func parseGlobalFlags(args []string) []string {
 	var remaining []string
@@ -406,16 +397,6 @@ func parseGlobalFlags(args []string) []string {
 				continue
 			}
 			i++
-		case "--user":
-			// Per AI.md PART 33: --user NAME for user/org context
-			// Server auto-detects if NAME is user or org
-			// @NAME forces user context, +NAME forces org context
-			if i+1 < len(args) {
-				flagUser = args[i+1]
-				i += 2
-				continue
-			}
-			i++
 		case "--color":
 			if i+1 < len(args) {
 				display.SetColorMode(args[i+1])
@@ -432,11 +413,6 @@ func parseGlobalFlags(args []string) []string {
 			}
 			if strings.HasPrefix(args[i], "--token-file=") {
 				flagTokenFile = strings.TrimPrefix(args[i], "--token-file=")
-				i++
-				continue
-			}
-			if strings.HasPrefix(args[i], "--user=") {
-				flagUser = strings.TrimPrefix(args[i], "--user=")
 				i++
 				continue
 			}
@@ -520,13 +496,6 @@ func makeRequest(method, endpoint string, body io.Reader, contentType string, cf
 		req.Header.Set("Authorization", "Bearer "+token)
 	} else if cfg.Username != "" && cfg.Password != "" {
 		req.SetBasicAuth(cfg.Username, cfg.Password)
-	}
-
-	// User/Org context per AI.md PART 33
-	// --user NAME sets X-User-Context header for server-side smart detection
-	// @NAME = force user, +NAME = force org, NAME = server auto-detects
-	if flagUser != "" {
-		req.Header.Set("X-User-Context", flagUser)
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
