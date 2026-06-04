@@ -54,14 +54,14 @@ func SetAdminPath(p string) {
 	}
 }
 
-// AdminBasePath returns the admin base path with leading slash (e.g., "/admin")
+// AdminBasePath returns the admin UI base path (e.g., "/server/admin")
 func AdminBasePath() string {
-	return "/" + currentAdminPath
+	return "/server/" + currentAdminPath
 }
 
-// AdminAPIPath returns the admin API path (e.g., "/api/v1/admin")
+// AdminAPIPath returns the admin API path (e.g., "/api/v1/server/admin")
 func AdminAPIPath() string {
-	return APIBasePath() + "/" + currentAdminPath
+	return "/api/" + currentAPIVersion + "/server/" + currentAdminPath
 }
 
 type Config struct {

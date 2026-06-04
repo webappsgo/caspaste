@@ -2235,6 +2235,9 @@ func main() {
 	}
 	defer cleanupLogFiles()
 
+	// Record server start time for uptime calculations
+	startTime := time.Now()
+
 	log.Debug("Initializing database connection pool...")
 	db, err := storage.NewPool(yamlCfg.Database.Driver, yamlCfg.Database.Source, yamlCfg.Database.MaxOpenConns, yamlCfg.Database.MaxIdleConns, *flagDataDir)
 	if err != nil {
@@ -2420,13 +2423,22 @@ func main() {
 	})
 
 	// Register admin panel and API per AI.md PART 17
-	// Admin panel at /{admin_path}/ and API at /api/{version}/{admin_path}/
+	// UI at /server/{admin_path}/, API at /api/{version}/server/{admin_path}/
 	adminCfg := &admin.Config{
 		BasePath:   config.AdminPath(),
 		APIVersion: config.APIVersion(),
 		Enabled:    true,
+		DB:         db.Pool(),
+		Debug:      *flagDebug,
+		StartTime:  startTime,
+		AppCfg:     &cfg,
+		ConfigFile: configFilePath,
+		DataDir:    dataDir,
+		ConfigDir:  configDir,
+		BackupDir:  backupDir,
 	}
 	adminPanel := admin.New(adminCfg)
+	adminPanel.MaybeGenerateSetupToken()
 	adminBasePath := config.AdminBasePath()
 	adminAPIPath := config.AdminAPIPath()
 
@@ -2673,6 +2685,9 @@ func main() {
 	} else {
 		log.Info("Built-in scheduler started per AI.md PART 19")
 	}
+
+	// Inject scheduler into admin panel now that it is running
+	adminPanel.SetScheduler(sched)
 
 	// Determine ports (HTTP and optionally HTTPS)
 	var httpPort, httpsPort int

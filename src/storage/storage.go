@@ -338,6 +338,41 @@ func InitDB(driverName string, dataSourceName string) error {
 		return err
 	}
 
+	// Create admin_sessions table (separate session store per AI.md PART 17)
+	err = execCreate(ctx, db.pool, `
+		CREATE TABLE IF NOT EXISTS admin_sessions (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			admin_id   INTEGER NOT NULL,
+			token_hash TEXT NOT NULL UNIQUE,
+			ip_address TEXT,
+			user_agent TEXT,
+			expires_at INTEGER NOT NULL,
+			created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+		);
+	`, f)
+	if err != nil {
+		return err
+	}
+
+	// Create admin_tokens table (API tokens for admin accounts, per AI.md PART 17)
+	err = execCreate(ctx, db.pool, `
+		CREATE TABLE IF NOT EXISTS admin_tokens (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			admin_id     INTEGER NOT NULL,
+			name         TEXT NOT NULL,
+			token_prefix TEXT NOT NULL,
+			token_hash   TEXT NOT NULL UNIQUE,
+			last_used_at INTEGER,
+			expires_at   INTEGER,
+			created_at   INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+		);
+	`, f)
+	if err != nil {
+		return err
+	}
+
 	// Create users table (PART 34: Multi-User)
 	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS users (
@@ -634,6 +669,10 @@ func InitDB(driverName string, dataSourceName string) error {
 	// Create indexes
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admins_token ON admins(api_token_hash);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token_hash);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON admin_tokens(token_hash);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_tokens_admin ON admin_tokens(admin_id);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);`)
