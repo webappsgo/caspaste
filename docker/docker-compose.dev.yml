@@ -1,5 +1,7 @@
-# Development docker-compose - HUMAN USE ONLY
-# Per AI.md PART 27: AI must NEVER use this file
+# caspaste — development compose
+# Usage: docker compose -f docker/docker-compose.dev.yml up -d
+# Development compose - HUMAN USE ONLY (never used by AI)
+
 name: caspaste-dev
 
 x-logging: &default-logging
@@ -9,35 +11,30 @@ x-logging: &default-logging
   driver: json-file
 
 services:
-  app:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      args:
-        VERSION: dev
-        BUILD_DATE: "${BUILD_DATE:-}"
-        COMMIT_ID: "${COMMIT_ID:-}"
-    image: caspaste:dev
+  caspaste:
+    image: ghcr.io/casjay-forks/caspaste:devel
     container_name: caspaste-dev
-    hostname: caspaste-dev
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: unless-stopped
+    pull_policy: always
     logging: *default-logging
     environment:
+      - MODE=development
       - PORT=80
+      - DEBUG=true
       - TZ=${TZ:-America/New_York}
       - CASPASTE_DB_DRIVER=sqlite
-      - CASPASTE_MODE=development
     ports:
       - '8080:80'
     volumes:
-      - './rootfs/config:/config:z'
-      - './rootfs/data:/data:z'
+      - './volumes/config:/config:z'
+      - './volumes/data:/data:z'
     healthcheck:
-      test: ["CMD", "caspaste", "--status"]
-      interval: 30s
-      timeout: 10s
+      test: /usr/local/bin/caspaste --status
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 90s
+      start_period: 60s
     networks:
       - caspaste-dev
 

@@ -106,8 +106,8 @@ releases/**
 # ignore Go build cache (used by Makefile Docker builds)
 .go-cache/
 
-# ignore the docker-compose filesystem
-rootfs/
+# ignore runtime volume data (local dev only, never committed)
+volumes/
 
 # ============================================
 # PROJECT-SPECIFIC (per AI.md)
@@ -119,8 +119,15 @@ rootfs/
 *.swp
 *.swo
 
-# AI config directories (regenerated from AI.md rules, not committed)
-.claude/
+# AI config directories — allow team settings and rules, ignore personal/generated files
+.claude/settings.local.json
+.claude/plans/
+.claude/worktrees/
+.claude/.mcp.json
+.cursor/
+.aider/
+.ai/
+.windsurf/
 .cursor/
 .aider/
 .ai/

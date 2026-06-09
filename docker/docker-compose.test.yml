@@ -1,27 +1,44 @@
-# Test docker-compose - AI/AUTOMATED TESTING ONLY
-# Per AI.md PART 29: AI copies this to temp dir, runs from there
-# ./rootfs paths resolve to $TEMP_DIR/rootfs when run from temp directory
+# caspaste — test compose
+# AI/AUTOMATED TESTING ONLY — copy to temp dir before use
+# Usage (from temp dir): docker compose up -d
+# Per AI.md PART 29: AI MUST copy to temp dir and run from there
+
 name: caspaste-test
 
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
 services:
-  app:
-    image: caspaste:test
+  caspaste:
+    image: ghcr.io/casjay-forks/caspaste:latest
     container_name: caspaste-test
     hostname: caspaste-test
-    restart: "no"
+    restart: 'no'
+    logging: *default-logging
     environment:
+      - MODE=development
       - PORT=80
+      - DEBUG=false
       - TZ=UTC
       - CASPASTE_DB_DRIVER=sqlite
-      - CASPASTE_MODE=development
     ports:
       - '18080:80'
     volumes:
-      - './rootfs/config:/config:z'
-      - './rootfs/data:/data:z'
+      - './volumes/config:/config:z'
+      - './volumes/data:/data:z'
     healthcheck:
-      test: ["CMD", "caspaste", "--status"]
+      test: /usr/local/bin/caspaste --status
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - caspaste-test
+
+networks:
+  caspaste-test:
+    name: caspaste-test
+    external: false

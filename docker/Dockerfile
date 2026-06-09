@@ -1,92 +1,99 @@
-# syntax=docker/dockerfile:1
+# =============================================================================
+# Build Stage — Compile Go binary
+# =============================================================================
+FROM casjaysdev/go:latest AS builder
 
-# Build stage
-FROM golang:alpine AS builder
+# Install git (required for go mod download) and bash (for build scripts)
+RUN apk add --no-cache git bash
 
-WORKDIR /build
-
-RUN apk add --no-cache git curl jq ca-certificates tzdata
-
-COPY go.mod go.sum ./
-COPY src/ ./src/
-
-RUN go mod tidy && go mod download
-
+ARG TARGETARCH
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG COMMIT_ID
+ARG OFFICIAL_SITE
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -trimpath \
-    -tags netgo \
-    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://pste.us -extldflags '-static'" \
-    -o /caspaste \
-    ./src/server
+WORKDIR /app
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -trimpath \
-    -tags netgo \
-    -ldflags "-w -s -X main.Version=${VERSION} -X main.CommitID=${COMMIT_ID} -X 'main.BuildDate=${BUILD_DATE}' -X main.OfficialSite=https://pste.us -extldflags '-static'" \
-    -o /caspaste-cli \
-    ./src/client
+# Copy go.mod first for layer caching
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Final stage
+# Copy source and build server binary
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -ldflags "-s -w \
+      -X 'main.Version=${VERSION}' \
+      -X 'main.CommitID=${COMMIT_ID}' \
+      -X 'main.BuildDate=${BUILD_DATE}' \
+      -X 'main.OfficialSite=${OFFICIAL_SITE}'" \
+    -o /app/binary/caspaste ./src/server
+
+# Build CLI binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -ldflags "-s -w \
+      -X 'main.Version=${VERSION}' \
+      -X 'main.CommitID=${COMMIT_ID}' \
+      -X 'main.BuildDate=${BUILD_DATE}' \
+      -X 'main.OfficialSite=${OFFICIAL_SITE}'" \
+    -o /app/binary/caspaste-cli ./src/client
+
+# =============================================================================
+# Runtime Stage — Minimal Alpine image
+# =============================================================================
 FROM alpine:latest
 
+# ARGs for build-time values (set by docker build --build-arg)
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG COMMIT_ID
 
-# OCI Labels (required per AI.md PART 27)
-LABEL maintainer="casjay-forks" \
-      org.opencontainers.image.title="caspaste" \
-      org.opencontainers.image.description="A simple, fast, and secure self-hosted pastebin service" \
-      org.opencontainers.image.authors="casjay-forks" \
-      org.opencontainers.image.vendor="casjay-forks" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.url="https://github.com/casjay-forks/caspaste" \
-      org.opencontainers.image.documentation="https://github.com/casjay-forks/caspaste/blob/main/README.md" \
-      org.opencontainers.image.source="https://github.com/casjay-forks/caspaste" \
-      org.opencontainers.image.base.name="alpine:latest" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.revision="${COMMIT_ID}" \
-      org.opencontainers.image.schema-version="${VERSION}" \
-      org.opencontainers.image.vcs-type="Git" \
-      com.github.containers.toolbox="false"
+# No LABEL blocks — all image metadata is applied as OCI annotations at build time.
+# Pass --annotation flags to docker buildx build (or use docker/metadata-action
+# annotations: output in GitHub Actions). Annotations attach to the manifest index
+# and are visible on multiarch pulls. LABEL applies only to per-platform layers.
 
-# Required packages per AI.md PART 27
-RUN apk add --no-cache git curl bash tini tor ca-certificates tzdata
+# Install required packages
+# NOTE: Tor binary installed but NOT configured here — binary handles all Tor setup (see PART 32)
+RUN apk add --no-cache \
+    git \
+    curl \
+    bash \
+    tini \
+    tor
 
-# Copy binaries from builder
-COPY --from=builder /caspaste /usr/local/bin/caspaste
-COPY --from=builder /caspaste-cli /usr/local/bin/caspaste-cli
+# NO directory creation — binary handles ALL setup based on env vars
+# Docker volume mounts auto-create mount points
 
-# Copy entrypoint and filesystem overlay
+# Copy binary from builder stage
+COPY --from=builder /app/binary/caspaste /usr/local/bin/caspaste
+COPY --from=builder /app/binary/caspaste-cli /usr/local/bin/caspaste-cli
+
+# Copy build-time overlay (entrypoint.sh) from docker/rootfs/ into image
 COPY docker/rootfs/ /
 
-# Create directories
-RUN mkdir -p /config/caspaste /data/caspaste /data/log/caspaste && \
-    chmod +x /usr/local/bin/entrypoint.sh
+# Copy Dockerfile to image for reference
+COPY docker/Dockerfile /root/Dockerfile
 
-WORKDIR /data/caspaste
+# Make all binaries/scripts in /usr/local/bin executable
+RUN chmod 755 /usr/local/bin/*
 
-# Container paths per AI.md PART 27
-ENV PORT=80 \
-    CASPASTE_CONFIG_DIR=/config/caspaste \
-    CASPASTE_DATA_DIR=/data/caspaste \
-    CASPASTE_LOGS_DIR=/data/log/caspaste \
-    TZ=America/New_York
+# Set environment
+# NOTE: Tor available (binary installed) but server binary controls Tor startup (see PART 32)
+# DATABASE_DIR: SQLite location (binary auto-detects container, but explicit is clearer)
+ENV MODE=development \
+    TZ=America/New_York \
+    DATABASE_DIR=/data/db/sqlite
 
+# Expose internal port (always 80)
 EXPOSE 80
 
-VOLUME ["/config", "/data"]
-
-# STOPSIGNAL per AI.md PART 27
+# Stop signal for graceful shutdown
 STOPSIGNAL SIGRTMIN+3
 
-# ENTRYPOINT per AI.md PART 27 - use tini
-ENTRYPOINT ["tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh"]
+# Health check (long start period for services that need initialization)
+HEALTHCHECK --start-period=10m --interval=5m --timeout=15s --retries=3 \
+    CMD /usr/local/bin/caspaste --status || exit 1
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD caspaste --status || exit 1
+# Use tini as init with signal propagation
+# -p SIGTERM: propagate SIGTERM to child processes
+ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]

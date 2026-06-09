@@ -1,0 +1,28 @@
+# =============================================================================
+# Toolchain Image — casjaysdev/go:latest + build/test/lint/scan tools
+# Built monthly via build-toolchain.yml; tagged :build
+# Used as the container image in all CI jobs
+# =============================================================================
+FROM casjaysdev/go:latest
+
+# Install build, test, lint, and security scanning tools
+RUN apk add --no-cache \
+    git \
+    bash \
+    curl \
+    make \
+    gcc \
+    musl-dev \
+    binutils \
+    ca-certificates \
+    tzdata
+
+# Install Go tools for linting, static analysis, and vulnerability scanning
+RUN go install golang.org/x/tools/cmd/staticcheck@latest && \
+    go install golang.org/x/vuln/cmd/govulncheck@latest && \
+    go install github.com/trufflesecurity/trufflehog/v3@latest
+
+# Verify tools are installed
+RUN staticcheck -version && \
+    govulncheck -version && \
+    trufflehog --version

@@ -1,5 +1,7 @@
-# Production docker-compose - HUMAN USE ONLY
-# Per AI.md PART 27: AI must NEVER use this file
+# caspaste — self-hosted pastebin service
+# nginx proxy address - http://172.17.0.1:64580
+# Production compose - HUMAN USE ONLY (never used by AI)
+
 name: caspaste
 
 x-logging: &default-logging
@@ -9,65 +11,63 @@ x-logging: &default-logging
   driver: json-file
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: caspaste-postgres
-    hostname: caspaste-postgres
-    restart: always
-    logging: *default-logging
-    environment:
-      - POSTGRES_USER=${DB_USER:-caspaste}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-caspaste}
-      - POSTGRES_DB=${DB_NAME:-caspaste}
-      - TZ=${TZ:-America/New_York}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-caspaste}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - caspaste
-
-  app:
+  caspaste:
     image: ghcr.io/casjay-forks/caspaste:latest
-    container_name: caspaste
-    hostname: ${HOSTNAME:-caspaste}
+    container_name: caspaste-app
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
+    pull_policy: always
     logging: *default-logging
     environment:
+      - MODE=production
       - PORT=80
+      - DEBUG=false
       - TZ=${TZ:-America/New_York}
-      - CASPASTE_DB_CLEANUP_PERIOD=1m
-      - CASPASTE_ROBOTS_DISALLOW=false
+      - CASPASTE_DB_DRIVER=postgres
+      - CASPASTE_DB_SOURCE=postgres://${DB_USER:-caspaste}:${DB_PASSWORD:-caspaste}@caspaste-db:5432/${DB_NAME:-caspaste}?sslmode=disable
       - CASPASTE_TITLE_MAX_LENGTH=120
       - CASPASTE_BODY_MAX_LENGTH=9999999999999999
       - CASPASTE_MAX_PASTE_LIFETIME=unlimited
-      - CASPASTE_ADMIN_NAME=${APP_ORG_NAME:-CasPaste}
       - CASPASTE_UI_DEFAULT_LIFETIME=never
       - CASPASTE_UI_DEFAULT_THEME=dark
-      - CASPASTE_DB_DRIVER=postgres
-      - CASPASTE_DB_SOURCE=postgres://${DB_USER:-caspaste}:${DB_PASSWORD:-caspaste}@caspaste-postgres:5432/${DB_NAME:-caspaste}?sslmode=disable
-    ports:
-      - '64580:80'
     volumes:
-      - './rootfs/config:/config:z'
-      - './rootfs/data:/data:z'
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - './volumes/config:/config:z'
+      - './volumes/data:/data:z'
+    ports:
+      - '172.17.0.1:64580:80'
     healthcheck:
-      test: ["CMD", "caspaste", "--status"]
-      interval: 30s
-      timeout: 10s
+      test: /usr/local/bin/caspaste --status
+      interval: 10s
+      timeout: 5s
       retries: 3
       start_period: 90s
+    depends_on:
+      caspaste-db:
+        condition: service_healthy
     networks:
       - caspaste
 
-volumes:
-  postgres-data:
+  caspaste-db:
+    image: postgres:16-alpine
+    pull_policy: always
+    container_name: caspaste-db
+    restart: always
+    logging: *default-logging
+    environment:
+      - POSTGRES_DB=${DB_NAME:-caspaste}
+      - POSTGRES_USER=${DB_USER:-caspaste}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-caspaste}
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - './volumes/data/db/postgres/caspaste:/var/lib/postgresql/data:z'
+    healthcheck:
+      test: pg_isready -U caspaste -d caspaste
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - caspaste
 
 networks:
   caspaste:

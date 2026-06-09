@@ -1,192 +1,71 @@
-name: Build Docker Images
+name: Docker Images
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
-  pull_request:
-    branches: [main]
+    branches: [main, master, beta]
+    tags: ['v*', '[0-9]*.[0-9]*.[0-9]*']
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to build (e.g., 1.0.0)'
-        required: false
-        type: string
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta' }}
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   docker:
-    name: Build and Push
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      # For provenance
-      id-token: write
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # v4.0.0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Set build info
+        run: |
+          if [ -f release.txt ]; then
+            echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          fi
+          echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          if [ -f site.txt ]; then
+            echo "OFFICIALSITE=$(cat site.txt)" >> $GITHUB_ENV
+          else
+            echo "OFFICIALSITE=${{ secrets.OFFICIALSITE }}" >> $GITHUB_ENV
+          fi
+
+      - uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6.0.0
         id: meta
-        run: |
-          # Determine version
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#v}"
-          elif [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          elif [ -f release.txt ]; then
-            VERSION=$(cat release.txt | tr -d '[:space:]')
-          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            VERSION="dev"
-          else
-            VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "1.0.6")
-          fi
-          
-          # Build metadata
-          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          VCS_REF=$(git rev-parse --short HEAD)
-          YYMM=$(date +%y%m)
-          
-          # Repository lowercase
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
-          echo "vcs_ref=$VCS_REF" >> $GITHUB_OUTPUT
-          echo "yymm=$YYMM" >> $GITHUB_OUTPUT
-          echo "repo_lower=$REPO_LOWER" >> $GITHUB_OUTPUT
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+          annotations: |
+            org.opencontainers.image.description=CasPaste — self-hosted pastebin service
+            org.opencontainers.image.title=caspaste
+            org.opencontainers.image.licenses=MIT
 
-      - name: Generate Docker tags
-        id: docker_tags
-        run: |
-          REPO="${{ env.REGISTRY }}/${{ steps.meta.outputs.repo_lower }}"
-          
-          if [[ "${{ github.ref }}" == refs/tags/v* ]] || [ -n "${{ github.event.inputs.version }}" ]; then
-            # Release build
-            TAGS="${REPO}:${{ steps.meta.outputs.version }}"
-            TAGS="${TAGS},${REPO}:${{ steps.meta.outputs.yymm }}"
-            TAGS="${TAGS},${REPO}:${{ steps.meta.outputs.vcs_ref }}"
-            TAGS="${TAGS},${REPO}:latest"
-          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            # Main branch build
-            TAGS="${REPO}:dev"
-            TAGS="${TAGS},${REPO}:${{ steps.meta.outputs.vcs_ref }}"
-          else
-            # PR or other branch
-            TAGS="${REPO}:pr-${{ github.event.number }}"
-          fi
-          
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
-          echo "Docker tags: $TAGS"
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+      - uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.docker_tags.outputs.tags }}
+          push: true
+          provenance: false
+          annotations: ${{ steps.meta.outputs.annotations }}
+          labels: ""
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
-            BUILD_DATE=${{ steps.meta.outputs.build_date }}
-            COMMIT_ID=${{ steps.meta.outputs.vcs_ref }}
-            VCS_URL=https://github.com/${{ github.repository }}
-          labels: |
-            org.opencontainers.image.title=CasPaste
-            org.opencontainers.image.description=A simple, fast, and secure self-hosted pastebin service with file uploads, syntax highlighting, and burn-after-reading
-            org.opencontainers.image.authors=CasjaysDev <docker-admin@casjaysdev.pro>
-            org.opencontainers.image.vendor=CasjaysDev
-            org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.url=https://github.com/${{ github.repository }}
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
-            org.opencontainers.image.revision=${{ steps.meta.outputs.vcs_ref }}
-            org.opencontainers.image.base.name=docker.io/library/alpine:latest
-            com.casjaysdev.app.name=CasPaste
-            com.casjaysdev.app.description=Self-hosted pastebin service
-            com.casjaysdev.app.version=${{ steps.meta.outputs.version }}
-            com.casjaysdev.app.maintainer=CasjaysDev <docker-admin@casjaysdev.pro>
-            com.casjaysdev.app.support=https://github.com/${{ github.repository }}/issues
-            com.casjaysdev.app.license=MIT
-            com.casjaysdev.app.vcs-url=https://github.com/${{ github.repository }}
-            com.casjaysdev.app.vcs-ref=${{ steps.meta.outputs.vcs_ref }}
-            com.casjaysdev.app.build-date=${{ steps.meta.outputs.build_date }}
-          annotations: |
-            manifest:org.opencontainers.image.title=CasPaste
-            manifest:org.opencontainers.image.description=A simple, fast, and secure self-hosted pastebin service with file uploads, syntax highlighting, and burn-after-reading
-            manifest:org.opencontainers.image.authors=CasjaysDev <docker-admin@casjaysdev.pro>
-            manifest:org.opencontainers.image.vendor=CasjaysDev
-            manifest:org.opencontainers.image.licenses=MIT
-            manifest:org.opencontainers.image.url=https://github.com/${{ github.repository }}
-            manifest:org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
-            manifest:org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            manifest:org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            manifest:org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
-            manifest:org.opencontainers.image.revision=${{ steps.meta.outputs.vcs_ref }}
-            manifest:org.opencontainers.image.base.name=docker.io/library/alpine:latest
-            manifest:com.casjaysdev.app.name=CasPaste
-            manifest:com.casjaysdev.app.description=Self-hosted pastebin service
-            manifest:com.casjaysdev.app.version=${{ steps.meta.outputs.version }}
-            manifest:com.casjaysdev.app.maintainer=CasjaysDev <docker-admin@casjaysdev.pro>
-            manifest:com.casjaysdev.app.support=https://github.com/${{ github.repository }}/issues
-            manifest:com.casjaysdev.app.license=MIT
-            manifest:com.casjaysdev.app.vcs-url=https://github.com/${{ github.repository }}
-            manifest:com.casjaysdev.app.vcs-ref=${{ steps.meta.outputs.vcs_ref }}
-            manifest:com.casjaysdev.app.build-date=${{ steps.meta.outputs.build_date }}
-            index:org.opencontainers.image.title=CasPaste
-            index:org.opencontainers.image.description=A simple, fast, and secure self-hosted pastebin service with file uploads, syntax highlighting, and burn-after-reading
-            index:org.opencontainers.image.authors=CasjaysDev <docker-admin@casjaysdev.pro>
-            index:org.opencontainers.image.vendor=CasjaysDev
-            index:org.opencontainers.image.licenses=MIT
-            index:org.opencontainers.image.url=https://github.com/${{ github.repository }}
-            index:org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
-            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            index:org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            index:org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
-            index:org.opencontainers.image.revision=${{ steps.meta.outputs.vcs_ref }}
-            index:org.opencontainers.image.base.name=docker.io/library/alpine:latest
-            index:com.casjaysdev.app.name=CasPaste
-            index:com.casjaysdev.app.description=Self-hosted pastebin service
-            index:com.casjaysdev.app.version=${{ steps.meta.outputs.version }}
-            index:com.casjaysdev.app.maintainer=CasjaysDev <docker-admin@casjaysdev.pro>
-            index:com.casjaysdev.app.support=https://github.com/${{ github.repository }}/issues
-            index:com.casjaysdev.app.license=MIT
-            index:com.casjaysdev.app.vcs-url=https://github.com/${{ github.repository }}
-            index:com.casjaysdev.app.vcs-ref=${{ steps.meta.outputs.vcs_ref }}
-            index:com.casjaysdev.app.build-date=${{ steps.meta.outputs.build_date }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: true
-          sbom: true
-
-      - name: Image digest
-        run: echo "Image built with digest ${{ steps.docker_build.outputs.digest }}"
+            VERSION=${{ env.VERSION }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            COMMIT_ID=${{ env.COMMIT_ID }}
+            OFFICIAL_SITE=${{ env.OFFICIALSITE }}

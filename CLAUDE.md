@@ -1,0 +1,87 @@
+Role: Efficient loader for AI.md
+
+⚠️ **THIS FILE IS AUTO-LOADED EVERY CONVERSATION. FOLLOW IT EXACTLY.** ⚠️
+
+Purpose:
+- This file is a short loader for the most important rules
+- `AI.md` is the full source of truth
+- For complete details, read the referenced PARTs in `AI.md`
+
+## FIRST TURN - MANDATORY
+
+On EVERY new conversation or after "context compacted" message:
+1. **READ** the relevant `.claude/rules/*.md` for your current task
+2. **NEVER** assume or guess — verify against AI.md before implementing
+
+## Asking Questions
+
+- **Default to continuing work** — do not stop just to ask whether you should continue
+- **Never guess** — if the answer cannot be determined from `AI.md`, `IDEA.md`, the codebase, or repo state, ASK the user
+- **Do NOT ask for permission to keep going** — continue until the current task is complete, blocked by a real decision, or the user explicitly asks to pause
+- **Question mark = question** — when user ends with `?`, answer/clarify, don't execute
+
+## Before ANY Code Change
+
+1. Have I read the relevant PART in AI.md? (If no → read it)
+2. Does this follow the spec EXACTLY? (If unsure → check spec)
+3. Am I guessing or do I KNOW from the spec? (If guessing → read spec)
+4. Would this pass the compliance checklist? (AI.md FINAL section)
+
+**WHEN IN DOUBT: READ THE SPEC. DO NOT GUESS.**
+
+## Key Project Info (from IDEA.md)
+
+- **project_name**: caspaste
+- **project_org**: casapps
+- **internal_name**: caspaste (FROZEN)
+- **binary_name**: caspaste
+- **cli_binary_name**: caspaste-cli
+- **admin_path**: admin (default)
+- **default_port**: 80
+- **official_site**: https://pste.us
+
+## NEVER Do (Critical Violations)
+
+1. Use bcrypt → Use Argon2id
+2. Put Dockerfile in root → `docker/Dockerfile`
+3. Use CGO → CGO_ENABLED=0 always
+4. Hardcode dev values → Detect at runtime
+5. Use external cron → Internal scheduler (PART 19)
+6. Use Makefile in CI/CD → Explicit commands only
+7. Skip platforms → Build all 8 (linux/darwin/windows × amd64/arm64)
+8. Client-side rendering → Server-side Go templates
+9. Run Go on host → Always use Docker (casjaysdev/go:latest)
+10. Guess or assume → Read spec or ask user
+
+## ALWAYS Do
+
+1. Read AI.md before implementing ANY feature
+2. All builds/tests in Docker (casjaysdev/go:latest)
+3. Mobile-first responsive CSS
+4. All features work without JavaScript
+5. Full admin panel at /server/{admin_path}/config/
+6. Client binary (caspaste-cli) for ALL projects
+7. Commit often — small, focused commits
+
+## Source Entry Points
+
+- Server: `./src/server` (main package)
+- CLI: `./src/client` (main package)
+- Admin: `./src/admin/`
+- Storage: `./src/storage/`
+- Config: `./src/config/`
+
+## Where to Find Details
+
+- AI behavior: `.claude/rules/ai-rules.md` (PART 0, 1)
+- Project structure: `.claude/rules/project-rules.md` (PART 2, 3, 4)
+- Frontend/WebUI: `.claude/rules/frontend-rules.md` (PART 16, 17)
+- Full spec: `AI.md` (~61k lines) ← **SOURCE OF TRUTH**
+
+## Current Project State
+
+- Admin panel Phase 2 (PART 17): COMPLETE — src/admin/ fully implemented
+- Storage: admins, admin_sessions, admin_tokens, pastes tables
+- CI/CD: ci.yml + build-toolchain.yml added; trigger build-toolchain.yml workflow_dispatch to create :build image before ci.yml will pass
+- tests/ renamed from test/; scripts rewritten per spec
+- Makefile, Dockerfile, docker-compose.yml updated per spec

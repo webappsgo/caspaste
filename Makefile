@@ -1,216 +1,180 @@
-# CasPaste Makefile - Local Development
-# Targets: build, release, docker, test, local, help
-# All Go builds/tests run inside Docker (golang:alpine)
+# CasPaste Makefile - Local Development Only
+# Targets: dev, local, build, test, release, docker, clean
+# All Go builds/tests run inside Docker (casjaysdev/go:latest)
+# DO NOT ADD MORE TARGETS per AI.md PART 26
 
-GH ?= gh
+# Infer PROJECTNAME and PROJECTORG from git remote or directory path (NEVER hardcode)
+PROJECTNAME := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$$|\1|' || basename "$$(pwd)")
+PROJECTORG  := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$$|\1|' || basename "$$(dirname "$$(pwd)")")
 
-# Project info
-NAME := caspaste
-CLI_NAME := caspaste-cli
-ORGANIZATION := casjay-forks
-MAIN_GO := ./src/server
-CLI_MAIN_GO := ./src/client
+# Version precedence: release.txt > env/default fallback
+VERSION ?= $(shell cat release.txt 2>/dev/null || echo "devel")
 
-# Version management
-VERSION_FILE := release.txt
-DEFAULT_VERSION := 1.0.0
+# Build info — ISO 8601 / RFC 3339 UTC per AI.md PART 26
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+COMMIT_ID  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "N/A")
 
-# Get version: env var > release.txt > git tag > default
-ifdef VERSION
-    APP_VERSION := $(VERSION)
-else ifneq (,$(wildcard $(VERSION_FILE)))
-    APP_VERSION := $(shell cat $(VERSION_FILE) | tr -d '[:space:]')
-else
-    GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
-    APP_VERSION := $(if $(GIT_VERSION),$(GIT_VERSION),$(DEFAULT_VERSION))
-endif
+# Official site URL (OPTIONAL — never guess or assume)
+# Sources (in order of precedence):
+#   1. File: site.txt in project root (single line, URL only)
+#   2. Environment variable: OFFICIALSITE=https://example.com
+#   3. Empty (self-hosted projects — users must use --server flag)
+OFFICIALSITE := $(shell [ -f site.txt ] && cat site.txt || echo "${OFFICIALSITE:-}")
+
+# Linker flags to embed build info
+LDFLAGS := -s -w \
+	-X 'main.Version=$(VERSION)' \
+	-X 'main.CommitID=$(COMMIT_ID)' \
+	-X 'main.BuildDate=$(BUILD_DATE)' \
+	-X 'main.OfficialSite=$(OFFICIALSITE)'
 
 # Directories
-BUILD_DIR := ./binaries
-RELEASE_DIR := ./releases
+BINDIR  := binaries
+RELDIR  := releases
 
-# Go directories (configurable via environment)
-GODIR ?= $(HOME)/.local/share/go
-GOCACHEDIR ?= $(HOME)/.local/share/go/build
-
-# Build info per AI.md PART 26
-COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-# Build flags
-LDFLAGS := -w -s -X main.Version=$(APP_VERSION) -X main.CommitID=$(COMMIT_ID) -X main.BuildDate=$(BUILD_DATE) -X main.OfficialSite=https://lp.pste.us -extldflags -static
-STATIC_FLAGS := -tags netgo -ldflags "$(LDFLAGS)"
-
-# Docker build environment
-DOCKER_IMAGE := golang:alpine
-DOCKER_OPTS := --rm \
-	-v "$(CURDIR)":/build \
-	-v "$(GODIR)":/go \
-	-w /build \
+# Docker — persistent Go state in named volume (NOT a host path)
+# go-state:/usr/local/share/go keeps modules cached across builds
+GO_DOCKER := docker run --rm -it \
+	--name $(PROJECTNAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
+	-v $(PWD):/app \
+	-v go-state:/usr/local/share/go \
+	-w /app \
 	-e CGO_ENABLED=0 \
-	-e GOCACHE=/go/build \
-	-e GOMODCACHE=/go/pkg/mod
+	casjaysdev/go:latest
 
-# For local builds, match the runtime machine's architecture
-DOCKER_RUN_LOCAL = docker run --platform linux/$$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') $(DOCKER_OPTS) $(DOCKER_IMAGE)
+# Registry for docker target
+REGISTRY ?= ghcr.io/$(PROJECTORG)/$(PROJECTNAME)
 
-# For cross-platform builds
-DOCKER_RUN = docker run $(DOCKER_OPTS) $(DOCKER_IMAGE)
+# Build platforms (8 platforms per AI.md PART 26)
+PLATFORMS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64,freebsd/amd64,freebsd/arm64
 
-# Platforms: os_arch (8 platforms per AI.md PART 26)
-PLATFORMS := \
-    linux_amd64 \
-    linux_arm64 \
-    darwin_amd64 \
-    darwin_arm64 \
-    windows_amd64 \
-    windows_arm64 \
-    freebsd_amd64 \
-    freebsd_arm64
+.PHONY: build local release docker test dev clean
 
-.PHONY: build release docker test local dev help clean
+# =============================================================================
+# BUILD — Build all platforms + local binary (via Docker with cached modules)
+# =============================================================================
+build: clean
+	@mkdir -p $(BINDIR)
+	@echo "Building version $(VERSION)..."
+	@$(GO_DOCKER) go mod tidy
+	@$(GO_DOCKER) go mod download
+	@$(GO_DOCKER) sh -c "GOOS=$$(go env GOOS) GOARCH=$$(go env GOARCH) \
+		go build -ldflags \"$(LDFLAGS)\" -o $(BINDIR)/$(PROJECTNAME) ./src/server"
+	@if [ -d "src/client" ]; then \
+		$(GO_DOCKER) sh -c "GOOS=$$(go env GOOS) GOARCH=$$(go env GOARCH) \
+			go build -ldflags \"$(LDFLAGS)\" -o $(BINDIR)/$(PROJECTNAME)-cli ./src/client"; \
+	fi
+	@for platform in $$(echo "$(PLATFORMS)" | tr ',' ' '); do \
+		OS=$${platform%/*}; \
+		ARCH=$${platform#*/}; \
+		OUTPUT=$(BINDIR)/$(PROJECTNAME)-$$OS-$$ARCH; \
+		[ "$$OS" = "windows" ] && OUTPUT=$$OUTPUT.exe; \
+		echo "Building server $$OS/$$ARCH..."; \
+		$(GO_DOCKER) sh -c "GOOS=$$OS GOARCH=$$ARCH \
+			go build -ldflags \"$(LDFLAGS)\" \
+			-o $$OUTPUT ./src/server" || exit 1; \
+		if [ -d "src/client" ]; then \
+			CLI_OUTPUT=$(BINDIR)/$(PROJECTNAME)-cli-$$OS-$$ARCH; \
+			[ "$$OS" = "windows" ] && CLI_OUTPUT=$$CLI_OUTPUT.exe; \
+			$(GO_DOCKER) sh -c "GOOS=$$OS GOARCH=$$ARCH \
+				go build -ldflags \"$(LDFLAGS)\" \
+				-o $$CLI_OUTPUT ./src/client" || exit 1; \
+		fi; \
+	done
+	@echo "Build complete: $(BINDIR)/"
 
-# Default target
-help:
-	@echo "CasPaste Makefile - Local Development"
-	@echo "====================================="
-	@echo ""
-	@echo "Targets:"
-	@echo "  make dev     - Quick build to temp dir (no version info, debugging)"
-	@echo "  make local   - Build for current OS/arch only (fast, with version)"
-	@echo "  make build   - Build all binaries for all OS/arch (./binaries/)"
-	@echo "  make test    - Run all tests"
-	@echo "  make release - Build production binaries and create GitHub release"
-	@echo "  make docker  - Build and push Docker images to ghcr.io"
-	@echo "  make clean   - Remove build artifacts"
-	@echo ""
-	@echo "Version: $(APP_VERSION)"
-	@echo "Go cache: $(GODIR)"
-	@echo "Note: All Go builds run inside Docker (golang:alpine)"
-	@echo ""
+# =============================================================================
+# LOCAL — Build local binaries only (fast development builds)
+# =============================================================================
+local: clean
+	@mkdir -p $(BINDIR)
+	@echo "Building local binaries version $(VERSION)..."
+	@$(GO_DOCKER) go mod tidy
+	@$(GO_DOCKER) go mod download
+	@$(GO_DOCKER) sh -c "GOOS=$$(go env GOOS) GOARCH=$$(go env GOARCH) \
+		go build -ldflags \"$(LDFLAGS)\" -o $(BINDIR)/$(PROJECTNAME) ./src/server"
+	@if [ -d "src/client" ]; then \
+		$(GO_DOCKER) sh -c "GOOS=$$(go env GOOS) GOARCH=$$(go env GOARCH) \
+			go build -ldflags \"$(LDFLAGS)\" -o $(BINDIR)/$(PROJECTNAME)-cli ./src/client"; \
+	fi
+	@echo "Local build complete: $(BINDIR)/"
 
-# Quick dev build to temp directory (no version info)
-# Per AI.md PART 28: make dev for quick debugging
-TEMP_DIR := /tmp/$(ORGANIZATION)/$(NAME)-dev
-dev:
-	@mkdir -p $(TEMP_DIR) $(GODIR)/build $(GODIR)/pkg/mod
-	@echo "Building $(NAME) (dev) to $(TEMP_DIR)..."
-	@docker run --rm \
-		-v "$(CURDIR)":/build \
-		-v "$(GODIR)":/go \
-		-v "$(TEMP_DIR)":/out \
-		-w /build \
-		-e CGO_ENABLED=0 \
-		-e GOCACHE=/go/build \
-		-e GOMODCACHE=/go/pkg/mod \
-		--platform linux/$$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') \
-		$(DOCKER_IMAGE) sh -c '\
-			go mod tidy && \
-			go build -trimpath -tags netgo -ldflags "-w -s" -o /out/$(NAME) $(MAIN_GO) && \
-			go build -trimpath -tags netgo -ldflags "-w -s" -o /out/$(CLI_NAME) $(CLI_MAIN_GO)'
-	@echo "Built: $(TEMP_DIR)/$(NAME) $(TEMP_DIR)/$(CLI_NAME)"
+# =============================================================================
+# RELEASE — Manual local release (stable only)
+# =============================================================================
+release: build
+	@mkdir -p $(RELDIR)
+	@echo "Preparing release $(VERSION)..."
+	@echo "$(VERSION)" > $(RELDIR)/version.txt
+	@for f in $(BINDIR)/$(PROJECTNAME)-*; do \
+		[ -f "$$f" ] || continue; \
+		strip "$$f" 2>/dev/null || true; \
+		cp "$$f" $(RELDIR)/; \
+	done
+	@tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+		--exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+		-czf $(RELDIR)/$(PROJECTNAME)-$(VERSION)-source.tar.gz .
+	@gh release delete $(VERSION) --yes 2>/dev/null || true
+	@git tag -d $(VERSION) 2>/dev/null || true
+	@git push origin :refs/tags/$(VERSION) 2>/dev/null || true
+	@gh release create $(VERSION) $(RELDIR)/* \
+		--title "$(PROJECTNAME) $(VERSION)" \
+		--notes "Release $(VERSION)" \
+		--latest
+	@echo "Release complete: $(VERSION)"
 
-# Build for runtime machine's architecture
-local:
-	@if [ ! -f $(VERSION_FILE) ]; then echo "$(APP_VERSION)" > $(VERSION_FILE); fi
-	@mkdir -p $(BUILD_DIR) $(GODIR)/build $(GODIR)/pkg/mod
-	@echo "Building $(NAME) v$(APP_VERSION) for $$(uname -m)..."
-	@$(DOCKER_RUN_LOCAL) sh -c '\
-		go mod tidy && \
-		go build -trimpath $(STATIC_FLAGS) -o $(BUILD_DIR)/$(NAME) $(MAIN_GO) && \
-		go build -trimpath $(STATIC_FLAGS) -o $(BUILD_DIR)/$(CLI_NAME) $(CLI_MAIN_GO)'
-	@echo "Built: $(BUILD_DIR)/$(NAME) $(BUILD_DIR)/$(CLI_NAME)"
-
-# Build all platforms
-build:
-	@if [ ! -f $(VERSION_FILE) ]; then echo "$(APP_VERSION)" > $(VERSION_FILE); fi
-	@mkdir -p $(BUILD_DIR) $(GODIR)/build $(GODIR)/pkg/mod
-	@echo "Building $(NAME) v$(APP_VERSION) for all platforms..."
-	@$(DOCKER_RUN) sh -c '\
-		go mod tidy && \
-		go build -trimpath $(STATIC_FLAGS) -o $(BUILD_DIR)/$(NAME) $(MAIN_GO) && \
-		go build -trimpath $(STATIC_FLAGS) -o $(BUILD_DIR)/$(CLI_NAME) $(CLI_MAIN_GO) && \
-		for platform in $(PLATFORMS); do \
-			os=$$(echo $$platform | cut -d_ -f1); \
-			arch=$$(echo $$platform | cut -d_ -f2); \
-			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
-			echo "  $$os/$$arch..."; \
-			GOOS=$$os GOARCH=$$arch go build -trimpath $(STATIC_FLAGS) \
-				-o $(BUILD_DIR)/$(NAME)-$$os-$$arch$$ext $(MAIN_GO) || exit 1; \
-			GOOS=$$os GOARCH=$$arch go build -trimpath $(STATIC_FLAGS) \
-				-o $(BUILD_DIR)/$(CLI_NAME)-$$os-$$arch$$ext $(CLI_MAIN_GO) || exit 1; \
-		done'
-	@chmod +x $(BUILD_DIR)/$(NAME) $(BUILD_DIR)/$(CLI_NAME)
-	@echo "Build complete: $(BUILD_DIR)/"
-
-# Release to GitHub
-release:
-	@if [ ! -f $(VERSION_FILE) ]; then echo "$(APP_VERSION)" > $(VERSION_FILE); fi
-	@mkdir -p $(RELEASE_DIR) $(GODIR)/build $(GODIR)/pkg/mod
-	@echo "Building release v$(APP_VERSION)..."
-	@$(DOCKER_RUN) sh -c '\
-		apk add --no-cache binutils && \
-		go mod tidy && \
-		for platform in $(PLATFORMS); do \
-			os=$$(echo $$platform | cut -d_ -f1); \
-			arch=$$(echo $$platform | cut -d_ -f2); \
-			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
-			echo "  $$os/$$arch..."; \
-			GOOS=$$os GOARCH=$$arch go build -trimpath $(STATIC_FLAGS) \
-				-o $(RELEASE_DIR)/$(NAME)-$$os-$$arch$$ext $(MAIN_GO) || exit 1; \
-			GOOS=$$os GOARCH=$$arch go build -trimpath $(STATIC_FLAGS) \
-				-o $(RELEASE_DIR)/$(CLI_NAME)-$$os-$$arch$$ext $(CLI_MAIN_GO) || exit 1; \
-			if echo "$$os" | grep -qE "linux|freebsd|openbsd"; then \
-				strip $(RELEASE_DIR)/$(NAME)-$$os-$$arch$$ext 2>/dev/null || true; \
-				strip $(RELEASE_DIR)/$(CLI_NAME)-$$os-$$arch$$ext 2>/dev/null || true; \
-			fi; \
-		done'
-	@# Source archive (no VCS)
-	@echo "Creating source archive..."
-	@mkdir -p $(RELEASE_DIR)/tmp/$(NAME)-$(APP_VERSION)
-	@rsync -a --exclude='.git' --exclude='.github' --exclude='$(BUILD_DIR)' \
-		--exclude='$(RELEASE_DIR)' --exclude='.gitignore' --exclude='.gitattributes' \
-		--exclude='.go-cache' \
-		. $(RELEASE_DIR)/tmp/$(NAME)-$(APP_VERSION)/
-	@tar -C $(RELEASE_DIR)/tmp -czf $(RELEASE_DIR)/$(NAME)-$(APP_VERSION)-source.tar.gz $(NAME)-$(APP_VERSION)
-	@rm -rf $(RELEASE_DIR)/tmp
-	@# Delete existing tag/release
-	@$(GH) release delete v$(APP_VERSION) --yes 2>/dev/null || true
-	@git tag -d v$(APP_VERSION) 2>/dev/null || true
-	@git push origin :refs/tags/v$(APP_VERSION) 2>/dev/null || true
-	@# Create release
-	@git tag -a v$(APP_VERSION) -m "Release v$(APP_VERSION)"
-	@git push origin v$(APP_VERSION)
-	@$(GH) release create v$(APP_VERSION) --title "$(NAME) v$(APP_VERSION)" --generate-notes $(RELEASE_DIR)/*
-	@echo "Released v$(APP_VERSION)"
-
-# Build and push Docker images (per AI.md PART 27)
+# =============================================================================
+# DOCKER — Build container (set REGISTRY env var to override)
+# =============================================================================
 docker:
-	@if [ ! -f $(VERSION_FILE) ]; then echo "$(APP_VERSION)" > $(VERSION_FILE); fi
-	@COMMIT_ID=$$(git rev-parse --short HEAD); \
-	BUILD_DATE=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
-	REPO="ghcr.io/$(ORGANIZATION)/$(NAME)"; \
-	echo "Building Docker images v$(APP_VERSION)..."; \
-	docker buildx build \
+	@echo "Building Docker image $(VERSION)..."
+	@docker buildx version > /dev/null 2>&1 || (echo "docker buildx required" && exit 1)
+	@docker buildx create --name $(PROJECTNAME)-builder --use 2>/dev/null || \
+		docker buildx use $(PROJECTNAME)-builder
+	@docker buildx build \
 		-f docker/Dockerfile \
 		--platform linux/amd64,linux/arm64 \
-		--build-arg VERSION=$(APP_VERSION) \
-		--build-arg BUILD_DATE="$$BUILD_DATE" \
-		--build-arg COMMIT_ID=$$COMMIT_ID \
-		--tag $$REPO:$(APP_VERSION) \
-		--tag $$REPO:$$COMMIT_ID \
-		--tag $$REPO:latest \
-		--push . || exit 1; \
-	echo "Pushed: $$REPO:latest $$REPO:$(APP_VERSION) $$REPO:$$COMMIT_ID"
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg BUILD_DATE="$(BUILD_DATE)" \
+		--build-arg COMMIT_ID="$(COMMIT_ID)" \
+		--build-arg OFFICIAL_SITE="$(OFFICIALSITE)" \
+		-t $(REGISTRY):$(VERSION) \
+		-t $(REGISTRY):latest \
+		.
+	@echo "Docker build complete: $(REGISTRY):$(VERSION)"
 
-# Run tests
+# =============================================================================
+# TEST — Run unit tests with coverage enforcement (via Docker)
+# =============================================================================
 test:
-	@mkdir -p $(GODIR)/build $(GODIR)/pkg/mod
-	@echo "Running tests..."
-	@$(DOCKER_RUN) sh -c 'go mod tidy && go test -v -cover ./...'
+	@echo "Running tests with coverage..."
+	@$(GO_DOCKER) go mod download
+	@$(GO_DOCKER) go test -v -cover -coverprofile=coverage.out ./...
+	@COVERAGE=$$($(GO_DOCKER) go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//'); \
+	if [ "$$(echo "$$COVERAGE < 80" | bc -l)" -eq 1 ]; then \
+		echo "ERROR: Coverage is $$COVERAGE%%, must be >= 80%%"; \
+		exit 1; \
+	fi
+	@echo "Tests complete (>= 80%% required) ✓"
 
-# Clean build artifacts
+# =============================================================================
+# DEV — Quick build to random temp dir (no version info, debugging)
+# =============================================================================
+dev:
+	@$(GO_DOCKER) go mod tidy
+	@mkdir -p "$${TMPDIR:-/tmp}/$(PROJECTORG)" && \
+		BUILD_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/$(PROJECTORG)/$(PROJECTNAME)-XXXXXX") && \
+		echo "Quick dev build to $$BUILD_DIR..." && \
+		$(GO_DOCKER) go build -o $$BUILD_DIR/$(PROJECTNAME) ./src/server && \
+		echo "Built: $$BUILD_DIR/$(PROJECTNAME)" && \
+		if [ -d "src/client" ]; then \
+			$(GO_DOCKER) go build -o $$BUILD_DIR/$(PROJECTNAME)-cli ./src/client && \
+			echo "Built: $$BUILD_DIR/$(PROJECTNAME)-cli"; \
+		fi && \
+		echo "Test: docker run --rm -it --name $(PROJECTNAME)-test -v $$BUILD_DIR:/app alpine:latest /app/$(PROJECTNAME) --help"
+
+# =============================================================================
+# CLEAN — Remove build artifacts
+# =============================================================================
 clean:
-	@echo "Cleaning build artifacts..."
-	@rm -rf $(BUILD_DIR) $(RELEASE_DIR) .go-cache
-	@echo "Clean complete"
+	@rm -rf $(BINDIR) $(RELDIR) coverage.out
