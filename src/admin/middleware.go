@@ -33,9 +33,9 @@ func (p *Panel) requireAuth(next http.Handler) http.Handler {
 
 		adminID := p.validateAdminSession(r)
 		if adminID == 0 {
-			// Not authenticated — redirect to login
+			// Not authenticated — redirect to shared auth login per AI.md PART 15
 			returnTo := r.URL.RequestURI()
-			http.Redirect(w, r, p.adminBasePath()+"/login?next="+returnTo, http.StatusSeeOther)
+			http.Redirect(w, r, "/server/auth/login?next="+returnTo, http.StatusSeeOther)
 			return
 		}
 
@@ -44,7 +44,7 @@ func (p *Panel) requireAuth(next http.Handler) http.Handler {
 		if err != nil || a == nil {
 			// Session points to a non-existent admin — clear it
 			p.deleteAdminSession(w, r)
-			http.Redirect(w, r, p.adminBasePath()+"/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/server/auth/login", http.StatusSeeOther)
 			return
 		}
 

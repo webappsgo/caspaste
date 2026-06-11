@@ -10,16 +10,26 @@ import (
 	"net/http"
 )
 
+// AuthHandler returns the HTTP handler for shared admin authentication routes.
+// Mounted with http.StripPrefix("/server/auth", ...) per AI.md PART 15 (Auth Routes).
+// The same login form handles both admin and (when multi-user is enabled) regular user login.
+func (p *Panel) AuthHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /login", p.handleLoginPage)
+	mux.HandleFunc("POST /login", p.handleLoginPost)
+	mux.HandleFunc("GET /logout", p.handleLogout)
+	mux.HandleFunc("POST /logout", p.handleLogout)
+	return mux
+}
+
 // Handler returns the HTTP handler for the admin panel UI.
 // It is mounted with http.StripPrefix("/server/{admin_path}", ...) so all
 // patterns below are relative to that stripped prefix.
+// Login/logout are served by AuthHandler at /server/auth/ instead.
 func (p *Panel) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	// Public routes — no auth required
-	mux.HandleFunc("GET /login", p.handleLoginPage)
-	mux.HandleFunc("POST /login", p.handleLoginPost)
-	mux.HandleFunc("GET /logout", p.handleLogout)
 	mux.HandleFunc("GET /config/setup", p.handleSetup)
 	mux.HandleFunc("POST /config/setup", p.handleSetup)
 

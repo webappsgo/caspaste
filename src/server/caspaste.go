@@ -2442,6 +2442,10 @@ func main() {
 	adminBasePath := config.AdminBasePath()
 	adminAPIPath := config.AdminAPIPath()
 
+	// Shared auth routes per AI.md PART 15 — handles both admin and (future) user login
+	// Mounted at /server/auth/ so login/logout are independent of admin_path
+	mux.Handle("/server/auth/", http.StripPrefix("/server/auth", adminPanel.AuthHandler()))
+
 	// Admin panel UI handler
 	mux.Handle(adminBasePath+"/", http.StripPrefix(adminBasePath, adminPanel.Handler()))
 

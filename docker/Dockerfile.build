@@ -22,7 +22,11 @@ RUN go install golang.org/x/tools/cmd/staticcheck@latest && \
     go install golang.org/x/vuln/cmd/govulncheck@latest && \
     go install github.com/trufflesecurity/trufflehog/v3@latest
 
+# Install Trivy for image/filesystem vulnerability scanning
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
 # Verify tools are installed
 RUN staticcheck -version && \
     govulncheck -version && \
-    trufflehog --version
+    trufflehog --version && \
+    trivy --version

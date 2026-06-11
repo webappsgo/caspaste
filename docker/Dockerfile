@@ -28,15 +28,6 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
       -X 'main.OfficialSite=${OFFICIAL_SITE}'" \
     -o /app/binary/caspaste ./src/server
 
-# Build CLI binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
-    -ldflags "-s -w \
-      -X 'main.Version=${VERSION}' \
-      -X 'main.CommitID=${COMMIT_ID}' \
-      -X 'main.BuildDate=${BUILD_DATE}' \
-      -X 'main.OfficialSite=${OFFICIAL_SITE}'" \
-    -o /app/binary/caspaste-cli ./src/client
-
 # =============================================================================
 # Runtime Stage — Minimal Alpine image
 # =============================================================================
@@ -64,9 +55,8 @@ RUN apk add --no-cache \
 # NO directory creation — binary handles ALL setup based on env vars
 # Docker volume mounts auto-create mount points
 
-# Copy binary from builder stage
+# Copy server binary from builder stage (standard image = server only, per AI.md PART 27)
 COPY --from=builder /app/binary/caspaste /usr/local/bin/caspaste
-COPY --from=builder /app/binary/caspaste-cli /usr/local/bin/caspaste-cli
 
 # Copy build-time overlay (entrypoint.sh) from docker/rootfs/ into image
 COPY docker/rootfs/ /

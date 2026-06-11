@@ -116,3 +116,45 @@ jobs:
           else
             trufflehog git --depth 1 --fail file://. 2>&1 || true
           fi
+
+  workflow-policy:
+    needs: ensure-build-image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.ensure-build-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Verify all Actions are pinned to full SHA
+        run: |
+          FAILED=0
+          for f in .github/workflows/*.yml; do
+            while IFS= read -r line; do
+              if echo "$line" | grep -qE '^\s+uses:' && \
+                 echo "$line" | grep -qE '@' && \
+                 ! echo "$line" | grep -qE '@[0-9a-f]{40}'; then
+                echo "::error file=$f::Action not pinned to full SHA: $line"
+                FAILED=1
+              fi
+            done < "$f"
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::One or more Actions use mutable tags instead of full commit SHAs."
+            exit 1
+          fi
+          echo "All Actions are SHA-pinned ✓"
+
+  image-scan:
+    needs: [ensure-build-image, build]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    container:
+      image: ${{ needs.ensure-build-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Trivy filesystem vulnerability scan
+        run: |
+          trivy fs \
+            --exit-code 1 \
+            --severity CRITICAL,HIGH \
+            --no-progress \
+            .

@@ -89,10 +89,10 @@ func (p *Panel) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
-// handleLogout clears the admin session and redirects to login
+// handleLogout clears the admin session and redirects to shared login per AI.md PART 15
 func (p *Panel) handleLogout(w http.ResponseWriter, r *http.Request) {
 	p.deleteAdminSession(w, r)
-	http.Redirect(w, r, p.adminBasePath()+"/login", http.StatusSeeOther)
+	http.Redirect(w, r, "/server/auth/login", http.StatusSeeOther)
 }
 
 // handleProfile renders the admin profile page
