@@ -245,6 +245,57 @@ func (p *Panel) revokeToken(tokenID int64) error {
 	return err
 }
 
+// countOnlineAdmins returns the count of distinct admins with a currently valid session.
+// Privacy: returns count only — no usernames exposed per AI.md PART 17.
+func (p *Panel) countOnlineAdmins() (int, error) {
+	if p.db == nil {
+		return 0, errNoDB
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+	var count int
+	err := p.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT admin_id) FROM admin_sessions WHERE expires_at > ?`,
+		time.Now().Unix(),
+	).Scan(&count)
+	return count, err
+}
+
+// inviteRecord holds a row from the admin_invites table
+type inviteRecord struct {
+	ID        int64
+	CreatedBy int64
+	ExpiresAt int64
+	UsedAt    sql.NullInt64
+	CreatedAt int64
+}
+
+// createAdminInvite generates a single-use invite token and inserts it.
+// Returns the raw (unhashed) token — shown once to the inviting admin.
+func (p *Panel) createAdminInvite(createdByID int64, expireHours int) (string, error) {
+	if p.db == nil {
+		return "", errNoDB
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	rawHex := hex.EncodeToString(raw)
+	h := sha256.Sum256([]byte(rawHex))
+	tokenHash := hex.EncodeToString(h[:])
+	expiresAt := time.Now().Add(time.Duration(expireHours) * time.Hour).Unix()
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+	_, err := p.db.ExecContext(ctx,
+		`INSERT INTO admin_invites (token_hash, created_by, expires_at) VALUES (?, ?, ?)`,
+		tokenHash, createdByID, expiresAt)
+	if err != nil {
+		return "", err
+	}
+	return rawHex, nil
+}
+
 // CleanupExpiredSessions removes expired admin sessions
 func (p *Panel) CleanupExpiredSessions() error {
 	if p.db == nil {

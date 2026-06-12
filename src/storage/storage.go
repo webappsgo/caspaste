@@ -373,6 +373,22 @@ func InitDB(driverName string, dataSourceName string) error {
 		return err
 	}
 
+	// Create admin_invites table (admin-to-admin invite flow, per AI.md PART 17)
+	err = execCreate(ctx, db.pool, `
+		CREATE TABLE IF NOT EXISTS admin_invites (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			token_hash   TEXT NOT NULL UNIQUE,
+			created_by   INTEGER NOT NULL,
+			expires_at   INTEGER NOT NULL,
+			used_at      INTEGER,
+			created_at   INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			FOREIGN KEY (created_by) REFERENCES admins(id) ON DELETE CASCADE
+		);
+	`, f)
+	if err != nil {
+		return err
+	}
+
 	// Create users table (PART 34: Multi-User)
 	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS users (
@@ -673,6 +689,8 @@ func InitDB(driverName string, dataSourceName string) error {
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON admin_tokens(token_hash);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_tokens_admin ON admin_tokens(admin_id);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_invites_token ON admin_invites(token_hash);`)
+	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_admin_invites_creator ON admin_invites(created_by);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`)
 	_, _ = db.pool.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);`)

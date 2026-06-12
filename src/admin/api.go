@@ -331,6 +331,49 @@ func (p *Panel) apiRevokeToken(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// apiListAdmins returns admin count and online count (no identifying details per AI.md PART 17)
+func (p *Panel) apiListAdmins(w http.ResponseWriter, r *http.Request) {
+	total, _ := p.CountAdmins()
+	online, _ := p.countOnlineAdmins()
+	jsonOK(w, map[string]interface{}{
+		"total":  total,
+		"online": online,
+	})
+}
+
+// apiInviteAdmin generates a single-use admin invite token
+func (p *Panel) apiInviteAdmin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ExpireHours int `json:"expire_hours"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.ExpireHours <= 0 {
+		req.ExpireHours = 24
+	}
+
+	adminID := currentAdminID(r)
+	rawToken, err := p.createAdminInvite(adminID, req.ExpireHours)
+	if err != nil {
+		jsonErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	inviteURL := "/server/auth/invite/server/" + rawToken
+	if p.cfg.AppCfg != nil && p.cfg.AppCfg.FQDN != "" {
+		inviteURL = "https://" + p.cfg.AppCfg.FQDN + inviteURL
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"invite_url":   inviteURL,
+		"expire_hours": req.ExpireHours,
+		"note":         "This link is single-use. The new admin sets their own password on first use.",
+	})
+}
+
 // apiTorInfo returns Tor hidden service status
 func (p *Panel) apiTorInfo(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]interface{}{

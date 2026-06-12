@@ -61,6 +61,8 @@ func (p *Panel) Handler() http.Handler {
 	mux.Handle("GET /config/updates", auth(http.HandlerFunc(p.handleUpdates)))
 	mux.Handle("GET /config/info", auth(http.HandlerFunc(p.handleInfo)))
 	mux.Handle("GET /config/metrics", auth(http.HandlerFunc(p.handleMetrics)))
+	mux.Handle("GET /config/admins", auth(http.HandlerFunc(p.handleAdmins)))
+	mux.Handle("POST /config/admins", auth(http.HandlerFunc(p.handleAdminsPost)))
 
 	// Network
 	mux.Handle("GET /config/network/", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +110,8 @@ func (p *Panel) APIHandler() http.Handler {
 	mux.Handle("DELETE /config/security/tokens", auth(http.HandlerFunc(p.apiRevokeToken)))
 	mux.Handle("GET /config/network/tor", auth(http.HandlerFunc(p.apiTorInfo)))
 	mux.Handle("GET /config/network/geoip", auth(http.HandlerFunc(p.apiGeoIPInfo)))
+	mux.Handle("GET /config/admins", auth(http.HandlerFunc(p.apiListAdmins)))
+	mux.Handle("POST /config/admins", auth(http.HandlerFunc(p.apiInviteAdmin)))
 
 	return mux
 }

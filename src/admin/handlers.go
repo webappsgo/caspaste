@@ -576,6 +576,101 @@ func (p *Panel) handleSecurityTokensPost(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, p.adminBasePath()+"/config/security/tokens", http.StatusSeeOther)
 }
 
+// handleAdmins renders the server administrators management page.
+// Per AI.md PART 17: privacy by design — shows count only, not other admin details.
+func (p *Panel) handleAdmins(w http.ResponseWriter, r *http.Request) {
+	totalAdmins, _ := p.CountAdmins()
+	onlineAdmins, _ := p.countOnlineAdmins()
+	currentUser := currentAdminUsername(r)
+
+	var content strings.Builder
+	content.WriteString(`<div class="kv-list">`)
+	content.WriteString(string(kvRow("Your Account", template.HTMLEscapeString(currentUser))))
+	content.WriteString(string(kvRow("Total Admins", fmt.Sprintf("%d", totalAdmins))))
+	content.WriteString(string(kvRow("Currently Online", fmt.Sprintf("%d", onlineAdmins))))
+	content.WriteString(`</div>`)
+
+	content.WriteString(`<p class="muted" style="margin-top:1rem">`)
+	content.WriteString(`For security, other admin account details are not visible. `)
+	content.WriteString(`Each admin manages their own credentials independently.`)
+	content.WriteString(`</p>`)
+
+	base := p.adminBasePath()
+	content.WriteString(fmt.Sprintf(`
+<h2 class="section-title" style="margin-top:2rem">Invite New Admin</h2>
+<form method="POST" action="%s/config/admins">
+  <input type="hidden" name="csrf_token" value="">
+  <input type="hidden" name="action" value="invite">
+  <div class="form-group">
+    <label for="invite_expires">Invite Expires In</label>
+    <select id="invite_expires" name="invite_expires">
+      <option value="1">1 hour</option>
+      <option value="6">6 hours</option>
+      <option value="24" selected>24 hours (default)</option>
+      <option value="48">48 hours</option>
+      <option value="168">7 days</option>
+    </select>
+  </div>
+  <button type="submit" class="btn">Generate Invite Link</button>
+</form>`, base))
+
+	p.renderPage(w, r, "Server Administrators", "admins", template.HTML(content.String()))
+}
+
+// handleAdminsPost processes admin invite form submissions.
+// Generates a single-use invite link and displays it once per AI.md PART 17.
+func (p *Panel) handleAdminsPost(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		p.renderErrorPage(w, r, "Bad request")
+		return
+	}
+
+	if r.FormValue("action") != "invite" {
+		http.Redirect(w, r, p.adminBasePath()+"/config/admins", http.StatusSeeOther)
+		return
+	}
+
+	expireHours := 24
+	switch r.FormValue("invite_expires") {
+	case "1":
+		expireHours = 1
+	case "6":
+		expireHours = 6
+	case "48":
+		expireHours = 48
+	case "168":
+		expireHours = 168
+	}
+
+	adminID := currentAdminID(r)
+	rawToken, err := p.createAdminInvite(adminID, expireHours)
+	if err != nil {
+		p.renderErrorPage(w, r, "Failed to create invite: "+err.Error())
+		return
+	}
+
+	inviteURL := "/server/auth/invite/server/" + rawToken
+	if p.cfg.AppCfg != nil && p.cfg.AppCfg.FQDN != "" {
+		inviteURL = "https://" + p.cfg.AppCfg.FQDN + inviteURL
+	}
+
+	var content strings.Builder
+	content.WriteString(`<div class="alert alert-success">`)
+	content.WriteString(`<strong>Invite created successfully.</strong> `)
+	content.WriteString(fmt.Sprintf(`This link is valid for %d hour(s) and single-use only:`, expireHours))
+	content.WriteString(`</div>`)
+	content.WriteString(`<div class="kv-list" style="margin-top:1rem">`)
+	content.WriteString(string(kvRow("Invite URL", inviteURL)))
+	content.WriteString(`</div>`)
+	content.WriteString(`<p class="muted">`)
+	content.WriteString(`⚠️ This link will only work ONCE. The new admin will set their own password on first use.`)
+	content.WriteString(`</p>`)
+	base := p.adminBasePath()
+	content.WriteString(fmt.Sprintf(`<div style="margin-top:1.5rem"><a href="%s/config/admins" class="btn">Back to Admins</a></div>`, base))
+
+	p.renderPage(w, r, "Invite Created", "admins", template.HTML(content.String()))
+}
+
 // handleSecurityFirewall renders the firewall rules page
 func (p *Panel) handleSecurityFirewall(w http.ResponseWriter, r *http.Request) {
 	var content strings.Builder
