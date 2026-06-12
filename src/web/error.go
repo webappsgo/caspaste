@@ -29,7 +29,6 @@ type errorTmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 
 	Translate func(string, ...interface{}) template.HTML
 }
@@ -68,7 +67,6 @@ func (data *Data) writeError(rw http.ResponseWriter, req *http.Request, e error)
 		UnreadCount:   0,
 		Notifications: nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:  data.ShowRegister,
 		Translate:     locale.translate,
 	}
 

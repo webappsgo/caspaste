@@ -40,7 +40,6 @@ type settingsTmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 }
 
 // Pattern: /settings
@@ -97,7 +96,6 @@ func (data *Data) handleSettings(rw http.ResponseWriter, req *http.Request) erro
 			UnreadCount:      0,
 			Notifications:    nil,
 			ShowLogin:     data.ShowLogin,
-			ShowRegister:     data.ShowRegister,
 		}
 
 		if dataTmpl.ThemeCode == "" {

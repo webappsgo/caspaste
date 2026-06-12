@@ -126,9 +126,6 @@ type Data struct {
 	// True when multi-user support is enabled (i.e., accounts exist to log into).
 	ShowLogin bool
 
-	// ShowRegister controls whether the register link appears in the nav.
-	// True when multi-user is enabled and registration mode is open or public.
-	ShowRegister bool
 }
 
 // LoadContentWithOverride loads content from embedded FS or overrides from file
@@ -180,10 +177,9 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.UiDefaultLifeTime = cfg.UiDefaultLifetime
 	data.UiDefaultTheme = cfg.UiDefaultTheme
 	data.Public = cfg.Public
-	// Anonymous pastebin: no multi-user, so registration link never shown.
-	// Login link shown only when an htpasswd file is configured (server.public=false).
+	// Anonymous pastebin: no multi-user, so login link shown only when
+	// an htpasswd file is configured (server.public=false).
 	data.ShowLogin = cfg.CasPasswdFile != ""
-	data.ShowRegister = false
 	data.CasPasswdFile = cfg.CasPasswdFile
 
 	// Initialize brute force protection for login

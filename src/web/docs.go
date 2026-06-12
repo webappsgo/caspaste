@@ -24,7 +24,6 @@ type docsTmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 
 	Highlight func(string, string) template.HTML
 	Translate func(string, ...interface{}) template.HTML
@@ -42,7 +41,6 @@ type docsApiV1Tmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 
 	Highlight func(string, string) template.HTML
 	Translate func(string, ...interface{}) template.HTML
@@ -65,7 +63,6 @@ func (data *Data) handleDocs(rw http.ResponseWriter, req *http.Request) error {
 		UnreadCount:   0,
 		Notifications: nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 	})
 }
@@ -83,7 +80,6 @@ func (data *Data) handleDocsAPIv1(rw http.ResponseWriter, req *http.Request) err
 		UnreadCount:     0,
 		Notifications:   nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:    data.ShowRegister,
 		Translate:       data.Locales.findLocale(req).translate,
 		Highlight:       data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 	})
@@ -101,7 +97,6 @@ func (data *Data) handleDocsLibraries(rw http.ResponseWriter, req *http.Request)
 		UnreadCount:   0,
 		Notifications: nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 	})
 }
@@ -119,7 +114,6 @@ func (data *Data) handleDocsCustomize(rw http.ResponseWriter, req *http.Request)
 		UnreadCount:   0,
 		Notifications: nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 	})
@@ -137,7 +131,6 @@ func (data *Data) handleDocsCliExamples(rw http.ResponseWriter, req *http.Reques
 		UnreadCount:   0,
 		Notifications: nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 	})

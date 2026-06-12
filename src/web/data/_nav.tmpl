@@ -20,13 +20,10 @@
 				<label for="history-popup-state" class="nav-button" aria-label="View paste history">{{ call .Translate `base.History` }}</label>
 				<a href="/settings" aria-label="Settings">{{ call .Translate `base.Settings` }}</a>
 				{{/* Login/Register live here: inside the hamburger on mobile, right-aligned on desktop */}}
-				{{if not .User}}
-				{{if or .ShowLogin .ShowRegister}}
+				{{if and (not .User) .ShowLogin}}
 				<div class="nav-auth-group">
-					{{if .ShowLogin}}<a href="/server/auth/login" class="nav-button" aria-label="Sign in">{{ call .Translate `auth.Login` }}</a>{{end}}
-					{{if .ShowRegister}}<a href="/server/auth/register" class="nav-button" aria-label="Create account">{{ call .Translate `auth.Register` }}</a>{{end}}
+					<a href="/server/auth/login" class="nav-button" aria-label="Sign in">{{ call .Translate `auth.Login` }}</a>
 				</div>
-				{{end}}
 				{{end}}
 			</div>
 

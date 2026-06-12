@@ -44,7 +44,6 @@ type healthzTmplData struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 	User          *AuthUser
 }
 
@@ -236,7 +235,6 @@ func (data *Data) handleHealthz(rw http.ResponseWriter, req *http.Request) error
 			UnreadCount:        0,
 			Notifications:      nil,
 			ShowLogin:          data.ShowLogin,
-			ShowRegister:       data.ShowRegister,
 			User:               GetAuthUser(req.Context()),
 		}
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")

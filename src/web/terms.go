@@ -21,7 +21,6 @@ type termsOfUseTmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 
 	Highlight func(string, string) template.HTML
 	Translate func(string, ...interface{}) template.HTML
@@ -39,7 +38,6 @@ func (data *Data) handleTermsOfUse(rw http.ResponseWriter, req *http.Request) er
 		UnreadCount:   0,
 		Notifications: nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:  data.ShowRegister,
 		Highlight:     data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 		Translate:     data.Locales.findLocale(req).translate},
 	)

@@ -154,7 +154,6 @@ type pasteTmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 
 	Translate func(string, ...interface{}) template.HTML
 }
@@ -170,7 +169,6 @@ type pasteContinueTmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 
 	Translate func(string, ...interface{}) template.HTML
 }
@@ -206,7 +204,6 @@ func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) erro
 				UnreadCount:   0,
 				Notifications: nil,
 				ShowLogin:     data.ShowLogin,
-				ShowRegister:  data.ShowRegister,
 				Translate:     data.Locales.findLocale(req).translate,
 			}
 
@@ -332,7 +329,6 @@ func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) erro
 		UnreadCount:   0,
 		Notifications: nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:  data.ShowRegister,
 		Translate:     data.Locales.findLocale(req).translate,
 	}
 

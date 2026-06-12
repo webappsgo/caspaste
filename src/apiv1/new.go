@@ -97,6 +97,13 @@ func (data *Data) createPaste(rw http.ResponseWriter, req *http.Request) error {
 		return netshare.ErrMethodNotAllowed
 	}
 
+	// Enforce body size limit before reading to prevent memory exhaustion.
+	maxBytes := int64(data.BodyMaxLen) * 2
+	if maxBytes < 1<<20 {
+		maxBytes = 1 << 20
+	}
+	req.Body = http.MaxBytesReader(rw, req.Body, maxBytes)
+
 	// Get form data and create paste
 	pasteID, createTime, deleteTime, err := netshare.PasteAddFromForm(req, data.DB, data.RateLimitNew, data.TitleMaxLen, data.BodyMaxLen, data.MaxLifeTime, data.Lexers)
 	if err != nil {

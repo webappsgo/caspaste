@@ -73,15 +73,23 @@ On EVERY new conversation or after "context compacted" message:
 
 ## Where to Find Details
 
-- AI behavior: `.claude/rules/ai-rules.md` (PART 0, 1)
-- Project structure: `.claude/rules/project-rules.md` (PART 2, 3, 4)
-- Frontend/WebUI: `.claude/rules/frontend-rules.md` (PART 16, 17)
-- Full spec: `AI.md` (~61k lines) ← **SOURCE OF TRUTH**
+All 14 rule files live under `.claude/rules/` — load the one(s) matching your current task:
 
-## Current Project State
+| File | PARTs |
+|------|-------|
+| `ai-rules.md` | 0, 1 — AI behavior, critical rules |
+| `project-rules.md` | 2, 3, 4 — structure, paths |
+| `config-rules.md` | 5, 6, 12 — config, modes, server config |
+| `binary-rules.md` | 7, 8, 33 — binary, CLI, client |
+| `backend-rules.md` | 9, 10, 11, 32 — DB, security, Tor |
+| `api-rules.md` | 13, 14, 15 — health, API, SSL |
+| `frontend-rules.md` | 16, 17 — web UI, admin panel |
+| `features-rules.md` | 18–23 — email, scheduler, GeoIP, metrics, backup, update |
+| `service-rules.md` | 24, 25 — privilege, service |
+| `makefile-rules.md` | 26 — Makefile |
+| `docker-rules.md` | 27 — Docker |
+| `cicd-rules.md` | 28 — CI/CD |
+| `testing-rules.md` | 29–31 — testing, docs, i18n |
+| `optional-rules.md` | 34–36 — multi-user, orgs, domains |
 
-- Admin panel Phase 2 (PART 17): COMPLETE — src/admin/ fully implemented
-- Storage: admins, admin_sessions, admin_tokens, pastes tables
-- CI/CD: ci.yml + build-toolchain.yml added; trigger build-toolchain.yml workflow_dispatch to create :build image before ci.yml will pass
-- tests/ renamed from test/; scripts rewritten per spec
-- Makefile, Dockerfile, docker-compose.yml updated per spec
+Full spec: `AI.md` ← **SOURCE OF TRUTH**

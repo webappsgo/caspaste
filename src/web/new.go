@@ -33,7 +33,6 @@ type createTmpl struct {
 	UnreadCount   int
 	Notifications []NavNotification
 	ShowLogin     bool
-	ShowRegister  bool
 
 	Translate func(string, ...interface{}) template.HTML
 }
@@ -41,6 +40,13 @@ type createTmpl struct {
 func (data *Data) handleNewPaste(rw http.ResponseWriter, req *http.Request) error {
 	// Create paste if need
 	if req.Method == "POST" {
+		// Enforce body size limit before reading to prevent memory exhaustion.
+		// Allow 2× BodyMaxLen for URL-encoding/base64 overhead; minimum 1 MiB.
+		maxBytes := int64(data.BodyMaxLen) * 2
+		if maxBytes < 1<<20 {
+			maxBytes = 1 << 20
+		}
+		req.Body = http.MaxBytesReader(rw, req.Body, maxBytes)
 		pasteID, _, _, err := netshare.PasteAddFromForm(req, data.DB, data.RateLimitNew, data.TitleMaxLen, data.BodyMaxLen, data.MaxLifeTime, data.Lexers)
 		if err != nil {
 			return err
@@ -83,7 +89,6 @@ func (data *Data) handleNewPaste(rw http.ResponseWriter, req *http.Request) erro
 		UnreadCount:        0,
 		Notifications:      nil,
 		ShowLogin:     data.ShowLogin,
-		ShowRegister:       data.ShowRegister,
 		Translate:          data.Locales.findLocale(req).translate,
 	}
 
