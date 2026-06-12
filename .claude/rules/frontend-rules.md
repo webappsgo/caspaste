@@ -1,6 +1,29 @@
 # Frontend Rules (PART 16, 17) — Cheatsheet
 
+⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
+
 Full spec: AI.md PART 16, PART 17
+
+## CRITICAL — NEVER DO
+
+- Use React, Vue, Angular, or any client-side framework
+- Mount admin panel at `/{admin_path}/` — always `/server/{admin_path}/`
+- Mount admin login at `/server/{admin_path}/login` — always `/server/auth/login`
+- Hardcode colors — CSS custom properties only
+- Break features when JavaScript is disabled — all features work without JS
+- Link to or advertise the admin panel path on any public page
+- Store admin session in the same cookie as user sessions
+
+## CRITICAL — ALWAYS DO
+
+- Server-side Go templates for all HTML rendering
+- Dark theme default; support dark/light/auto via CSS custom properties
+- Mobile-first responsive CSS (no fixed pixel widths)
+- Content negotiation: browser `text/html` → HTML; curl/CLI `text/plain` or no Accept → plain text
+- Admin panel: isolated `src/admin/` package, separate session cookie `caspaste_admin`
+- Admin session cookie scoped to `/server/{admin_path}/`
+- Auth routes at `/server/auth/login` and `/server/auth/logout` (shared, not under admin prefix)
+- Admin setup token logged to stdout, never stored in plaintext
 
 ## Web Frontend (PART 16)
 
@@ -50,3 +73,5 @@ Full spec: AI.md PART 16, PART 17
 
 - --debug flag bypasses auth (per AI.md PART 6)
 - Injects "debug" admin user into context
+
+For complete details, see AI.md PART 16, PART 17

@@ -1,6 +1,26 @@
 # Testing Rules (PART 29) — Cheatsheet
 
+⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
+
 Full spec: AI.md PART 29
+
+## CRITICAL — NEVER DO
+
+- Run `go test` on the host — always inside Docker `casjaysdev/go:latest`
+- Run `docker compose up` in the project directory — always copy to temp dir first
+- Use `docker-compose.yml` or `docker-compose.dev.yml` for testing — only `docker-compose.test.yml`
+- Create runtime data (db files, logs, config) in the project directory
+- Commit with failing tests — all tests must pass before commit
+
+## CRITICAL — ALWAYS DO
+
+- Build binaries via Docker with the `go-state` named volume
+- Use temp dir: `mktemp -d "${TMPDIR:-/tmp}/${PROJECTORG}/${PROJECTNAME}-XXXXXX"`
+- Copy `docker/docker-compose.test.yml` to temp dir before running
+- Test the admin setup flow (setup token → create admin → login) in integration tests
+- Test content negotiation on every route (text/html vs text/plain)
+- Enforce ≥80% Go unit test coverage (hard gate in `make test`)
+- Clean up temp dirs after tests complete
 
 ## Two Required Test Types
 
@@ -57,3 +77,5 @@ Every route tested with:
 - Go unit tests: ≥80% (enforced by `make test`)
 - Integration: 100% endpoint coverage
 - Critical paths (auth, DB, token) always tested
+
+For complete details, see AI.md PART 29

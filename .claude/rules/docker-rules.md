@@ -1,6 +1,30 @@
 # Docker Rules (PART 27) — Cheatsheet
 
+⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
+
 Full spec: AI.md PART 27
+
+## CRITICAL — NEVER DO
+
+- Add LABEL blocks in any Dockerfile — use OCI annotations via docker/metadata-action in workflows
+- Create directories in Dockerfile — binary handles all setup at runtime
+- Use `build:` field in any compose file
+- Use `version:` field in any compose file (deprecated)
+- Run `docker compose up` in the project directory — always copy test compose to temp dir
+- Bind-mount host paths for data — use `./volumes/config:/config:z` and `./volumes/data:/data:z`
+- Use host-path Go cache — named volume `go-state:/usr/local/share/go` only
+
+## CRITICAL — ALWAYS DO
+
+- Builder stage: `FROM casjaysdev/go:latest AS builder`
+- Runtime stage: `FROM alpine:latest`
+- Include all five ARGs: TARGETARCH, VERSION, BUILD_DATE, COMMIT_ID, OFFICIAL_SITE
+- Set `STOPSIGNAL SIGRTMIN+3`
+- Set `ENTRYPOINT ["tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh"]`
+- Set `ENV MODE=development` in image (production compose overrides to MODE=production)
+- Add `name:` at top of every compose file
+- Add `pull_policy: always` and `restart: always` to every service
+- Add `x-logging: &default-logging` anchor and reference it in every service
 
 ## Dockerfile Rules
 
@@ -56,3 +80,5 @@ Full spec: AI.md PART 27
 - Export: TZ, CONFIG_DIR, DATA_DIR
 - Check: DEBUG env var to add --debug flag
 - Signal handling: cleanup() trap for SIGTERM/SIGINT/SIGQUIT
+
+For complete details, see AI.md PART 27

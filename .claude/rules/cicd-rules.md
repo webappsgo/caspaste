@@ -1,6 +1,25 @@
 # CI/CD Rules (PART 28) — Cheatsheet
 
+⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
+
 Full spec: AI.md PART 28
+
+## CRITICAL — NEVER DO
+
+- Use Makefile targets in CI/CD (explicit commands only)
+- Reference host paths (e.g. `~/.local/share/go`) — use named volume in Docker
+- Pin Actions with tags — always use full 40-char commit SHA
+- Commit ci.yml or release.yml before the `:build` toolchain image exists in the registry
+- Run `apk add`, `go install`, or any package install in a CI job step — all tools live in the `:build` image
+- Use cancel-in-progress: true on build-toolchain.yml (never interrupt)
+
+## CRITICAL — ALWAYS DO
+
+- Gate ALL jobs on `needs: ensure-build-image` (every workflow except build-toolchain.yml)
+- Run every job inside `container: image: ${{ needs.ensure-build-image.outputs.image }}`
+- Bootstrap order: Dockerfile.build + build-toolchain.yml first → trigger workflow_dispatch → verify `:build` exists → then ci.yml/release.yml
+- Use exact ldflags: `-X 'main.Version=...' -X 'main.CommitID=...' -X 'main.BuildDate=...' -X 'main.OfficialSite=...'`
+- Set CGO_ENABLED=0 in every build job
 
 ## Workflow Files Required
 
@@ -56,3 +75,5 @@ go build -ldflags "${LDFLAGS}" -o NAME ./src/server
 - Use Makefile targets (must be explicit commands)
 - Reference host paths (~/.local/share/go)
 - Pin Actions with tags — always use full commit SHA
+
+For complete details, see AI.md PART 28
