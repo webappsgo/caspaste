@@ -182,6 +182,15 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.ShowLogin = cfg.CasPasswdFile != ""
 	data.CasPasswdFile = cfg.CasPasswdFile
 
+	// Load persisted session signing key from app_secrets table.
+	// Per AI.md PART 11: cookie_signing_key must survive restarts — never regenerate.
+	var cookieKey []byte
+	cookieKey, err = db.LoadOrGenerateSecret("cookie_signing_key")
+	if err != nil {
+		return nil, err
+	}
+	SetSessionSecret(cookieKey)
+
 	// Initialize brute force protection for login
 	// Per AI.md PART 11: 5 failed attempts = 15-minute lockout
 	data.BruteForce = caspasswd.NewBruteForceProtection(5, 15*time.Minute)

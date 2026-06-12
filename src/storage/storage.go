@@ -373,6 +373,21 @@ func InitDB(driverName string, dataSourceName string) error {
 		return err
 	}
 
+	// Create app_secrets table (persistent cryptographic keys per AI.md PART 11)
+	// Stores cookie_signing_key, csrf_token_secret, installation_secret.
+	// Keys are generated on first start and must NEVER be regenerated on restart.
+	err = execCreate(ctx, db.pool, `
+		CREATE TABLE IF NOT EXISTS app_secrets (
+			name       TEXT NOT NULL PRIMARY KEY,
+			value      TEXT NOT NULL,
+			created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+			rotated_at INTEGER
+		);
+	`, f)
+	if err != nil {
+		return err
+	}
+
 	// Create admin_invites table (admin-to-admin invite flow, per AI.md PART 17)
 	err = execCreate(ctx, db.pool, `
 		CREATE TABLE IF NOT EXISTS admin_invites (

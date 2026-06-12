@@ -7,7 +7,6 @@ package web
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"html/template"
@@ -27,15 +26,15 @@ const (
 	sessionDuration   = 24 * time.Hour
 )
 
-// sessionSecret is used to sign session cookies
+// sessionSecret is used to sign session cookies.
+// It is set once during Load() from the persisted app_secrets.cookie_signing_key
+// (per AI.md PART 11 — secrets must survive restarts, not regenerate on init).
 var sessionSecret []byte
 
-func init() {
-	// Generate a random session secret on startup
-	sessionSecret = make([]byte, 32)
-	if _, err := rand.Read(sessionSecret); err != nil {
-		panic("failed to generate session secret: " + err.Error())
-	}
+// SetSessionSecret sets the HMAC key used for session cookie signing.
+// Called from Load() with the value loaded from app_secrets.cookie_signing_key.
+func SetSessionSecret(key []byte) {
+	sessionSecret = key
 }
 
 type loginTmpl struct {
