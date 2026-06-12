@@ -1,6 +1,6 @@
 # MIT License
 
-Copyright (c) 2024 casjay-forks
+Copyright (c) 2024 casapps
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,157 +22,99 @@ SOFTWARE.
 
 ---
 
-# Third-Party Licenses and Attributions
+## Third-Party Licenses
 
-CasPaste is built upon and includes code from various open-source projects. This document provides attribution and license information for all third-party components.
+This software includes the following third-party libraries:
 
----
+| Library | Version | License | Copyright |
+|---------|---------|---------|-----------|
+| github.com/alecthomas/chroma/v2 | v2.4.0 | MIT | Alec Thomas |
+| github.com/antlr4-go/antlr/v4 | v4.13.0 | BSD-3-Clause | The ANTLR Project |
+| github.com/aymanbagabas/go-osc52/v2 | v2.0.1 | MIT | Ayman Bagabas |
+| github.com/beorn7/perks | v1.0.1 | MIT | Björn Rabenstein |
+| github.com/cespare/xxhash/v2 | v2.3.0 | MIT | Caleb Spare |
+| github.com/charmbracelet/bubbletea | v1.3.10 | MIT | Charmbracelet Inc. |
+| github.com/charmbracelet/lipgloss | v1.1.0 | MIT | Charmbracelet Inc. |
+| github.com/charmbracelet/x/ansi | v0.10.1 | MIT | Charmbracelet Inc. |
+| github.com/charmbracelet/x/cellbuf | v0.0.13 | MIT | Charmbracelet Inc. |
+| github.com/charmbracelet/x/term | v0.2.1 | MIT | Charmbracelet Inc. |
+| github.com/coder/websocket | v1.8.12 | MIT | Coder Technologies Inc. |
+| github.com/cretz/bine | v0.2.0 | MIT | Chad Retz |
+| github.com/dlclark/regexp2 | v1.7.0 | MIT | Doug Clark |
+| github.com/dustin/go-humanize | v1.0.1 | MIT | Dustin Sallings |
+| github.com/erikgeiser/coninput | v0.0.0-20211004153227 | MIT | Erik Geiser |
+| github.com/go-sql-driver/mysql | v1.7.1 | MPL-2.0 | The Go-MySQL-Driver Authors |
+| github.com/google/uuid | v1.3.0 | BSD-3-Clause | Google Inc. |
+| github.com/jackc/pgpassfile | v1.0.0 | MIT | Jack Christensen |
+| github.com/jackc/pgservicefile | v0.0.0-20240606120523 | MIT | Jack Christensen |
+| github.com/jackc/pgx/v5 | v5.7.2 | MIT | 2013-2024 Jack Christensen |
+| github.com/jackc/puddle/v2 | v2.2.2 | MIT | Jack Christensen |
+| github.com/kballard/go-shellquote | v0.0.0-20180428030007 | MIT | Kevin Ballard |
+| github.com/kr/text | v0.2.0 | MIT | Keith Rarick |
+| github.com/lucasb-eyer/go-colorful | v1.2.0 | MIT | Lucas B. Eyer |
+| github.com/mattn/go-isatty | v0.0.20 | MIT | Yasuhiro Matsumoto |
+| github.com/mattn/go-localereader | v0.0.1 | MIT | Yasuhiro Matsumoto |
+| github.com/mattn/go-runewidth | v0.0.16 | MIT | Yasuhiro Matsumoto |
+| github.com/muesli/ansi | v0.0.0-20230316100256 | MIT | Christian Muehlhaeuser |
+| github.com/muesli/cancelreader | v0.2.2 | MIT | Christian Muehlhaeuser |
+| github.com/oschwald/maxminddb-golang | v1.13.1 | ISC | Gregory J. Oschwald |
+| github.com/prometheus/client_golang | v1.23.2 | Apache-2.0 | The Prometheus Authors |
+| github.com/prometheus/client_model | v0.6.1 | Apache-2.0 | The Prometheus Authors |
+| github.com/prometheus/common | v0.65.0 | Apache-2.0 | The Prometheus Authors |
+| github.com/prometheus/procfs | v0.16.1 | Apache-2.0 | The Prometheus Authors |
+| github.com/remyoudompheng/bigfft | v0.0.0-20230129092748 | BSD-3-Clause | Rémy Oudompheng |
+| github.com/rivo/uniseg | v0.4.7 | MIT | Rivo Laks |
+| github.com/tursodatabase/libsql-client-go | v0.0.0-20260514053736 | MIT | Turso |
+| github.com/xo/terminfo | v0.0.0-20220910002029 | MIT | xo Authors |
+| github.com/yuin/goldmark | v1.7.8 | MIT | Yusuke Inuzuka |
+| github.com/yuin/goldmark-highlighting/v2 | v2.0.0-20230729083705 | MIT | Yusuke Inuzuka |
+| go.yaml.in/yaml/v2 | v2.4.2 | MIT and Apache-2.0 | Canonical Ltd. |
+| golang.org/x/crypto | v0.41.0 | BSD-3-Clause | The Go Authors |
+| golang.org/x/exp | v0.0.0-20240325151524 | BSD-3-Clause | The Go Authors |
+| golang.org/x/mod | v0.26.0 | BSD-3-Clause | The Go Authors |
+| golang.org/x/net | v0.43.0 | BSD-3-Clause | The Go Authors |
+| golang.org/x/sync | v0.16.0 | BSD-3-Clause | The Go Authors |
+| golang.org/x/sys | v0.40.0 | BSD-3-Clause | The Go Authors |
+| golang.org/x/term | v0.39.0 | BSD-3-Clause | The Go Authors |
+| golang.org/x/text | v0.28.0 | BSD-3-Clause | The Go Authors |
+| golang.org/x/tools | v0.35.0 | BSD-3-Clause | The Go Authors |
+| google.golang.org/protobuf | v1.36.8 | BSD-3-Clause | Google Inc. |
+| gopkg.in/yaml.v3 | v3.0.1 | MIT and Apache-2.0 | Canonical Ltd. |
+| lukechampine.com/uint128 | v1.2.0 | MIT | Luke Champine |
+| modernc.org/cc/v3 | v3.40.0 | BSD-3-Clause | cznic |
+| modernc.org/ccgo/v3 | v3.16.13 | BSD-3-Clause | cznic |
+| modernc.org/libc | v1.29.0 | BSD-3-Clause | cznic |
+| modernc.org/mathutil | v1.6.0 | BSD-3-Clause | cznic |
+| modernc.org/memory | v1.7.2 | BSD-3-Clause | cznic |
+| modernc.org/opt | v0.1.3 | BSD-3-Clause | cznic |
+| modernc.org/sqlite | v1.28.0 | BSD-3-Clause | cznic |
+| modernc.org/strutil | v1.1.3 | BSD-3-Clause | cznic |
+| modernc.org/token | v1.0.1 | BSD-3-Clause | cznic |
 
-## Go Dependencies
-
-### Chroma - Syntax Highlighting
-- **Package:** `github.com/alecthomas/chroma/v2`
-- **Version:** v2.4.0
-- **License:** MIT License
-- **Copyright:** © Alec Thomas
-- **Source:** https://github.com/alecthomas/chroma
-
-### PostgreSQL Driver
-- **Package:** `github.com/jackc/pgx/v5`
-- **Version:** v5.7.2
-- **License:** MIT License
-- **Copyright:** © 2013-2024 Jack Christensen
-- **Source:** https://github.com/jackc/pgx
-
-### MySQL/MariaDB Driver
-- **Package:** `github.com/go-sql-driver/mysql`
-- **Version:** v1.7.1
-- **License:** Mozilla Public License 2.0 (MPL-2.0)
-- **Copyright:** © 2012-2023 The Go-MySQL-Driver Authors
-- **Source:** https://github.com/go-sql-driver/mysql
-
-### SQLite Driver (Pure Go)
-- **Package:** `modernc.org/sqlite`
-- **Version:** v1.28.0
-- **License:** BSD-3-Clause
-- **Copyright:** © 2017 The Sqlite Authors
-- **Source:** https://gitlab.com/cznic/sqlite
-
-### Go Crypto Libraries
-- **Package:** `golang.org/x/crypto`
-- **Version:** v0.18.0
-- **License:** BSD-3-Clause
-- **Copyright:** © The Go Authors
-- **Source:** https://golang.org/x/crypto
-- **Used for:** Argon2id password hashing, bcrypt support
-
-### Go Net Library
-- **Package:** `golang.org/x/net`
-- **Version:** v0.20.0
-- **License:** BSD-3-Clause
-- **Copyright:** © The Go Authors
-- **Source:** https://golang.org/x/net
-- **Used for:** Public Suffix List domain validation
-
-### Go Term Library
-- **Package:** `golang.org/x/term`
-- **Version:** v0.16.0
-- **License:** BSD-3-Clause
-- **Copyright:** © The Go Authors
-- **Source:** https://golang.org/x/term
-- **Used for:** Terminal password input
-
-### YAML Parser
-- **Package:** `gopkg.in/yaml.v3`
-- **Version:** v3.0.1
-- **License:** MIT License + Apache License 2.0
-- **Copyright:** © 2011-2019 Canonical Ltd., © 2006-2010 Kirill Simonov
-- **Source:** https://github.com/go-yaml/yaml
-
----
-
-## Indirect Dependencies
-
-The following packages are used indirectly by our direct dependencies:
-
-- `github.com/dlclark/regexp2` - BSD-3-Clause
-- `github.com/dustin/go-humanize` - MIT
-- `github.com/google/uuid` - BSD-3-Clause
-- `github.com/kballard/go-shellquote` - MIT
-- `github.com/mattn/go-isatty` - MIT
-- `github.com/remyoudompheng/bigfft` - BSD-3-Clause
-- `modernc.org/*` packages - BSD-3-Clause
-- `golang.org/x/*` packages - BSD-3-Clause
-- `lukechampine.com/uint128` - MIT
-
-See `go.mod` and `go.sum` for complete dependency list with versions.
+Full license texts: https://spdx.org/licenses/
 
 ---
 
-## Design Inspiration
+### modernc.org/sqlite v1.28.0 (BSD-3-Clause)
 
-### MicroBin
-- **Source:** https://github.com/szabodanika/microbin
-- **License:** BSD-3-Clause
-- **Inspiration:** File upload support, URL shortening, QR codes, editable pastes, private pastes
+Copyright (c) 2017 The Sqlite Authors. All rights reserved.
 
-CasPaste implements similar features to MicroBin but with independent implementation in Go.
+Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software
+without specific prior written permission.
 
----
-
-## Fonts and Resources
-
-### System Fonts
-Uses system default fonts with fallbacks:
-- `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
-- `"SF Mono", "Fira Code", "JetBrains Mono", Consolas, monospace`
-
-No embedded fonts - relies on user's system fonts.
-
-### QR Code Generation
-- Uses Google Charts API for QR code generation
-- No local QR code library dependencies
+Full license: https://spdx.org/licenses/BSD-3-Clause.html
 
 ---
 
-## Theme Color Schemes
+### golang.org/x/* packages (BSD-3-Clause)
 
-The following color schemes inspired our built-in themes:
+Copyright (c) 2009 The Go Authors. All rights reserved.
 
-- **Dracula Theme:** https://draculatheme.com/ - MIT License
-- **Nord Theme:** https://www.nordtheme.com/ - MIT License
-- **Gruvbox:** https://github.com/morhetz/gruvbox - MIT License
-- **Tokyo Night:** https://github.com/tokyo-night/tokyo-night-vscode-theme - MIT License
-- **Catppuccin:** https://github.com/catppuccin/catppuccin - MIT License
-- **One Dark:** https://github.com/atom/atom/tree/master/packages/one-dark-ui - MIT License
-- **Solarized:** https://ethanschoonover.com/solarized/ - MIT License
-- **GitHub:** https://github.com/primer/css - MIT License
+Neither the name of Google Inc. nor the names of its contributors may be used
+to endorse or promote products derived from this software without specific
+prior written permission.
 
-All color values were independently selected for optimal readability and mobile-first design.
+Full license: https://spdx.org/licenses/BSD-3-Clause.html
 
 ---
-
-## License Compliance
-
-### Distribution Requirements
-
-When distributing CasPaste, you must:
-
-1. **Include this LICENSE.md file** with all attributions
-2. **Comply with all third-party licenses** listed above
-
-### Contribution Guidelines
-
-By contributing to CasPaste, you agree that your contributions will be licensed under the MIT License.
-
----
-
-## Contact
-
-For license questions or concerns:
-- **Repository:** https://github.com/casjay-forks/caspaste
-- **Issues:** https://github.com/casjay-forks/caspaste/issues
-
----
-
-**Last Updated:** 2026-01-14
