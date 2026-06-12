@@ -79,6 +79,9 @@ func (d *Data) stikkedCreate(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if d.checkRateLimit(rw, req) {
+		return
+	}
 	if err := req.ParseForm(); err != nil {
 		http.Error(rw, "invalid form data", http.StatusBadRequest)
 		return

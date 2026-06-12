@@ -42,6 +42,9 @@ func (d *Data) hastebinCreate(rw http.ResponseWriter, req *http.Request) {
 		jsonErr(rw, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	if d.checkRateLimit(rw, req) {
+		return
+	}
 
 	body, err := io.ReadAll(io.LimitReader(req.Body, int64(d.BodyMaxLen)+1))
 	if err != nil || len(body) == 0 {

@@ -2300,6 +2300,7 @@ func main() {
 	compatData := compat.Load(
 		db,
 		log,
+		netshare.NewRateLimitSystem(yamlCfg.Limits.RateLimit.NewPastes.Per5Min, yamlCfg.Limits.RateLimit.NewPastes.Per15Min, yamlCfg.Limits.RateLimit.NewPastes.Per1Hour),
 		Version,
 		compatBaseURL,
 		yamlCfg.Server.Title,

@@ -119,9 +119,10 @@ func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem
 			return "", 0, 0, err
 		}
 
-		// Set file fields
+		// Set file fields; sanitize filename to strip control characters that
+		// could cause display injection (per AI.md IDEA.md correctness rule).
 		paste.IsFile = true
-		paste.FileName = handler.Filename
+		paste.FileName = sanitizeFilename(handler.Filename)
 		paste.MimeType = handler.Header.Get("Content-Type")
 		if paste.MimeType == "" {
 			paste.MimeType = "application/octet-stream"
@@ -295,4 +296,23 @@ func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem
 	}
 
 	return pasteID, createTime, deleteTime, nil
+}
+
+// sanitizeFilename strips control characters and path separators from a
+// filename to prevent display injection and path traversal in the UI.
+func sanitizeFilename(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		// Drop control characters (0x00-0x1F, 0x7F) and path separators.
+		if r < 0x20 || r == 0x7F || r == '/' || r == '\\' {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	// Limit to a safe display length.
+	s := b.String()
+	if len(s) > 255 {
+		s = s[:255]
+	}
+	return s
 }

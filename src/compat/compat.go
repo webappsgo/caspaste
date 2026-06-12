@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/casjay-forks/caspaste/src/logger"
+	"github.com/casjay-forks/caspaste/src/netshare"
 	"github.com/casjay-forks/caspaste/src/storage"
 )
 
@@ -48,6 +49,10 @@ type Data struct {
 	// Set CASPASTE_FORCE_HOST=no to make EnvMode take precedence.
 	ForceHost bool
 
+	// RateLimitNew rate-limits paste creation for all compat endpoints.
+	// Per AI.md IDEA.md: "all compat inputs are validated and rate-limited"
+	RateLimitNew *netshare.RateLimitSystem
+
 	// Server metadata used by info/status endpoints.
 	Version     string
 	BaseURL     string
@@ -63,7 +68,7 @@ type Data struct {
 
 // Load constructs a Data from the environment and provided fields.
 // Call once at server startup.
-func Load(db storage.DB, log logger.Logger, version, baseURL, title, adminName, adminMail, about, rules string, titleMax, bodyMax int, maxLife int64) *Data {
+func Load(db storage.DB, log logger.Logger, rateLimitNew *netshare.RateLimitSystem, version, baseURL, title, adminName, adminMail, about, rules string, titleMax, bodyMax int, maxLife int64) *Data {
 	envMode := normalizeMode(os.Getenv("CASPASTE_API_MODE"))
 
 	// CASPASTE_FORCE_HOST controls whether the Host header overrides the env mode.
@@ -74,11 +79,12 @@ func Load(db storage.DB, log logger.Logger, version, baseURL, title, adminName, 
 	}
 
 	return &Data{
-		DB:          db,
-		Log:         log,
-		EnvMode:     envMode,
-		ForceHost:   forceHost,
-		Version:     version,
+		DB:           db,
+		Log:          log,
+		EnvMode:      envMode,
+		ForceHost:    forceHost,
+		RateLimitNew: rateLimitNew,
+		Version:      version,
 		BaseURL:     strings.TrimRight(baseURL, "/"),
 		ServerTitle: title,
 		AdminName:   adminName,
@@ -207,6 +213,21 @@ func (d *Data) Middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(rw, req)
 	})
+}
+
+// checkRateLimit checks the rate limit for paste creation from the request's
+// client IP. Returns true (blocked) and writes a 429 if the limit is exceeded.
+// Always returns false (allowed) when no rate limit system is configured.
+func (d *Data) checkRateLimit(rw http.ResponseWriter, req *http.Request) bool {
+	if d.RateLimitNew == nil {
+		return false
+	}
+	ip := netshare.GetClientAddr(req)
+	if err := d.RateLimitNew.CheckAndUse(ip); err != nil {
+		http.Error(rw, "rate limit exceeded", http.StatusTooManyRequests)
+		return true
+	}
+	return false
 }
 
 // jsonOK writes v as JSON with status 200.

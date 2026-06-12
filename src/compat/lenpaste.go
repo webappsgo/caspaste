@@ -44,6 +44,9 @@ func (d *Data) lenpasteNew(rw http.ResponseWriter, req *http.Request) {
 		jsonErr(rw, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	if d.checkRateLimit(rw, req) {
+		return
+	}
 	if err := req.ParseForm(); err != nil {
 		jsonErr(rw, http.StatusBadRequest, "invalid form data")
 		return

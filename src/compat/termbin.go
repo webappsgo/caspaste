@@ -38,6 +38,9 @@ func (d *Data) handleTermbin(rw http.ResponseWriter, req *http.Request) bool {
 // termbinCreate accepts a raw POST body or a multipart "c" field (the curl -F form)
 // and creates a paste, returning its URL as plain text.
 func (d *Data) termbinCreate(rw http.ResponseWriter, req *http.Request) {
+	if d.checkRateLimit(rw, req) {
+		return
+	}
 	var body string
 
 	ct := req.Header.Get("Content-Type")

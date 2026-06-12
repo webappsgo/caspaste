@@ -65,6 +65,9 @@ func (d *Data) pastebinPost(rw http.ResponseWriter, req *http.Request) {
 // api_paste_expire_date, api_paste_private (0=public, 1=unlisted, 2=private)
 // Response: plain-text URL.
 func (d *Data) pastebinCreate(rw http.ResponseWriter, req *http.Request) {
+	if d.checkRateLimit(rw, req) {
+		return
+	}
 	body := req.PostFormValue("api_paste_code")
 	if body == "" {
 		http.Error(rw, "Bad API request: empty paste", http.StatusBadRequest)

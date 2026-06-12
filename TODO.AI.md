@@ -15,16 +15,11 @@ Source of truth: `AI.md` only. All items reference a spec PART.
 - [ ] Admin invite acceptance route at `/server/auth/invite/server/{token}` (PART 17 line 29019)
 - [ ] CSRF protection on all admin form POSTs (currently fields present but not validated)
 
-### Security (PART 11)
-
-- [ ] Verify session HMAC secret in `src/web/auth.go` persists across restarts (not regenerated each run)
-- [ ] Confirm pprof/debug endpoints are only bound to loopback when `--debug` is active (PART 6)
-
 ### Correctness (PART 14, IDEA.md)
 
-- [ ] Confirm all compat endpoints (src/compat/) are CSRF-exempt AND rate-limited per IDEA security decisions
 - [ ] Confirm burn-after-reading delete completes before HTTP response is written (no race)
-- [ ] Uploaded `file_name` — sanitize for control characters to prevent display injection
+  — currently a two-step confirm flow; the delete happens before rendering but two
+  concurrent confirms could both succeed; needs a conditional DELETE in the DB layer
 
 ### CI/CD bootstrap (PART 28)
 
@@ -32,6 +27,14 @@ Source of truth: `AI.md` only. All items reference a spec PART.
   — Until done, ci.yml, release.yml, beta.yml, daily.yml will fail with "Build image not found"
 
 ## Completed (do not re-do)
+
+- README.md: full spec-compliant rewrite (canonical section order, all 8 platforms in Install,
+  official site line, correct Docker compose snippets, correct API endpoints, emoji headers)
+- LICENSE.md: rewrite third-party section — compact table format, all direct + indirect deps,
+  correct copyright holder (casapps), BSD-3-Clause non-endorsement clauses included
+- Compat endpoints: all 6 create handlers now call checkRateLimit() (IDEA.md security rules)
+- Filename sanitization: sanitizeFilename() strips control chars/path separators in netshare
+
 
 - Non-spec packages removed: user, userapi, org, orgapi, domain, domainapi, authapi
 - Admin panel (PART 17): routes, handlers, API, auth, session, setup wizard — fully implemented

@@ -56,6 +56,9 @@ func (d *Data) handleMicrobin(rw http.ResponseWriter, req *http.Request) bool {
 // burn_after_read (bool), syntax_highlight (syntax name).
 // Redirects to /pasta/{id} on success (matching Microbin behaviour).
 func (d *Data) microbinCreate(rw http.ResponseWriter, req *http.Request) {
+	if d.checkRateLimit(rw, req) {
+		return
+	}
 	if err := req.ParseMultipartForm(32 << 20); err != nil {
 		// Fall back to regular form parsing.
 		if err2 := req.ParseForm(); err2 != nil {
