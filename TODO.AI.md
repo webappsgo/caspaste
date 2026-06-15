@@ -23,8 +23,9 @@ Source of truth: `AI.md` only. All items reference a spec PART.
 
 ### CI/CD bootstrap (PART 28)
 
-- [ ] Trigger `build-toolchain.yml` via workflow_dispatch to push `:build` image to ghcr.io
-  — Until done, ci.yml, release.yml, beta.yml, daily.yml will fail with "Build image not found"
+- [x] Triggered `build-toolchain.yml` — `:build` image now live at ghcr.io/casjay-forks/caspaste:build
+  Fixed Dockerfile.build bugs: staticcheck wrong module (golang.org/x/tools → honnef.co/go/tools),
+  trufflehog requires CGO → switched to prebuilt binary installer
 
 ## Completed (do not re-do)
 
