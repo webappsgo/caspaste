@@ -18,7 +18,8 @@ RUN apk add --no-cache \
     tzdata
 
 # Install Go tools for linting, static analysis, and vulnerability scanning
-RUN go install golang.org/x/tools/cmd/staticcheck@latest && \
+# staticcheck moved to its own module (honnef.co/go/tools) — not in golang.org/x/tools
+RUN go install honnef.co/go/tools/cmd/staticcheck@latest && \
     go install golang.org/x/vuln/cmd/govulncheck@latest && \
     go install github.com/trufflesecurity/trufflehog/v3@latest
 
