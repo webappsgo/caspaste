@@ -19,9 +19,13 @@ RUN apk add --no-cache \
 
 # Install Go tools for linting, static analysis, and vulnerability scanning
 # staticcheck moved to its own module (honnef.co/go/tools) — not in golang.org/x/tools
+# govulncheck is pure Go and works with CGO_ENABLED=0
 RUN go install honnef.co/go/tools/cmd/staticcheck@latest && \
-    go install golang.org/x/vuln/cmd/govulncheck@latest && \
-    go install github.com/trufflesecurity/trufflehog/v3@latest
+    go install golang.org/x/vuln/cmd/govulncheck@latest
+
+# Install trufflehog via prebuilt binary (v3 requires CGO; prebuilt avoids the dependency)
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+    | sh -s -- -b /usr/local/bin
 
 # Install Trivy for image/filesystem vulnerability scanning
 RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
