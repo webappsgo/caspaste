@@ -1,9 +1,9 @@
-# caspaste — test compose
+# caspb — test compose
 # AI/AUTOMATED TESTING ONLY — copy to temp dir before use
 # Usage (from temp dir): docker compose up -d
 # Per AI.md PART 29: AI MUST copy to temp dir and run from there
 
-name: caspaste-test
+name: caspb-test
 
 x-logging: &default-logging
   options:
@@ -12,10 +12,10 @@ x-logging: &default-logging
   driver: json-file
 
 services:
-  caspaste:
-    image: ghcr.io/casjay-forks/caspaste:latest
-    container_name: caspaste-test
-    hostname: caspaste-test
+  caspb:
+    image: ghcr.io/casjay-forks/caspb:latest
+    container_name: caspb-test
+    hostname: caspb-test
     restart: 'no'
     logging: *default-logging
     environment:
@@ -23,22 +23,22 @@ services:
       - PORT=80
       - DEBUG=false
       - TZ=UTC
-      - CASPASTE_DB_DRIVER=sqlite
+      - CASPB_DB_DRIVER=sqlite
     ports:
       - '18080:80'
     volumes:
       - './volumes/config:/config:z'
       - './volumes/data:/data:z'
     healthcheck:
-      test: /usr/local/bin/caspaste --status
+      test: /usr/local/bin/caspb --status
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
     networks:
-      - caspaste-test
+      - caspb-test
 
 networks:
-  caspaste-test:
-    name: caspaste-test
+  caspb-test:
+    name: caspb-test
     external: false

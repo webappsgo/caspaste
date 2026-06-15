@@ -34,7 +34,7 @@ type YAMLConfig struct {
 		Description string `yaml:"description"`
 
 		// API compatibility mode: native (default), lenpaste, stikked, microbin,
-		// hastebin, pastebin, termbin. Also set via CASPASTE_API_MODE env var.
+		// hastebin, pastebin, termbin. Also set via CASPB_API_MODE env var.
 		// When empty, mode is auto-detected per-request from the Host header.
 		APIMode string `yaml:"api_mode"`
 
@@ -321,7 +321,7 @@ type YAMLConfig struct {
 			Stderr bool `yaml:"stderr"`
 			// text, json (default: text)
 			Format string `yaml:"format"`
-			// Server log file (default: caspaste.log)
+			// Server log file (default: caspb.log)
 			File string `yaml:"file"`
 		} `yaml:"server"`
 
@@ -463,7 +463,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Server.Listen = "all"
 	// Empty = auto-detect available port at runtime
 	defaultConfig.Server.Port = ""
-	defaultConfig.Server.Title = "CasPaste"
+	defaultConfig.Server.Title = "CasPb"
 	defaultConfig.Server.TagLine = "A simple paste service"
 	defaultConfig.Server.Description = "CasPaste is a simple, fast, and secure paste service for sharing code snippets and text"
 
@@ -528,7 +528,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// Using modernc.org/sqlite (pure Go, no CGo)
 	// Source path is relative - converted to absolute at runtime
 	defaultConfig.Database.Driver = "sqlite"
-	defaultConfig.Database.Source = "caspaste.db"
+	defaultConfig.Database.Source = "caspb.db"
 	defaultConfig.Database.MaxOpenConns = 25
 	defaultConfig.Database.MaxIdleConns = 5
 	defaultConfig.Database.CleanupPeriod = "1m"
@@ -558,9 +558,9 @@ func GenerateDefaultYAMLConfig(path string) error {
 		"TLS_CHACHA20_POLY1305_SHA256",
 	}
 	// Auto-detected from Let's Encrypt
-	defaultConfig.Security.TLS.CertFile = "/etc/casjay-forks/caspaste/tls/cert.pem"
+	defaultConfig.Security.TLS.CertFile = "/etc/casapps/caspb/tls/cert.pem"
 	// Auto-detected from Let's Encrypt
-	defaultConfig.Security.TLS.KeyFile = "/etc/casjay-forks/caspaste/tls/key.pem"
+	defaultConfig.Security.TLS.KeyFile = "/etc/casapps/caspb/tls/key.pem"
 	
 	// Upload Security
 	// 50MB
@@ -667,12 +667,12 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// DIRECTORIES
 	// ============================================================================
 	// Platform-specific defaults
-	defaultConfig.Directories.Data = "/var/lib/casjay-forks/caspaste"
-	defaultConfig.Directories.Config = "/etc/casjay-forks/caspaste"
+	defaultConfig.Directories.Data = "/var/lib/casapps/caspb"
+	defaultConfig.Directories.Config = "/etc/casapps/caspb"
 	// Database directory - if under data dir, included in data backup
-	defaultConfig.Directories.Db = "/var/lib/casjay-forks/caspaste/db"
-	defaultConfig.Directories.Cache = "/var/cache/caspaste"
-	defaultConfig.Directories.Logs = "/var/log/casjay-forks/caspaste"
+	defaultConfig.Directories.Db = "/var/lib/casapps/caspb/db"
+	defaultConfig.Directories.Cache = "/var/cache/caspb"
+	defaultConfig.Directories.Logs = "/var/log/casapps/caspb"
 
 	// ============================================================================
 	// LOGGING
@@ -702,7 +702,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Logging.Server.Stderr = false
 	// text, json
 	defaultConfig.Logging.Server.Format = "text"
-	defaultConfig.Logging.Server.File = "caspaste.log"
+	defaultConfig.Logging.Server.File = "caspb.log"
 	
 	// Debug Log (DEBUG messages, only with --debug flag)
 	defaultConfig.Logging.Debug.Stdout = true

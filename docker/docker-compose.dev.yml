@@ -1,8 +1,8 @@
-# caspaste — development compose
+# caspb — development compose
 # Usage: docker compose -f docker/docker-compose.dev.yml up -d
 # Development compose - HUMAN USE ONLY (never used by AI)
 
-name: caspaste-dev
+name: caspb-dev
 
 x-logging: &default-logging
   options:
@@ -11,9 +11,9 @@ x-logging: &default-logging
   driver: json-file
 
 services:
-  caspaste:
-    image: ghcr.io/casjay-forks/caspaste:devel
-    container_name: caspaste-dev
+  caspb:
+    image: ghcr.io/casjay-forks/caspb:devel
+    container_name: caspb-dev
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: unless-stopped
     pull_policy: always
@@ -23,22 +23,22 @@ services:
       - PORT=80
       - DEBUG=true
       - TZ=${TZ:-America/New_York}
-      - CASPASTE_DB_DRIVER=sqlite
+      - CASPB_DB_DRIVER=sqlite
     ports:
       - '8080:80'
     volumes:
       - './volumes/config:/config:z'
       - './volumes/data:/data:z'
     healthcheck:
-      test: /usr/local/bin/caspaste --status
+      test: /usr/local/bin/caspb --status
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 60s
     networks:
-      - caspaste-dev
+      - caspb-dev
 
 networks:
-  caspaste-dev:
-    name: caspaste-dev
+  caspb-dev:
+    name: caspb-dev
     external: false

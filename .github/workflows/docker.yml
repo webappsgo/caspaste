@@ -50,8 +50,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
           annotations: |
-            org.opencontainers.image.description=CasPaste — self-hosted pastebin service
-            org.opencontainers.image.title=caspaste
+            org.opencontainers.image.description=CasPb — self-hosted pastebin service
+            org.opencontainers.image.title=caspb
             org.opencontainers.image.licenses=MIT
 
       - uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0

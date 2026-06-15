@@ -14,7 +14,7 @@ import (
 
 const (
 	projectOrg  = "casjay-forks"
-	projectName = "caspaste"
+	projectName = "caspb"
 )
 
 // IsRoot returns true if running as root/Administrator

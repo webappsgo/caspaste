@@ -2,7 +2,7 @@
 # Tests sqlite, postgres, and mariadb backends simultaneously
 # Usage: docker compose -f docker/docker-compose.dbtest.yml up
 # Cleanup: docker compose -f docker/docker-compose.dbtest.yml down -v
-name: caspaste-dbtest
+name: caspb-dbtest
 
 x-logging: &default-logging
   options:
@@ -17,9 +17,9 @@ x-app-base: &app-base
   logging: *default-logging
   environment:
     - TZ=UTC
-    - CASPASTE_DB_CLEANUP_PERIOD=1m
+    - CASPB_DB_CLEANUP_PERIOD=1m
   healthcheck:
-    test: ["CMD", "caspaste", "--status"]
+    test: ["CMD", "caspb", "--status"]
     interval: 15s
     timeout: 12s
     retries: 6
@@ -29,60 +29,60 @@ services:
   # ── SQLite (default) ──────────────────────────────────────────────────────
   app-sqlite:
     <<: *app-base
-    container_name: caspaste-dbtest-sqlite
+    container_name: caspb-dbtest-sqlite
     ports:
       - "18081:80"
     environment:
       - TZ=UTC
       - PORT=80
-      - CASPASTE_DB_CLEANUP_PERIOD=1m
-      - CASPASTE_DB_DRIVER=sqlite
+      - CASPB_DB_CLEANUP_PERIOD=1m
+      - CASPB_DB_DRIVER=sqlite
     volumes:
       - sqlite-data:/data
     networks:
-      - caspaste-dbtest
+      - caspb-dbtest
 
   # ── PostgreSQL ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: caspaste-dbtest-postgres
+    container_name: caspb-dbtest-postgres
     restart: "no"
     logging: *default-logging
     environment:
-      - POSTGRES_USER=caspaste
-      - POSTGRES_PASSWORD=caspaste
-      - POSTGRES_DB=caspaste
+      - POSTGRES_USER=caspb
+      - POSTGRES_PASSWORD=caspb
+      - POSTGRES_DB=caspb
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - caspaste-dbtest
+      - caspb-dbtest
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U caspaste"]
+      test: ["CMD-SHELL", "pg_isready -U caspb"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   app-postgres:
     <<: *app-base
-    container_name: caspaste-dbtest-app-postgres
+    container_name: caspb-dbtest-app-postgres
     ports:
       - "18082:80"
     environment:
       - TZ=UTC
       - PORT=80
-      - CASPASTE_DB_CLEANUP_PERIOD=1m
-      - CASPASTE_DB_DRIVER=postgres
-      - CASPASTE_DB_SOURCE=postgres://caspaste:caspaste@postgres:5432/caspaste?sslmode=disable
+      - CASPB_DB_CLEANUP_PERIOD=1m
+      - CASPB_DB_DRIVER=postgres
+      - CASPB_DB_SOURCE=postgres://caspb:caspb@postgres:5432/caspb?sslmode=disable
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - caspaste-dbtest
+      - caspb-dbtest
 
   # ── MariaDB ───────────────────────────────────────────────────────────────
   mariadb:
     image: mariadb:11
-    container_name: caspaste-dbtest-mariadb
+    container_name: caspb-dbtest-mariadb
     restart: "no"
     logging: *default-logging
     environment:
@@ -93,7 +93,7 @@ services:
     volumes:
       - mariadb-data:/var/lib/mysql
     networks:
-      - caspaste-dbtest
+      - caspb-dbtest
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
@@ -102,20 +102,20 @@ services:
 
   app-mariadb:
     <<: *app-base
-    container_name: caspaste-dbtest-app-mariadb
+    container_name: caspb-dbtest-app-mariadb
     ports:
       - "18083:80"
     environment:
       - TZ=UTC
       - PORT=80
-      - CASPASTE_DB_CLEANUP_PERIOD=1m
-      - CASPASTE_DB_DRIVER=mysql
-      - CASPASTE_DB_SOURCE=mariadb://caspaste:caspaste@mariadb:3306/caspaste
+      - CASPB_DB_CLEANUP_PERIOD=1m
+      - CASPB_DB_DRIVER=mysql
+      - CASPB_DB_SOURCE=mariadb://caspb:caspb@mariadb:3306/caspaste
     depends_on:
       mariadb:
         condition: service_healthy
     networks:
-      - caspaste-dbtest
+      - caspb-dbtest
 
 volumes:
   sqlite-data:
@@ -123,6 +123,6 @@ volumes:
   mariadb-data:
 
 networks:
-  caspaste-dbtest:
-    name: caspaste-dbtest
+  caspb-dbtest:
+    name: caspb-dbtest
     external: false

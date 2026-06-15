@@ -22,7 +22,7 @@ import (
 
 // Session cookie name and settings
 const (
-	sessionCookieName = "caspaste_session"
+	sessionCookieName = "caspb_session"
 	sessionDuration   = 24 * time.Hour
 )
 

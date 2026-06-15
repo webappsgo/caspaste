@@ -1,8 +1,8 @@
-# caspaste — self-hosted pastebin service
+# caspb — self-hosted pastebin service
 # nginx proxy address - http://172.17.0.1:64580
 # Production compose - HUMAN USE ONLY (never used by AI)
 
-name: caspaste
+name: caspb
 
 x-logging: &default-logging
   options:
@@ -11,9 +11,9 @@ x-logging: &default-logging
   driver: json-file
 
 services:
-  caspaste:
-    image: ghcr.io/casjay-forks/caspaste:latest
-    container_name: caspaste-app
+  caspb:
+    image: ghcr.io/casjay-forks/caspb:latest
+    container_name: caspb-app
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
     pull_policy: always
@@ -23,53 +23,53 @@ services:
       - PORT=80
       - DEBUG=false
       - TZ=${TZ:-America/New_York}
-      - CASPASTE_DB_DRIVER=postgres
-      - CASPASTE_DB_SOURCE=postgres://${DB_USER:-caspaste}:${DB_PASSWORD:-caspaste}@caspaste-db:5432/${DB_NAME:-caspaste}?sslmode=disable
-      - CASPASTE_TITLE_MAX_LENGTH=120
-      - CASPASTE_BODY_MAX_LENGTH=9999999999999999
-      - CASPASTE_MAX_PASTE_LIFETIME=unlimited
-      - CASPASTE_UI_DEFAULT_LIFETIME=never
-      - CASPASTE_UI_DEFAULT_THEME=dark
+      - CASPB_DB_DRIVER=postgres
+      - CASPB_DB_SOURCE=postgres://${DB_USER:-caspb}:${DB_PASSWORD:-caspb}@caspb-db:5432/${DB_NAME:-caspb}?sslmode=disable
+      - CASPB_TITLE_MAX_LENGTH=120
+      - CASPB_BODY_MAX_LENGTH=9999999999999999
+      - CASPB_MAX_PASTE_LIFETIME=unlimited
+      - CASPB_UI_DEFAULT_LIFETIME=never
+      - CASPB_UI_DEFAULT_THEME=dark
     volumes:
       - './volumes/config:/config:z'
       - './volumes/data:/data:z'
     ports:
       - '172.17.0.1:64580:80'
     healthcheck:
-      test: /usr/local/bin/caspaste --status
+      test: /usr/local/bin/caspb --status
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 90s
     depends_on:
-      caspaste-db:
+      caspb-db:
         condition: service_healthy
     networks:
-      - caspaste
+      - caspb
 
-  caspaste-db:
+  caspb-db:
     image: postgres:16-alpine
     pull_policy: always
-    container_name: caspaste-db
+    container_name: caspb-db
     restart: always
     logging: *default-logging
     environment:
-      - POSTGRES_DB=${DB_NAME:-caspaste}
-      - POSTGRES_USER=${DB_USER:-caspaste}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-caspaste}
+      - POSTGRES_DB=${DB_NAME:-caspb}
+      - POSTGRES_USER=${DB_USER:-caspb}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-caspb}
       - TZ=${TZ:-America/New_York}
     volumes:
-      - './volumes/data/db/postgres/caspaste:/var/lib/postgresql/data:z'
+      - './volumes/data/db/postgres/caspb:/var/lib/postgresql/data:z'
     healthcheck:
-      test: pg_isready -U caspaste -d caspaste
+      test: pg_isready -U caspb -d caspb
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
     networks:
-      - caspaste
+      - caspb
 
 networks:
-  caspaste:
-    name: caspaste
+  caspb:
+    name: caspb
     external: false

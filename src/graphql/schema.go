@@ -47,7 +47,7 @@ type Arg struct {
 	DefaultValue string   `json:"defaultValue,omitempty"`
 }
 
-// NewSchema creates and returns the CasPaste GraphQL schema
+// NewSchema creates and returns the CasPb GraphQL schema
 func NewSchema() *Schema {
 	s := &Schema{
 		types: make(map[string]*TypeDef),
@@ -296,7 +296,7 @@ func (s *Schema) typeRefToIntrospection(t *TypeRef) map[string]interface{} {
 
 // GetSDL returns the schema in SDL format
 func (s *Schema) GetSDL() string {
-	sdl := `# CasPaste GraphQL Schema
+	sdl := `# CasPb GraphQL Schema
 # Generated from code - do not edit manually
 
 type Query {

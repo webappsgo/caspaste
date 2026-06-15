@@ -43,8 +43,8 @@ func DefaultConfig(version string) Config {
 		CurrentVersion: version,
 		Branch:         "stable",
 		GithubOwner:    "casjay-forks",
-		GithubRepo:     "caspaste",
-		BinaryName:     "caspaste",
+		GithubRepo:     "caspb",
+		BinaryName:     "caspb",
 	}
 }
 

@@ -31,11 +31,11 @@ On EVERY new conversation or after "context compacted" message:
 
 ## Key Project Info (from IDEA.md)
 
-- **project_name**: caspaste
+- **project_name**: caspb
 - **project_org**: casapps
-- **internal_name**: caspaste (FROZEN)
-- **binary_name**: caspaste
-- **cli_binary_name**: caspaste-cli
+- **internal_name**: caspb
+- **binary_name**: caspb
+- **cli_binary_name**: caspb-cli
 - **admin_path**: admin (default)
 - **default_port**: 80
 - **official_site**: https://pste.us

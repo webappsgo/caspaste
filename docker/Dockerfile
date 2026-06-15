@@ -26,7 +26,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
       -X 'main.CommitID=${COMMIT_ID}' \
       -X 'main.BuildDate=${BUILD_DATE}' \
       -X 'main.OfficialSite=${OFFICIAL_SITE}'" \
-    -o /app/binary/caspaste ./src/server
+    -o /app/binary/caspb ./src/server
 
 # =============================================================================
 # Runtime Stage — Minimal Alpine image
@@ -56,7 +56,7 @@ RUN apk add --no-cache \
 # Docker volume mounts auto-create mount points
 
 # Copy server binary from builder stage (standard image = server only, per AI.md PART 27)
-COPY --from=builder /app/binary/caspaste /usr/local/bin/caspaste
+COPY --from=builder /app/binary/caspb /usr/local/bin/caspb
 
 # Copy build-time overlay (entrypoint.sh) from docker/rootfs/ into image
 COPY docker/rootfs/ /
@@ -82,7 +82,7 @@ STOPSIGNAL SIGRTMIN+3
 
 # Health check (long start period for services that need initialization)
 HEALTHCHECK --start-period=10m --interval=5m --timeout=15s --retries=3 \
-    CMD /usr/local/bin/caspaste --status || exit 1
+    CMD /usr/local/bin/caspb --status || exit 1
 
 # Use tini as init with signal propagation
 # -p SIGTERM: propagate SIGTERM to child processes

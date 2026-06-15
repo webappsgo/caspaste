@@ -56,7 +56,7 @@ var (
 	// Application metrics (REQUIRED per AI.md PART 21)
 	AppInfo = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "caspaste_app_info",
+			Name: "caspb_app_info",
 			Help: "Application information",
 		},
 		[]string{"version", "commit", "build_date", "go_version"},
@@ -64,14 +64,14 @@ var (
 
 	AppUptime = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_app_uptime_seconds",
+			Name: "caspb_app_uptime_seconds",
 			Help: "Application uptime in seconds",
 		},
 	)
 
 	AppStartTime = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_app_start_timestamp",
+			Name: "caspb_app_start_timestamp",
 			Help: "Application start timestamp",
 		},
 	)
@@ -79,7 +79,7 @@ var (
 	// HTTP metrics (REQUIRED per AI.md PART 21)
 	HTTPRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_http_requests_total",
+			Name: "caspb_http_requests_total",
 			Help: "Total number of HTTP requests",
 		},
 		[]string{"method", "path", "status"},
@@ -87,7 +87,7 @@ var (
 
 	HTTPRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "caspaste_http_request_duration_seconds",
+			Name:    "caspb_http_request_duration_seconds",
 			Help:    "HTTP request duration in seconds",
 			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		},
@@ -96,7 +96,7 @@ var (
 
 	HTTPRequestSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "caspaste_http_request_size_bytes",
+			Name:    "caspb_http_request_size_bytes",
 			Help:    "HTTP request size in bytes",
 			Buckets: []float64{100, 1000, 10000, 100000, 1000000, 10000000},
 		},
@@ -105,7 +105,7 @@ var (
 
 	HTTPResponseSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "caspaste_http_response_size_bytes",
+			Name:    "caspb_http_response_size_bytes",
 			Help:    "HTTP response size in bytes",
 			Buckets: []float64{100, 1000, 10000, 100000, 1000000, 10000000},
 		},
@@ -114,7 +114,7 @@ var (
 
 	HTTPActiveRequests = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_http_active_requests",
+			Name: "caspb_http_active_requests",
 			Help: "Number of active HTTP requests",
 		},
 	)
@@ -122,7 +122,7 @@ var (
 	// Database metrics (REQUIRED per AI.md PART 21)
 	DBQueriesTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_db_queries_total",
+			Name: "caspb_db_queries_total",
 			Help: "Total number of database queries",
 		},
 		[]string{"operation", "table"},
@@ -130,7 +130,7 @@ var (
 
 	DBQueryDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "caspaste_db_query_duration_seconds",
+			Name:    "caspb_db_query_duration_seconds",
 			Help:    "Database query duration in seconds",
 			Buckets: []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1},
 		},
@@ -139,21 +139,21 @@ var (
 
 	DBConnectionsOpen = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_db_connections_open",
+			Name: "caspb_db_connections_open",
 			Help: "Number of open database connections",
 		},
 	)
 
 	DBConnectionsInUse = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_db_connections_in_use",
+			Name: "caspb_db_connections_in_use",
 			Help: "Number of database connections in use",
 		},
 	)
 
 	DBErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_db_errors_total",
+			Name: "caspb_db_errors_total",
 			Help: "Total number of database errors",
 		},
 		[]string{"operation", "error_type"},
@@ -162,7 +162,7 @@ var (
 	// Authentication metrics (REQUIRED per AI.md PART 21)
 	AuthAttempts = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_auth_attempts_total",
+			Name: "caspb_auth_attempts_total",
 			Help: "Total authentication attempts",
 		},
 		[]string{"method", "status"},
@@ -170,7 +170,7 @@ var (
 
 	AuthSessionsActive = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_auth_sessions_active",
+			Name: "caspb_auth_sessions_active",
 			Help: "Number of active sessions",
 		},
 	)
@@ -178,7 +178,7 @@ var (
 	// Cache metrics (optional)
 	CacheHits = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_cache_hits_total",
+			Name: "caspb_cache_hits_total",
 			Help: "Total number of cache hits",
 		},
 		[]string{"cache"},
@@ -186,7 +186,7 @@ var (
 
 	CacheMisses = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_cache_misses_total",
+			Name: "caspb_cache_misses_total",
 			Help: "Total number of cache misses",
 		},
 		[]string{"cache"},
@@ -194,7 +194,7 @@ var (
 
 	CacheEvictions = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_cache_evictions_total",
+			Name: "caspb_cache_evictions_total",
 			Help: "Total number of cache evictions",
 		},
 		[]string{"cache"},
@@ -202,7 +202,7 @@ var (
 
 	CacheSize = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "caspaste_cache_size",
+			Name: "caspb_cache_size",
 			Help: "Current cache size (items)",
 		},
 		[]string{"cache"},
@@ -210,7 +210,7 @@ var (
 
 	CacheBytes = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "caspaste_cache_bytes",
+			Name: "caspb_cache_bytes",
 			Help: "Current cache size (bytes)",
 		},
 		[]string{"cache"},
@@ -219,7 +219,7 @@ var (
 	// Rate limiting metrics
 	RateLimitRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_ratelimit_requests_total",
+			Name: "caspb_ratelimit_requests_total",
 			Help: "Total rate-limited requests",
 		},
 		[]string{"limit", "status"},
@@ -227,7 +227,7 @@ var (
 
 	RateLimitBlockedTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "caspaste_ratelimit_blocked_total",
+			Name: "caspb_ratelimit_blocked_total",
 			Help: "Requests blocked by rate limiter",
 		},
 		[]string{"limit"},
@@ -236,35 +236,35 @@ var (
 	// Go runtime metrics (if include_runtime: true)
 	GoGoroutines = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_go_goroutines",
+			Name: "caspb_go_goroutines",
 			Help: "Current number of goroutines",
 		},
 	)
 
 	GoMemAllocBytes = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_go_mem_alloc_bytes",
+			Name: "caspb_go_mem_alloc_bytes",
 			Help: "Bytes allocated and in use (heap)",
 		},
 	)
 
 	GoMemSysBytes = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_go_mem_sys_bytes",
+			Name: "caspb_go_mem_sys_bytes",
 			Help: "Total bytes obtained from system",
 		},
 	)
 
 	GoGCRunsTotal = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "caspaste_go_gc_runs_total",
+			Name: "caspb_go_gc_runs_total",
 			Help: "Total garbage collection runs",
 		},
 	)
 
 	GoGCPauseTotalSeconds = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "caspaste_go_gc_pause_total_seconds",
+			Name: "caspb_go_gc_pause_total_seconds",
 			Help: "Total time spent in GC pauses",
 		},
 	)
@@ -272,28 +272,28 @@ var (
 	// Paste-specific metrics
 	PastesTotal = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_pastes_total",
+			Name: "caspb_pastes_total",
 			Help: "Total number of pastes",
 		},
 	)
 
 	PastesCreatedTotal = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "caspaste_pastes_created_total",
+			Name: "caspb_pastes_created_total",
 			Help: "Total number of pastes created",
 		},
 	)
 
 	PastesDeletedTotal = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "caspaste_pastes_deleted_total",
+			Name: "caspb_pastes_deleted_total",
 			Help: "Total number of pastes deleted",
 		},
 	)
 
 	PastesBytesTotal = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "caspaste_pastes_bytes_total",
+			Name: "caspb_pastes_bytes_total",
 			Help: "Total bytes of all pastes",
 		},
 	)

@@ -39,7 +39,7 @@ func (data *Data) handleServerInfo(rw http.ResponseWriter, req *http.Request) er
 
 	// Prepare data
 	serverInfo := serverInfoType{
-		Software:          "CasPaste",
+		Software:          "CasPb",
 		Version:           data.Version,
 		TitleMaxLen:       data.TitleMaxLen,
 		BodyMaxLen:        data.BodyMaxLen,

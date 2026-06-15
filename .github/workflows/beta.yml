@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  PROJECTNAME: caspaste
+  PROJECTNAME: caspb
 
 jobs:
   ensure-build-image:

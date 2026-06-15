@@ -4,13 +4,13 @@
 // See LICENSE.md file for details.
 
 // Package compat provides per-request API compatibility shims that let existing
-// tooling built against Lenpaste, Stikked, Microbin, or Hastebin talk to CasPaste
+// tooling built against Lenpaste, Stikked, Microbin, or Hastebin talk to CasPb
 // without modification.
 //
 // Mode selection order (first match wins):
-//  1. CASPASTE_API_MODE env var (set once at startup)
+//  1. CASPB_API_MODE env var (set once at startup)
 //  2. Host header pattern matching (per-request)
-//  3. Native CasPaste API (default, no interception)
+//  3. Native CasPb API (default, no interception)
 package compat
 
 import (
@@ -28,7 +28,7 @@ import (
 type Mode string
 
 const (
-	// ModeNative passes requests through to the CasPaste native API unchanged.
+	// ModeNative passes requests through to the CasPb native API unchanged.
 	ModeNative   Mode = "native"
 	ModeLenpaste Mode = "lenpaste"
 	ModeStikked  Mode = "stikked"
@@ -43,10 +43,10 @@ type Data struct {
 	DB  storage.DB
 	Log logger.Logger
 
-	// EnvMode is the mode set by CASPASTE_API_MODE.
+	// EnvMode is the mode set by CASPB_API_MODE.
 	EnvMode Mode
 	// ForceHost, when true (default), makes the Host header override EnvMode.
-	// Set CASPASTE_FORCE_HOST=no to make EnvMode take precedence.
+	// Set CASPB_FORCE_HOST=no to make EnvMode take precedence.
 	ForceHost bool
 
 	// RateLimitNew rate-limits paste creation for all compat endpoints.
@@ -69,12 +69,12 @@ type Data struct {
 // Load constructs a Data from the environment and provided fields.
 // Call once at server startup.
 func Load(db storage.DB, log logger.Logger, rateLimitNew *netshare.RateLimitSystem, version, baseURL, title, adminName, adminMail, about, rules string, titleMax, bodyMax int, maxLife int64) *Data {
-	envMode := normalizeMode(os.Getenv("CASPASTE_API_MODE"))
+	envMode := normalizeMode(os.Getenv("CASPB_API_MODE"))
 
-	// CASPASTE_FORCE_HOST controls whether the Host header overrides the env mode.
+	// CASPB_FORCE_HOST controls whether the Host header overrides the env mode.
 	// Default: yes (host header wins). Set to "no"/"false"/"0" to let env mode win.
 	forceHost := true
-	if fh := strings.ToLower(strings.TrimSpace(os.Getenv("CASPASTE_FORCE_HOST"))); fh == "no" || fh == "false" || fh == "0" {
+	if fh := strings.ToLower(strings.TrimSpace(os.Getenv("CASPB_FORCE_HOST"))); fh == "no" || fh == "false" || fh == "0" {
 		forceHost = false
 	}
 

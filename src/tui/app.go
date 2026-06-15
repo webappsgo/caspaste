@@ -159,7 +159,7 @@ func (m AppModel) headerView() string {
 	title := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("205")).
-		Render("CASPASTE")
+		Render("CASPB")
 
 	server := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
@@ -249,7 +249,7 @@ func (m AppModel) settingsView() string {
 		b.WriteString("API Token: (not configured)\n")
 	}
 
-	b.WriteString("\n" + subtitleStyle.Render("Edit ~/.config/casjay-forks/caspaste/cli.yml to change settings"))
+	b.WriteString("\n" + subtitleStyle.Render("Edit ~/.config/casapps/caspb/cli.yml to change settings"))
 
 	return b.String()
 }

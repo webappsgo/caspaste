@@ -148,7 +148,7 @@ func (d *Data) pastebinList(rw http.ResponseWriter, req *http.Request) {
 }
 
 // pastebinTrends handles api_option=trends.
-// CasPaste has no hit counter, so trending == recent.
+// CasPb has no hit counter, so trending == recent.
 func (d *Data) pastebinTrends(rw http.ResponseWriter, req *http.Request) {
 	pastes, err := d.DB.PasteList(18, 0)
 	if err != nil {

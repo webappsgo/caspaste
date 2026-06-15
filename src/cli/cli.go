@@ -19,14 +19,14 @@ func exitOnError(msg string) {
 	os.Exit(1)
 }
 
-// getEnvVar attempts to read a CASPASTE_* environment variable.
+// getEnvVar attempts to read a CASPB_* environment variable.
 // Returns the value and true if found, empty string and false otherwise.
 func getEnvVar(name string) (string, bool) {
 	// Convert flag name to environment variable format
 	// Example: "db-driver" -> "DB_DRIVER"
 	envName := strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
 
-	if val := os.Getenv("CASPASTE_" + envName); val != "" {
+	if val := os.Getenv("CASPB_" + envName); val != "" {
 		return val, true
 	}
 
@@ -251,7 +251,7 @@ func (c *CLI) Parse() {
 	readVars := make(map[string]struct{})
 
 	// Read variables from environment variables first
-	// Read CASPASTE_* environment variables
+	// Read CASPB_* environment variables
 	for i := range c.vars {
 		v := &c.vars[i]
 		if envVal, found := getEnvVar(v.name); found {

@@ -287,7 +287,7 @@ func PathSecurityMiddleware(next http.Handler) http.Handler {
 }
 
 // UserContextKey is the context key for the (optional) authenticated user.
-// CasPaste is an anonymous pastebin; this exists only so templates that
+// CasPb is an anonymous pastebin; this exists only so templates that
 // already reference .User keep working — GetAuthUser will always return nil
 // in the anonymous flow.
 type UserContextKey struct{}

@@ -26,14 +26,14 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
       -X 'main.Version=${VERSION}' \
       -X 'main.CommitID=${COMMIT_ID}' \
       -X 'main.BuildDate=${BUILD_DATE}'" \
-    -o /app/binary/caspaste ./src/server
+    -o /app/binary/caspb ./src/server
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -ldflags "-s -w \
       -X 'main.Version=${VERSION}' \
       -X 'main.CommitID=${COMMIT_ID}' \
       -X 'main.BuildDate=${BUILD_DATE}'" \
-    -o /app/binary/caspaste-cli ./src/client
+    -o /app/binary/caspb-cli ./src/client
 
 # =============================================================================
 # Runtime Stage — Minimal Alpine image (development mode)
@@ -47,8 +47,8 @@ RUN apk add --no-cache \
     tini \
     tor
 
-COPY --from=builder /app/binary/caspaste /usr/local/bin/caspaste
-COPY --from=builder /app/binary/caspaste-cli /usr/local/bin/caspaste-cli
+COPY --from=builder /app/binary/caspb /usr/local/bin/caspb
+COPY --from=builder /app/binary/caspb-cli /usr/local/bin/caspb-cli
 COPY docker/rootfs/ /
 COPY docker/Dockerfile.dev /root/Dockerfile
 
@@ -65,6 +65,6 @@ EXPOSE 80
 STOPSIGNAL SIGRTMIN+3
 
 HEALTHCHECK --start-period=5m --interval=2m --timeout=15s --retries=3 \
-    CMD /usr/local/bin/caspaste --status || exit 1
+    CMD /usr/local/bin/caspb --status || exit 1
 
 ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]

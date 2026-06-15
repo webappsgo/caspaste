@@ -17,7 +17,7 @@ import (
 
 // adminSessionCookieName is the cookie used for admin sessions.
 // Deliberately different from the public-site session cookie.
-const adminSessionCookieName = "caspaste_admin"
+const adminSessionCookieName = "caspb_admin"
 
 const adminSessionDuration = 30 * 24 * time.Hour
 

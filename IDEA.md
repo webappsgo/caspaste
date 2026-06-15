@@ -4,15 +4,15 @@ CasPaste is a self-hosted, privacy-focused pastebin service with URL shortening 
 
 ## Project variables
 
-project_name:     caspaste
+project_name:     caspb
 project_org:      casapps
-internal_name:    caspaste
-app_name:         CasPaste
+internal_name:    caspb
+app_name:         CasPb
 official_site:    https://pste.us
 maintainer_name:  CasjaysDev
 maintainer_email: casjay@yahoo.com
-binary_name:      caspaste
-cli_binary_name:  caspaste-cli
+binary_name:      caspb
+cli_binary_name:  caspb-cli
 default_port:     80
 
 ## Business logic

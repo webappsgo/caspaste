@@ -203,7 +203,7 @@ func (p *Panel) apiLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logFile := p.cfg.DataDir + "/logs/caspaste.log"
+	logFile := p.cfg.DataDir + "/logs/caspb.log"
 	tail, err := tailFile(logFile, n)
 	if err != nil {
 		jsonErr(w, http.StatusInternalServerError, err.Error())

@@ -311,7 +311,7 @@ func (p *Panel) handleSchedulerPost(w http.ResponseWriter, r *http.Request) {
 // handleLogs renders the application log page
 func (p *Panel) handleLogs(w http.ResponseWriter, r *http.Request) {
 	var content strings.Builder
-	logFile := filepath.Join(p.cfg.DataDir, "logs", "caspaste.log")
+	logFile := filepath.Join(p.cfg.DataDir, "logs", "caspb.log")
 	tail, err := tailFile(logFile, 200)
 	if err != nil {
 		content.WriteString(fmt.Sprintf(`<p class="muted">Log file unavailable: %s</p>`, template.HTMLEscapeString(err.Error())))

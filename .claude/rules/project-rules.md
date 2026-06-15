@@ -27,13 +27,13 @@ Full spec: AI.md PART 2, PART 3, PART 4
 
 ## Project Variables (from IDEA.md)
 
-- project_name: caspaste
+- project_name: caspb
 - project_org: casapps (github: casjay-forks)
-- internal_name: caspaste (FROZEN — never change)
-- binary_name: caspaste
-- cli_binary_name: caspaste-cli
-- config_dir: /etc/casjay-forks/caspaste
-- data_dir: /var/lib/casjay-forks/caspaste
+- internal_name: caspb
+- binary_name: caspb
+- cli_binary_name: caspb-cli
+- config_dir: /etc/casapps/caspb
+- data_dir: /var/lib/casapps/caspb
 
 ## Key Directory Rules
 
@@ -61,11 +61,11 @@ Full spec: AI.md PART 2, PART 3, PART 4
 
 ## Container Paths
 
-- Config: /config/caspaste/
-- Data: /data/caspaste/
-- Logs: /data/log/caspaste/
+- Config: /config/caspb/
+- Data: /data/caspb/
+- Logs: /data/log/caspb/
 - SQLite: /data/db/sqlite/server.db
-- Backups: /data/backups/caspaste/
+- Backups: /data/backups/caspb/
 
 ## Temp Directory Pattern (REQUIRED)
 

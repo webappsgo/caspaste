@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Incus integration tests for CasPaste (Debian + systemd)
+# Incus integration tests for CasPb (Debian + systemd)
 # Per AI.md PART 29: tests/incus.sh — full OS testing preferred
 # All builds via Docker (casjaysdev/go:latest), never on host
 

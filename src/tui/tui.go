@@ -238,7 +238,7 @@ func (m SetupModel) testConnection() tea.Cmd {
 		}
 
 		if healthResp.Version != "" {
-			return testResultMsg{result: fmt.Sprintf("Connected to CasPaste %s (status: %s)", healthResp.Version, healthResp.Status)}
+			return testResultMsg{result: fmt.Sprintf("Connected to CasPb %s (status: %s)", healthResp.Version, healthResp.Status)}
 		}
 		return testResultMsg{result: fmt.Sprintf("Connected (status: %s)", healthResp.Status)}
 	}
@@ -249,7 +249,7 @@ func (m SetupModel) View() string {
 	var b strings.Builder
 
 	// Title
-	title := titleStyle.Render("CASPASTE CLI SETUP")
+	title := titleStyle.Render("CASPB CLI SETUP")
 	subtitle := subtitleStyle.Render("Configure your server connection")
 
 	b.WriteString(title + "\n")

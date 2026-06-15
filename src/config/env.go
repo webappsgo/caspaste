@@ -36,7 +36,7 @@ func isValidDomain(s string) bool {
 	return err == nil
 }
 
-// parseAddress intelligently parses CASPASTE_ADDRESS to extract FQDN, listen, and port
+// parseAddress intelligently parses CASPB_ADDRESS to extract FQDN, listen, and port
 // Examples:
 //   - ":8080"                    → port=8080
 //   - "pastebin.example.com:80"  → fqdn=pastebin.example.com, port=80
@@ -104,9 +104,9 @@ func parseAddress(addr string) (fqdn, listen, port string) {
 	return
 }
 
-// getEnv gets CASPASTE_* environment variables
+// getEnv gets CASPB_* environment variables
 func getEnv(name string) string {
-	return os.Getenv("CASPASTE_" + name)
+	return os.Getenv("CASPB_" + name)
 }
 
 // ApplyEnvironmentOverrides applies environment variables to config
@@ -114,10 +114,10 @@ func getEnv(name string) string {
 func ApplyEnvironmentOverrides(cfg *YAMLConfig) {
 	// Smart ADDRESS parsing - single env var to set fqdn, listen, and/or port
 	// Examples:
-	//   CASPASTE_ADDRESS=:8080                    → port=8080
-	//   CASPASTE_ADDRESS=pastebin.example.com:80 → fqdn=pastebin.example.com, port=80
-	//   CASPASTE_ADDRESS=127.0.0.1               → listen=127.0.0.1
-	//   CASPASTE_ADDRESS=172.17.0.1:8091         → listen=172.17.0.1, port=8091
+	//   CASPB_ADDRESS=:8080                    → port=8080
+	//   CASPB_ADDRESS=pastebin.example.com:80 → fqdn=pastebin.example.com, port=80
+	//   CASPB_ADDRESS=127.0.0.1               → listen=127.0.0.1
+	//   CASPB_ADDRESS=172.17.0.1:8091         → listen=172.17.0.1, port=8091
 	if val := getEnv("ADDRESS"); val != "" {
 		fqdn, listen, port := parseAddress(val)
 		if fqdn != "" {

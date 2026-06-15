@@ -11,7 +11,7 @@ import (
 	"github.com/casjay-forks/caspaste/src/netshare"
 )
 
-const Software = "CasPaste"
+const Software = "CasPb"
 
 // Default API and admin path values
 const (

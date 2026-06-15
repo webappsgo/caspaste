@@ -13,9 +13,9 @@ import (
 )
 
 // ProjectName is used for client detection
-const ProjectName = "caspaste"
+const ProjectName = "caspb"
 
-// IsOurCliClient detects our own client binary (caspaste-cli)
+// IsOurCliClient detects our own client binary (caspb-cli)
 // Client is INTERACTIVE (TUI/GUI) - receives JSON, renders itself
 func IsOurCliClient(r *http.Request) bool {
 	ua := r.Header.Get("User-Agent")

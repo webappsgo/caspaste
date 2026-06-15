@@ -1,4 +1,4 @@
-# CasPaste
+# CasPb
 
 A self-hosted, privacy-focused pastebin service for sharing text snippets, code, files, and short URLs. Single static binary, all assets embedded, zero external runtime dependencies.
 
@@ -19,35 +19,35 @@ Download the latest release from [GitHub Releases](https://github.com/casjay-for
 
 | Arch | Binary |
 |------|--------|
-| amd64 | `caspaste-linux-amd64` |
-| arm64 | `caspaste-linux-arm64` |
+| amd64 | `caspb-linux-amd64` |
+| arm64 | `caspb-linux-arm64` |
 
 ```bash
 ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspaste-linux-${ARCH}" \
-  -o /usr/local/bin/caspaste && chmod +x /usr/local/bin/caspaste
+curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspb-linux-${ARCH}" \
+  -o /usr/local/bin/caspb && chmod +x /usr/local/bin/caspb
 ```
 
 ### macOS
 
 | Arch | Binary |
 |------|--------|
-| Intel (x86_64) | `caspaste-darwin-amd64` |
-| Apple Silicon (arm64) | `caspaste-darwin-arm64` |
+| Intel (x86_64) | `caspb-darwin-amd64` |
+| Apple Silicon (arm64) | `caspb-darwin-arm64` |
 
 ```bash
 ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspaste-darwin-${ARCH}" \
-  -o /usr/local/bin/caspaste && chmod +x /usr/local/bin/caspaste
-xattr -d com.apple.quarantine /usr/local/bin/caspaste 2>/dev/null || true
+curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspb-darwin-${ARCH}" \
+  -o /usr/local/bin/caspb && chmod +x /usr/local/bin/caspb
+xattr -d com.apple.quarantine /usr/local/bin/caspb 2>/dev/null || true
 ```
 
 ### Windows
 
 | Arch | Binary |
 |------|--------|
-| amd64 | `caspaste-windows-amd64.exe` |
-| arm64 | `caspaste-windows-arm64.exe` |
+| amd64 | `caspb-windows-amd64.exe` |
+| arm64 | `caspb-windows-arm64.exe` |
 
 Download and add to `%PATH%`.
 
@@ -55,23 +55,23 @@ Download and add to `%PATH%`.
 
 | Arch | Binary |
 |------|--------|
-| amd64 | `caspaste-freebsd-amd64` |
-| arm64 | `caspaste-freebsd-arm64` |
+| amd64 | `caspb-freebsd-amd64` |
+| arm64 | `caspb-freebsd-arm64` |
 
 ```bash
 ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspaste-freebsd-${ARCH}" \
-  -o /usr/local/bin/caspaste && chmod +x /usr/local/bin/caspaste
+curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspb-freebsd-${ARCH}" \
+  -o /usr/local/bin/caspb && chmod +x /usr/local/bin/caspb
 ```
 
-### CLI Client (caspaste-cli)
+### CLI Client (caspb-cli)
 
-The CLI client is released alongside the server under the same naming convention (`caspaste-cli-{os}-{arch}`). Example for Linux:
+The CLI client is released alongside the server under the same naming convention (`caspb-cli-{os}-{arch}`). Example for Linux:
 
 ```bash
 ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspaste-cli-linux-${ARCH}" \
-  -o /usr/local/bin/caspaste-cli && chmod +x /usr/local/bin/caspaste-cli
+curl -LSsf "https://github.com/casjay-forks/caspaste/releases/latest/download/caspb-cli-linux-${ARCH}" \
+  -o /usr/local/bin/caspb-cli && chmod +x /usr/local/bin/caspb-cli
 ```
 
 ---
@@ -85,9 +85,9 @@ docker compose up -d
 **`docker/docker-compose.yml`** (production defaults):
 
 ```yaml
-name: caspaste
+name: caspb
 services:
-  caspaste:
+  caspb:
     image: ghcr.io/casjay-forks/caspaste:latest
     restart: always
     pull_policy: always
@@ -104,9 +104,9 @@ services:
 **With PostgreSQL:**
 
 ```yaml
-name: caspaste
+name: caspb
 services:
-  caspaste:
+  caspb:
     image: ghcr.io/casjay-forks/caspaste:latest
     restart: always
     pull_policy: always
@@ -118,19 +118,19 @@ services:
     environment:
       - TZ=America/New_York
       - MODE=production
-      - CASPASTE_DB_DRIVER=postgres
-      - CASPASTE_DB_SOURCE=postgres://caspaste:changeme@caspaste-db:5432/caspaste?sslmode=disable
+      - CASPB_DB_DRIVER=postgres
+      - CASPB_DB_SOURCE=postgres://caspb:changeme@caspb-db:5432/caspb?sslmode=disable
 
-  caspaste-db:
+  caspb-db:
     image: postgres:16-alpine
     restart: always
     pull_policy: always
     environment:
-      - POSTGRES_DB=caspaste
-      - POSTGRES_USER=caspaste
+      - POSTGRES_DB=caspb
+      - POSTGRES_USER=caspb
       - POSTGRES_PASSWORD=changeme
     volumes:
-      - ./volumes/data/db/postgres/caspaste:/var/lib/postgresql/data:z
+      - ./volumes/data/db/postgres/caspb:/var/lib/postgresql/data:z
 ```
 
 ---
@@ -139,25 +139,25 @@ services:
 
 ```bash
 # Point at your instance
-export CASPASTE_SERVER=https://pste.us
+export CASPB_SERVER=https://pste.us
 
 # Create a paste from stdin
-echo "Hello World" | caspaste-cli new
+echo "Hello World" | caspb-cli new
 
 # Create from a file with syntax highlighting
-caspaste-cli new -f script.py -s python
+caspb-cli new -f script.py -s python
 
 # Get a paste
-caspaste-cli get abc123
+caspb-cli get abc123
 
 # List recent pastes
-caspaste-cli list
+caspb-cli list
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--server`, `-s` | Server URL (env: `CASPASTE_SERVER`) |
-| `--token`, `-t` | API token (env: `CASPASTE_TOKEN`) |
+| `--server`, `-s` | Server URL (env: `CASPB_SERVER`) |
+| `--token`, `-t` | API token (env: `CASPB_TOKEN`) |
 | `--syntax` | Syntax language (default: auto-detect) |
 | `--private` | Create as private paste |
 | `--one-use` | Burn after reading |
@@ -169,37 +169,37 @@ caspaste-cli list
 
 ```bash
 # Start server (auto-generates config on first run)
-caspaste
+caspb
 
 # Specify directories
-caspaste --port 8080 \
-  --data /var/lib/casjay-forks/caspaste \
-  --config /etc/casjay-forks/caspaste
+caspb --port 8080 \
+  --data /var/lib/casapps/caspb \
+  --config /etc/casapps/caspb
 ```
 
 ### Service Management
 
 ```bash
 # Install as system service (auto-detects systemd / launchd / Windows Service / rc.d)
-sudo caspaste --service install
-sudo caspaste --service start
-sudo caspaste --service stop
-sudo caspaste --service status
-sudo caspaste --service uninstall
+sudo caspb --service install
+sudo caspb --service start
+sudo caspb --service stop
+sudo caspb --service status
+sudo caspb --service uninstall
 ```
 
 ### Health Check
 
 ```bash
-caspaste --status
+caspb --status
 # Exit codes: 0=healthy, 1=unhealthy, 2=degraded
 ```
 
 ### Backup & Restore
 
 ```bash
-caspaste --maintenance backup
-caspaste --maintenance restore
+caspb --maintenance backup
+caspb --maintenance restore
 ```
 
 ---
@@ -244,11 +244,11 @@ Existing clients for other paste services work without modification — just cha
 | sprunge.us | Always active (POST `/sprunge`) |
 | ix.io | Always active (POST `/ix`) |
 | termbin.com | Always active (POST `/termbin`) |
-| hastebin | Host `haste.*` or `CASPASTE_API_MODE=hastebin` |
-| pastebin.com | Host `pb.*` or `CASPASTE_API_MODE=pastebin` |
-| stikked | Host `sk.*` or `CASPASTE_API_MODE=stikked` |
-| microbin | Host `mb.*` or `CASPASTE_API_MODE=microbin` |
-| lenpaste | Host `lp.*` or `CASPASTE_API_MODE=lenpaste` |
+| hastebin | Host `haste.*` or `CASPB_API_MODE=hastebin` |
+| pastebin.com | Host `pb.*` or `CASPB_API_MODE=pastebin` |
+| stikked | Host `sk.*` or `CASPB_API_MODE=stikked` |
+| microbin | Host `mb.*` or `CASPB_API_MODE=microbin` |
+| lenpaste | Host `lp.*` or `CASPB_API_MODE=lenpaste` |
 
 ---
 
@@ -260,21 +260,21 @@ Configuration is auto-generated on first run. Command-line flags and environment
 
 | Variable | Description |
 |----------|-------------|
-| `CASPASTE_ADDRESS` | Listen address (e.g. `:8080`, `0.0.0.0:80`) |
-| `CASPASTE_PORT` | Listen port |
-| `CASPASTE_PUBLIC` | `true` = open, `false` = password required |
-| `CASPASTE_CONFIG_DIR` | Config directory |
-| `CASPASTE_DATA_DIR` | Data directory |
-| `CASPASTE_DB_DIR` | Database directory |
-| `CASPASTE_BACKUP_DIR` | Backup directory |
-| `CASPASTE_DB_DRIVER` | `sqlite` (default), `postgres`, `mysql` |
-| `CASPASTE_DB_SOURCE` | Connection string or SQLite filename |
+| `CASPB_ADDRESS` | Listen address (e.g. `:8080`, `0.0.0.0:80`) |
+| `CASPB_PORT` | Listen port |
+| `CASPB_PUBLIC` | `true` = open, `false` = password required |
+| `CASPB_CONFIG_DIR` | Config directory |
+| `CASPB_DATA_DIR` | Data directory |
+| `CASPB_DB_DIR` | Database directory |
+| `CASPB_BACKUP_DIR` | Backup directory |
+| `CASPB_DB_DRIVER` | `sqlite` (default), `postgres`, `mysql` |
+| `CASPB_DB_SOURCE` | Connection string or SQLite filename |
 
 ### Authentication (Private Mode)
 
 ```bash
 # Require password for all access
-CASPASTE_PUBLIC=false caspaste
+CASPB_PUBLIC=false caspb
 ```
 
 On first run in private mode, a setup token is printed to stdout. Visit `/server/admin/config/setup` to create the admin account.
@@ -283,9 +283,9 @@ On first run in private mode, a setup token is printed to stdout. Visit `/server
 
 | Directory | Linux (root) | Linux (user) | macOS |
 |-----------|-------------|--------------|-------|
-| Config | `/etc/casjay-forks/caspaste` | `~/.config/casjay-forks/caspaste` | `~/Library/Application Support/CasPaste/Config` |
-| Data | `/var/lib/casjay-forks/caspaste` | `~/.local/share/casjay-forks/caspaste` | `~/Library/Application Support/CasPaste` |
-| Logs | `/var/log/casjay-forks/caspaste` | `~/.local/log/casjay-forks/caspaste` | `~/Library/Logs/CasPaste` |
+| Config | `/etc/casapps/caspb` | `~/.config/casapps/caspb` | `~/Library/Application Support/CasPb/Config` |
+| Data | `/var/lib/casapps/caspb` | `~/.local/share/casapps/caspb` | `~/Library/Application Support/CasPb` |
+| Logs | `/var/log/casapps/caspb` | `~/.local/log/casapps/caspb` | `~/Library/Logs/CasPb` |
 
 ---
 
@@ -293,7 +293,7 @@ On first run in private mode, a setup token is printed to stdout. Visit `/server
 
 ```bash
 git clone https://github.com/casjay-forks/caspaste.git
-cd caspaste
+cd caspb
 ```
 
 ### Makefile Targets

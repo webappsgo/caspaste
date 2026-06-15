@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Docker integration tests for CasPaste
+# Docker integration tests for CasPb
 # Per AI.md PART 29: tests/docker.sh — runs in Alpine, no systemd
 # All builds via Docker (casjaysdev/go:latest), never on host
 

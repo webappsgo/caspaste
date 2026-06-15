@@ -214,7 +214,7 @@ func (p *Panel) buildLayout(pd pageData, content template.HTML) string {
 	// Build sidebar nav links with active-state marker
 	nav := p.buildSidebarNav(pd.Page, base, pd.AdminUsername)
 
-	serverTitle := "CasPaste"
+	serverTitle := "CasPb"
 	if p.cfg.AppCfg != nil && p.cfg.AppCfg.ServerTitle != "" {
 		serverTitle = p.cfg.AppCfg.ServerTitle
 	}
@@ -393,7 +393,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
       %s
     </main>
     <footer class="footer">
-      <span>CasPaste %s</span>
+      <span>CasPb %s</span>
       <a href="/docs">Documentation</a>
       <span>© casjay-forks</span>
     </footer>

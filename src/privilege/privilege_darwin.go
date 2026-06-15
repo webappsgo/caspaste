@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	CasPasteUser  = "_caspaste"
-	CasPasteGroup = "_caspaste"
+	CasPbUser  = "_caspb"
+	CasPbGroup = "_caspb"
 )
 
 // findAvailableUID finds first available UID in range 200-500
@@ -40,7 +40,7 @@ func findAvailableUID() (int, error) {
 // EnsureUser creates the caspaste user and group if they don't exist
 func EnsureUser() (int, int, error) {
 	// Check if user already exists
-	u, err := user.Lookup(CasPasteUser)
+	u, err := user.Lookup(CasPbUser)
 	if err == nil {
 		uid, _ := strconv.Atoi(u.Uid)
 		gid, _ := strconv.Atoi(u.Gid)
@@ -49,7 +49,7 @@ func EnsureUser() (int, int, error) {
 
 	// User doesn't exist, need to create
 	if os.Geteuid() != 0 {
-		return 0, 0, fmt.Errorf("cannot create user %s: not running as root", CasPasteUser)
+		return 0, 0, fmt.Errorf("cannot create user %s: not running as root", CasPbUser)
 	}
 
 	uid, err := findAvailableUID()
@@ -59,7 +59,7 @@ func EnsureUser() (int, int, error) {
 	gid := uid
 
 	// Create group
-	cmd := exec.Command("dseditgroup", "-o", "create", "-i", strconv.Itoa(gid), CasPasteGroup)
+	cmd := exec.Command("dseditgroup", "-o", "create", "-i", strconv.Itoa(gid), CasPbGroup)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if !strings.Contains(string(output), "already exists") {
 			return 0, 0, fmt.Errorf("failed to create group: %w\nOutput: %s", err, string(output))
@@ -68,7 +68,7 @@ func EnsureUser() (int, int, error) {
 
 	// Create user
 	cmd = exec.Command("sysadminctl",
-		"-addUser", CasPasteUser,
+		"-addUser", CasPbUser,
 		"-UID", strconv.Itoa(uid),
 		"-GID", strconv.Itoa(gid),
 		"-shell", "/usr/bin/false",

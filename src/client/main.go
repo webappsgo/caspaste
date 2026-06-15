@@ -291,19 +291,19 @@ Examples:
   %s --token usr_abc123 new -f file.txt
 
 Configuration:
-  Config file: ~/.config/casjay-forks/caspaste/cli.yml
+  Config file: ~/.config/casapps/caspb/cli.yml
 
   Token priority (highest to lowest):
     1. --token flag
     2. --token-file flag
-    3. CASPASTE_TOKEN environment variable
+    3. CASPB_TOKEN environment variable
     4. Config file token field
 
   Or use environment variables:
-    CASPASTE_SERVER=https://paste.example.com
-    CASPASTE_TOKEN=usr_abc123
-    CASPASTE_USERNAME=admin
-    CASPASTE_PASSWORD=secret
+    CASPB_SERVER=https://paste.example.com
+    CASPB_TOKEN=usr_abc123
+    CASPB_USERNAME=admin
+    CASPB_PASSWORD=secret
 
 `, Version, binName, binName, binName, binName, binName, binName, binName, binName)
 }
@@ -312,14 +312,14 @@ Configuration:
 func getConfigPath() string {
 	// Check XDG_CONFIG_HOME first
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "casjay-forks", "caspaste", "cli.yml")
+		return filepath.Join(xdg, "casapps", "caspb", "cli.yml")
 	}
 	// Fall back to ~/.config
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".config", "casjay-forks", "caspaste", "cli.yml")
+	return filepath.Join(home, ".config", "casapps", "caspb", "cli.yml")
 }
 
 // loadConfig loads configuration from file and environment
@@ -336,13 +336,13 @@ func loadConfig() Config {
 	}
 
 	// Environment variables override file config
-	if server := os.Getenv("CASPASTE_SERVER"); server != "" {
+	if server := os.Getenv("CASPB_SERVER"); server != "" {
 		cfg.Server = server
 	}
-	if username := os.Getenv("CASPASTE_USERNAME"); username != "" {
+	if username := os.Getenv("CASPB_USERNAME"); username != "" {
 		cfg.Username = username
 	}
-	if password := os.Getenv("CASPASTE_PASSWORD"); password != "" {
+	if password := os.Getenv("CASPB_PASSWORD"); password != "" {
 		cfg.Password = password
 	}
 
@@ -431,7 +431,7 @@ func parseGlobalFlags(args []string) []string {
 // getToken returns the API token with proper priority per AI.md PART 33:
 // 1. --token flag (explicit)
 // 2. --token-file flag (file path)
-// 3. Environment variable: CASPASTE_TOKEN
+// 3. Environment variable: CASPB_TOKEN
 // 4. Config file: cli.yml -> token
 func getToken(cfg Config) string {
 	// 1. CLI flag --token takes highest priority
@@ -447,8 +447,8 @@ func getToken(cfg Config) string {
 		}
 	}
 
-	// 3. Environment variable CASPASTE_TOKEN
-	if envToken := os.Getenv("CASPASTE_TOKEN"); envToken != "" {
+	// 3. Environment variable CASPB_TOKEN
+	if envToken := os.Getenv("CASPB_TOKEN"); envToken != "" {
 		return envToken
 	}
 
@@ -471,7 +471,7 @@ func getToken(cfg Config) string {
 // makeRequest makes an HTTP request with token or basic auth per AI.md PART 33
 func makeRequest(method, endpoint string, body io.Reader, contentType string, cfg Config) (*http.Response, error) {
 	if cfg.Server == "" {
-		return nil, fmt.Errorf("server not configured. Run 'caspaste-cli login' first")
+		return nil, fmt.Errorf("server not configured. Run 'caspb-cli login' first")
 	}
 
 	url := strings.TrimSuffix(cfg.Server, "/") + endpoint
@@ -612,7 +612,7 @@ func handleNew() {
 		case "-h", "--help":
 			fmt.Println(`Create a new paste
 
-Usage: caspaste-cli new [options]
+Usage: caspb-cli new [options]
 
 Options:
   -f, --file FILE      Read content from file (default: stdin)
@@ -623,9 +623,9 @@ Options:
   -p, --private        Don't show in public listings
 
 Examples:
-  echo "Hello" | caspaste-cli new
-  caspaste-cli new -f script.py -s python -t "My Script"
-  cat log.txt | caspaste-cli new -l 1h -1`)
+  echo "Hello" | caspb-cli new
+  caspb-cli new -f script.py -s python -t "My Script"
+  cat log.txt | caspb-cli new -l 1h -1`)
 			return
 		}
 	}
@@ -697,7 +697,7 @@ Examples:
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode == 401 {
-		fmt.Fprintf(os.Stderr, "Error: Authentication required. Run 'caspaste-cli login' to configure credentials.\n")
+		fmt.Fprintf(os.Stderr, "Error: Authentication required. Run 'caspb-cli login' to configure credentials.\n")
 		os.Exit(1)
 	}
 
@@ -743,7 +743,7 @@ func handleGet() {
 	cfg := loadConfig()
 
 	if len(os.Args) < 3 {
-		fmt.Fprintf(os.Stderr, "Usage: caspaste-cli get <paste-id>\n")
+		fmt.Fprintf(os.Stderr, "Usage: caspb-cli get <paste-id>\n")
 		os.Exit(1)
 	}
 

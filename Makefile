@@ -1,4 +1,4 @@
-# CasPaste Makefile - Local Development Only
+# CasPb Makefile - Local Development Only
 # Targets: dev, local, build, test, release, docker, clean
 # All Go builds/tests run inside Docker (casjaysdev/go:latest)
 # DO NOT ADD MORE TARGETS per AI.md PART 26
