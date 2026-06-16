@@ -17,7 +17,6 @@ package apiv1
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -881,32 +880,3 @@ func (data *Data) hastebinGet(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
-// writeCompatError writes an error response for compat endpoints
-func writeCompatError(rw http.ResponseWriter, req *http.Request, code int, errCode, message string, defaultFormat httputil.ResponseFormat) {
-	accept := req.Header.Get("Accept")
-	format := defaultFormat
-
-	if strings.Contains(accept, "application/json") {
-		format = httputil.FormatJSON
-	} else if strings.Contains(accept, "text/plain") {
-		format = httputil.FormatText
-	}
-
-	rw.WriteHeader(code)
-
-	switch format {
-	case httputil.FormatJSON:
-		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
-		jsonResp := APIResponse{
-			OK:      false,
-			Error:   errCode,
-			Message: message,
-		}
-		jsonData, _ := json.MarshalIndent(jsonResp, "", "  ")
-		rw.Write(jsonData)
-		rw.Write([]byte("\n"))
-	default:
-		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		fmt.Fprintf(rw, "ERROR: %s: %s\n", errCode, message)
-	}
-}

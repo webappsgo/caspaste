@@ -427,7 +427,7 @@ func (p *Panel) breadcrumb(page, base string) string {
 			continue
 		}
 		acc += "/" + part
-		label := strings.Title(strings.ReplaceAll(part, "-", " "))
+		label := titleCase(strings.ReplaceAll(part, "-", " "))
 		sb.WriteString(fmt.Sprintf(`<span class="breadcrumb-sep">/</span><a href="%s">%s</a>`,
 			acc, template.HTMLEscapeString(label)))
 	}
@@ -492,6 +492,18 @@ func (p *Panel) buildSidebarNav(activePage, base, username string) string {
 	}
 
 	return sb.String()
+}
+
+// titleCase capitalises the first letter of each space-separated word.
+// Replaces the deprecated strings.Title (SA1019 in staticcheck).
+func titleCase(s string) string {
+	words := strings.Fields(s)
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 // kvRow returns a KV list row HTML

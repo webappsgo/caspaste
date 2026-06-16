@@ -17,19 +17,19 @@ const (
 
 var (
 	// HTTP 400
-	ErrBadRequest = errors.New("Bad Request")
+	ErrBadRequest = errors.New("bad request")
 	// HTTP 401
-	ErrUnauthorized = errors.New("Unauthorized")
+	ErrUnauthorized = errors.New("unauthorized")
 	// HTTP 404
-	ErrNotFound = errors.New("Not Found")
+	ErrNotFound = errors.New("not found")
 	// HTTP 405
-	ErrMethodNotAllowed = errors.New("Method Not Allowed")
+	ErrMethodNotAllowed = errors.New("method not allowed")
 	// HTTP 413
-	ErrPayloadTooLarge = errors.New("Payload Too Large")
+	ErrPayloadTooLarge = errors.New("payload too large")
 	// HTTP 429
-	ErrTooManyRequests = errors.New("Too Many Requests")
+	ErrTooManyRequests = errors.New("too many requests")
 	// HTTP 500
-	ErrInternal = errors.New("Internal Server Error")
+	ErrInternal = errors.New("internal server error")
 )
 
 type RateLimitError struct {

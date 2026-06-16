@@ -11,12 +11,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // FindUnusedPort finds an unused port in the specified range
 // Returns the first available port found or an error if none available

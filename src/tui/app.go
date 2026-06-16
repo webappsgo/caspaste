@@ -35,8 +35,6 @@ type AppModel struct {
 	height       int
 	menuItems    []MenuItem
 	selectedMenu int
-	statusMsg    string
-	errorMsg     string
 
 	// View-specific data
 	pasteList    []PasteItem

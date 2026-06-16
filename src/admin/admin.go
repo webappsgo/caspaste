@@ -137,11 +137,6 @@ func (p *Panel) adminBasePath() string {
 	return "/server/" + p.cfg.BasePath
 }
 
-// apiBasePath returns the full server-relative API base path (e.g. "/api/v1/server/admin")
-func (p *Panel) apiBasePath() string {
-	return "/api/" + p.cfg.APIVersion + "/server/" + p.cfg.BasePath
-}
-
 // errNoDB is returned when the panel has no database
 var errNoDB = fmt.Errorf("admin: no database configured")
 

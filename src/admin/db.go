@@ -261,15 +261,6 @@ func (p *Panel) countOnlineAdmins() (int, error) {
 	return count, err
 }
 
-// inviteRecord holds a row from the admin_invites table
-type inviteRecord struct {
-	ID        int64
-	CreatedBy int64
-	ExpiresAt int64
-	UsedAt    sql.NullInt64
-	CreatedAt int64
-}
-
 // createAdminInvite generates a single-use invite token and inserts it.
 // Returns the raw (unhashed) token — shown once to the inviting admin.
 func (p *Panel) createAdminInvite(createdByID int64, expireHours int) (string, error) {
