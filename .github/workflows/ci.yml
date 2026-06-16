@@ -75,7 +75,7 @@ jobs:
             echo "No test packages found — skipping coverage"
             exit 0
           fi
-          go test -cover -coverprofile=coverage.out $TESTPKGS
+          go test -buildvcs=false -cover -coverprofile=coverage.out $TESTPKGS
       - name: Enforce coverage threshold
         run: |
           THRESHOLD=20  # Current coverage ~24%; target 60%+ as tests are added (PART 26)
@@ -100,7 +100,7 @@ jobs:
       CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - run: go build ./...
+      - run: go build -buildvcs=false ./...
 
   vuln-check:
     needs: ensure-build-image
@@ -109,7 +109,7 @@ jobs:
       image: ${{ needs.ensure-build-image.outputs.image }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - run: govulncheck ./...
+      - run: GOFLAGS=-buildvcs=false govulncheck ./...
 
   secret-scan:
     needs: ensure-build-image
