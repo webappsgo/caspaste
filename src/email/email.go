@@ -90,7 +90,7 @@ func (c *Client) TestConnection() error {
 		return fmt.Errorf("SMTP host not configured")
 	}
 
-	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
+	addr := net.JoinHostPort(c.config.Host, fmt.Sprintf("%d", c.config.Port))
 	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to connect to SMTP server: %w", err)
