@@ -144,55 +144,6 @@ func retryWithBackoff(operation func() error, maxAttempts int, initialDelay time
 	return fmt.Errorf("%s failed after %d attempts: %w", description, maxAttempts, err)
 }
 
-// getDisplayAddress converts a listen address to a user-friendly display address
-// Replaces 0.0.0.0, 127.0.0.1, localhost, etc. with valid FQDN, hostname, or IP
-func getDisplayAddress(listenAddr string) string {
-	host, port, err := net.SplitHostPort(listenAddr)
-	if err != nil {
-		// No port specified, use address as-is
-		host = listenAddr
-		port = "80"
-	}
-
-	// List of addresses to replace (localhost/loopback indicators)
-	replaceableHosts := []string{"", "0.0.0.0", "127.0.0.1", "localhost", "::1", "::"}
-
-	shouldReplace := false
-	for _, replaceable := range replaceableHosts {
-		if host == replaceable {
-			shouldReplace = true
-			break
-		}
-	}
-
-	if shouldReplace {
-		// Try to get hostname
-		if hostname, err := os.Hostname(); err == nil && hostname != "" && hostname != "localhost" {
-			host = hostname
-		} else {
-			// Try to get first non-loopback IP
-			if addrs, err := net.InterfaceAddrs(); err == nil {
-				for _, addr := range addrs {
-					if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-						if ipnet.IP.To4() != nil {
-							// Prefer IPv4
-							host = ipnet.IP.String()
-							break
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// If still couldn't determine, use localhost
-	if host == "" || host == "0.0.0.0" || host == "::" {
-		host = "localhost"
-	}
-
-	return net.JoinHostPort(host, port)
-}
-
 // isRunningAsRoot checks if the process is running with root/admin privileges
 func isRunningAsRoot() bool {
 	switch runtime.GOOS {
@@ -2193,8 +2144,7 @@ func main() {
 	}
 	
 	// Access log file writer (for HTTP requests)
-	var accessFileWriter io.Writer
-	accessFileWriter = accessLogFd
+	accessFileWriter := io.Writer(accessLogFd)
 	
 	// Create logger with format configuration
 	log := logger.New("2006/01/02 15:04:05")
@@ -2513,11 +2463,6 @@ func main() {
 		mux.Handle(metricsCfg.Endpoint, metric.Handler(metricsCfg))
 	}
 
-	// Wrap with maintenance mode middleware
-	dataDirectory := *flagDataDir
-	if dataDirectory == "" {
-		dataDirectory = getDefaultDataDir()
-	}
 	// Parse cleanup period from config
 	cleanupPeriod, err := cli.ParseDuration(yamlCfg.Database.CleanupPeriod)
 	if err != nil {
@@ -2969,7 +2914,7 @@ func main() {
 		// Stop Tor hidden service per AI.md PART 32
 		if torManager != nil {
 			if err := torManager.Stop(); err != nil {
-				log.Error(fmt.Errorf("Tor shutdown error: %w", err))
+				log.Error(fmt.Errorf("tor shutdown error: %w", err))
 			}
 		}
 

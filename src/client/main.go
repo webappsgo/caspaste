@@ -8,11 +8,9 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -121,7 +119,7 @@ func parseAPIResponse(body []byte) (json.RawMessage, error) {
 	}
 
 	// If no data field, return the whole body (for backwards compatibility)
-	if resp.Data == nil || len(resp.Data) == 0 {
+	if len(resp.Data) == 0 {
 		return body, nil
 	}
 
@@ -1015,56 +1013,3 @@ func extToSyntax(ext string) string {
 	return ""
 }
 
-// uploadFile handles file upload for binary files
-func uploadFile(filePath string, cfg Config) (*NewPasteResponse, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-
-	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := io.Copy(part, file); err != nil {
-		return nil, err
-	}
-
-	writer.Close()
-
-	// POST to /api/v1/pastes per REST API spec
-	resp, err := makeRequest("POST", "/api/v1/pastes", &buf, writer.FormDataContentType(), cfg)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != 200 {
-		// Parse unified error response per AI.md PART 16
-		_, parseErr := parseAPIResponse(body)
-		if parseErr != nil {
-			return nil, parseErr
-		}
-		return nil, fmt.Errorf("upload failed: %s", resp.Status)
-	}
-
-	// Parse unified success response per AI.md PART 16
-	data, parseErr := parseAPIResponse(body)
-	if parseErr != nil {
-		return nil, parseErr
-	}
-
-	var result NewPasteResponse
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
