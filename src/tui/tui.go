@@ -38,8 +38,6 @@ var (
 	cursorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("205"))
 
-	noStyle = lipgloss.NewStyle()
-
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			MarginTop(1)

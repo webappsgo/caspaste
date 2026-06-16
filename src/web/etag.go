@@ -37,9 +37,7 @@ func CheckETagMatch(r *http.Request, etag string) bool {
 	for _, candidate := range strings.Split(ifNoneMatch, ",") {
 		candidate = strings.TrimSpace(candidate)
 		// Handle weak ETags (W/"...")
-		if strings.HasPrefix(candidate, "W/") {
-			candidate = candidate[2:]
-		}
+		candidate = strings.TrimPrefix(candidate, "W/")
 		if candidate == etag || candidate == "*" {
 			return true
 		}

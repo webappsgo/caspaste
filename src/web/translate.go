@@ -130,7 +130,7 @@ func (locales Locales) findLocale(req *http.Request) Locale {
 	}
 
 	// Load default locale
-	locale, _ := locales[baseLocale]
+	locale := locales[baseLocale]
 	return locale
 }
 

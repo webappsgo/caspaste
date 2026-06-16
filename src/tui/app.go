@@ -37,9 +37,8 @@ type AppModel struct {
 	selectedMenu int
 
 	// View-specific data
-	pasteList    []PasteItem
-	pasteContent string
-	pasteInput   *Input
+	pasteList  []PasteItem
+	pasteInput *Input
 	titleInput   *Input
 }
 

@@ -53,7 +53,7 @@ func loadThemes(hostThemeDir string, localesList LocalesList, defaultTheme strin
 	themes := make(Themes)
 	themesList := make(ThemesList)
 
-	for localeCode, _ := range localesList {
+	for localeCode := range localesList {
 		themesList[localeCode] = make(ThemesListPart)
 	}
 
@@ -164,7 +164,7 @@ func loadThemes(hostThemeDir string, localesList LocalesList, defaultTheme strin
 		}
 		themesList[baseLocale][key] = themeName + themeNameSuffix
 
-		for localeCode, _ := range localesList {
+		for localeCode := range localesList {
 			result, ok := val["theme.Name."+localeCode]
 			if ok {
 				themesList[localeCode][key] = result + themeNameSuffix
@@ -202,7 +202,7 @@ func (themesList ThemesList) getForLocale(req *http.Request) ThemesListPart {
 	}
 
 	// Load default part theme
-	theme, _ := themesList[baseLocale]
+	theme := themesList[baseLocale]
 	return theme
 }
 
@@ -271,7 +271,7 @@ func (themes Themes) findTheme(req *http.Request, defaultTheme string) Theme {
 	}
 
 	// Load default theme
-	theme, _ := themes[defaultTheme]
+	theme := themes[defaultTheme]
 	return theme
 }
 

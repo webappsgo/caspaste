@@ -27,7 +27,7 @@ func FindLetsEncryptCerts(fqdn string) (*TLSCertPaths, error) {
 
 	// Check if Let's Encrypt directory exists
 	if _, err := os.Stat(letsencryptDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("Let's Encrypt directory not found: %s", letsencryptDir)
+		return nil, fmt.Errorf("let's encrypt directory not found: %s", letsencryptDir)
 	}
 
 	// Read all domain directories

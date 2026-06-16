@@ -80,7 +80,3 @@ func IsMarkdownMimeType(mimeType string) bool {
 		mimeType == "text/plain; charset=utf-8" && strings.Contains(mimeType, "markdown")
 }
 
-// markdownToHTML is a template function for rendering markdown
-func markdownToHTML(markdown string) template.HTML {
-	return RenderMarkdown(markdown)
-}
