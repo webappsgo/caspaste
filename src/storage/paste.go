@@ -200,6 +200,35 @@ func (db DB) PasteDelete(id string) error {
 	return nil
 }
 
+// PasteDeleteIfOneUse atomically deletes a one-use paste.
+// Returns (true, nil) if this caller successfully deleted it.
+// Returns (false, nil) if another concurrent request already consumed it.
+func (db DB) PasteDeleteIfOneUse(id string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+	defer cancel()
+
+	result, err := db.execSQL(ctx,
+		`DELETE FROM pastes WHERE id = $1 AND one_use = 1`,
+		id,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	if rowsAffected > 0 && db.backupPool != nil {
+		backupCtx, backupCancel := context.WithTimeout(context.Background(), defaultQueryTimeout)
+		defer backupCancel()
+		_, _ = db.backupPool.ExecContext(backupCtx, `DELETE FROM pastes WHERE id = ?`, id)
+	}
+
+	return rowsAffected > 0, nil
+}
+
 func (db DB) PasteGet(id string) (Paste, error) {
 	var paste Paste
 

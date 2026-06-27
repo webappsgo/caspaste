@@ -11,6 +11,8 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+
+	"github.com/casjay-forks/caspaste/src/web"
 )
 
 // pageData holds the data needed to render any admin page
@@ -38,15 +40,18 @@ func (p *Panel) renderPage(w http.ResponseWriter, r *http.Request, title, page s
 	}
 	basePath := p.adminBasePath()
 
+	csrfToken := web.GetCSRFToken(r, 32)
 	pd := pageData{
 		Title:         title,
 		Page:          page,
 		AdminUsername: username,
 		Version:       version,
 		BasePath:      basePath,
+		CSRFToken:     csrfToken,
 	}
 
 	html := p.buildLayout(pd, content)
+	html = strings.ReplaceAll(html, `name="csrf_token" value=""`, `name="csrf_token" value="`+template.HTMLEscapeString(csrfToken)+`"`)
 	_, _ = w.Write([]byte(html))
 }
 
@@ -92,6 +97,7 @@ func (p *Panel) renderLoginPage(w http.ResponseWriter, r *http.Request, errorMsg
 	}
 
 	basePath := p.adminBasePath()
+	csrfToken := web.GetCSRFToken(r, 32)
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -135,6 +141,7 @@ input:focus{border-color:var(--accent);}
   </div>
 </div>
 </body></html>`, errHTML, basePath, template.HTMLEscapeString(nextURL))
+	html = strings.ReplaceAll(html, `name="csrf_token" value=""`, `name="csrf_token" value="`+template.HTMLEscapeString(csrfToken)+`"`)
 	_, _ = w.Write([]byte(html))
 }
 
@@ -181,6 +188,7 @@ input:focus{border-color:var(--accent);}
     <p class="card-subtitle">Create the first admin account to get started.</p>
     %s
     <form method="POST" action="%s/config/setup">
+      <input type="hidden" name="csrf_token" value="">
       <input type="hidden" name="setup_token" value="%s">
       <div class="form-group">
         <label for="username">Admin Username</label>
@@ -204,6 +212,78 @@ input:focus{border-color:var(--accent);}
   </div>
 </div>
 </body></html>`, errHTML, basePath, template.HTMLEscapeString(token))
+	csrfToken := web.GetCSRFToken(r, 32)
+	html = strings.ReplaceAll(html, `name="csrf_token" value=""`, `name="csrf_token" value="`+template.HTMLEscapeString(csrfToken)+`"`)
+	_, _ = w.Write([]byte(html))
+}
+
+// renderInviteAcceptPage renders the admin invite acceptance form
+func (p *Panel) renderInviteAcceptPage(w http.ResponseWriter, r *http.Request, token, errorMsg string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+
+	errHTML := ""
+	if errorMsg != "" {
+		errHTML = fmt.Sprintf(`<div class="alert alert-error">%s</div>`,
+			template.HTMLEscapeString(errorMsg))
+	}
+
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Accept Admin Invite</title>
+<style>
+:root{--bg:#1a1a2e;--bg2:#16213e;--bg3:#0f3460;--accent:#e94560;--text:#eaeaea;--text2:#b8b8b8;--border:#2d3748;--error:#ef4444;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.login-wrap{width:100%%;max-width:480px;padding:1rem;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:2rem;}
+.card-title{font-size:1.5rem;font-weight:600;margin-bottom:.5rem;color:var(--accent);}
+.card-subtitle{color:var(--text2);font-size:.875rem;margin-bottom:1.5rem;}
+.form-group{margin-bottom:1rem;}
+label{display:block;margin-bottom:.4rem;font-size:.875rem;color:var(--text2);}
+input[type=text],input[type=email],input[type=password]{width:100%%;padding:.625rem .75rem;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.875rem;outline:none;}
+input:focus{border-color:var(--accent);}
+.btn{width:100%%;padding:.75rem;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:1rem;margin-top:.5rem;}
+.btn:hover{background:#d63d55;}
+.alert-error{background:rgba(239,68,68,.15);border:1px solid var(--error);color:var(--error);padding:.75rem;border-radius:4px;margin-bottom:1rem;font-size:.875rem;}
+.hint{font-size:.75rem;color:var(--text2);margin-top:.25rem;}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card">
+    <div class="card-title">Accept Admin Invite</div>
+    <p class="card-subtitle">Create your admin account to accept the invitation.</p>
+    %s
+    <form method="POST" action="/server/auth/invite/server/%s">
+      <input type="hidden" name="csrf_token" value="">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" autofocus required minlength="3" maxlength="64">
+      </div>
+      <div class="form-group">
+        <label for="email">Email (optional)</label>
+        <input type="email" id="email" name="email" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="new-password" required minlength="8">
+        <p class="hint">Minimum 8 characters. Stored as Argon2id hash.</p>
+      </div>
+      <div class="form-group">
+        <label for="password_confirm">Confirm Password</label>
+        <input type="password" id="password_confirm" name="password_confirm" autocomplete="new-password" required minlength="8">
+      </div>
+      <button type="submit" class="btn">Create Admin Account</button>
+    </form>
+  </div>
+</div>
+</body></html>`, errHTML, template.HTMLEscapeString(token))
+	csrfToken := web.GetCSRFToken(r, 32)
+	html = strings.ReplaceAll(html, `name="csrf_token" value=""`, `name="csrf_token" value="`+template.HTMLEscapeString(csrfToken)+`"`)
 	_, _ = w.Write([]byte(html))
 }
 

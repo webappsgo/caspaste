@@ -14,6 +14,7 @@ import (
 
 	"github.com/casjay-forks/caspaste/src/lineend"
 	"github.com/casjay-forks/caspaste/src/netshare"
+	"github.com/casjay-forks/caspaste/src/storage"
 )
 
 // File type detection helpers
@@ -210,10 +211,13 @@ func (data *Data) handleGetPaste(rw http.ResponseWriter, req *http.Request) erro
 			return data.PasteContinue.Execute(rw, tmplData)
 		}
 
-		// If continue button pressed delete paste
-		err = data.DB.PasteDelete(pasteID)
+		// Atomic conditional delete — prevents concurrent requests from both reading a one-use paste
+		deleted, err := data.DB.PasteDeleteIfOneUse(pasteID)
 		if err != nil {
 			return err
+		}
+		if !deleted {
+			return storage.ErrNotFoundID
 		}
 	}
 

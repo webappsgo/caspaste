@@ -287,6 +287,80 @@ func (p *Panel) createAdminInvite(createdByID int64, expireHours int) (string, e
 	return rawHex, nil
 }
 
+// inviteRecord holds a row from the admin_invites table
+type inviteRecord struct {
+	ID        int64
+	TokenHash string
+	CreatedBy int64
+	ExpiresAt int64
+}
+
+// getAdminInviteByToken looks up an active (unexpired, unaccepted) invite by its raw token.
+// Returns nil if the token is invalid, expired, or already used.
+func (p *Panel) getAdminInviteByToken(rawToken string) (*inviteRecord, error) {
+	if p.db == nil {
+		return nil, errNoDB
+	}
+	h := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(h[:])
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+	inv := &inviteRecord{}
+	err := p.db.QueryRowContext(ctx,
+		`SELECT id, token_hash, created_by, expires_at
+		 FROM admin_invites
+		 WHERE token_hash = ? AND expires_at > ? AND used_at IS NULL`,
+		tokenHash, time.Now().Unix(),
+	).Scan(&inv.ID, &inv.TokenHash, &inv.CreatedBy, &inv.ExpiresAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return inv, nil
+}
+
+// acceptAdminInvite atomically marks the invite as used and creates the new admin account.
+// Returns false if the invite was already consumed (concurrent acceptance attempt).
+func (p *Panel) acceptAdminInvite(rawToken, username, password, email string) (bool, error) {
+	if p.db == nil {
+		return false, errNoDB
+	}
+	h := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(h[:])
+
+	hash, err := caspasswd.HashPassword(password)
+	if err != nil {
+		return false, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	now := time.Now().Unix()
+	// Mark invite as used — conditional update prevents double-use
+	result, err := p.db.ExecContext(ctx,
+		`UPDATE admin_invites SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`,
+		now, tokenHash, now)
+	if err != nil {
+		return false, err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if n == 0 {
+		return false, nil
+	}
+
+	_, err = p.db.ExecContext(ctx,
+		`INSERT INTO admins (username, password_hash, email, role, enabled)
+		 VALUES (?, ?, ?, 'admin', 1)`,
+		username, hash, email)
+	return err == nil, err
+}
+
 // CleanupExpiredSessions removes expired admin sessions
 func (p *Panel) CleanupExpiredSessions() error {
 	if p.db == nil {

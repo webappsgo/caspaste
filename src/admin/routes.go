@@ -19,6 +19,8 @@ func (p *Panel) AuthHandler() http.Handler {
 	mux.HandleFunc("POST /login", p.handleLoginPost)
 	mux.HandleFunc("GET /logout", p.handleLogout)
 	mux.HandleFunc("POST /logout", p.handleLogout)
+	mux.HandleFunc("GET /invite/server/{token}", p.handleAdminInviteAccept)
+	mux.HandleFunc("POST /invite/server/{token}", p.handleAdminInviteAccept)
 	return mux
 }
 

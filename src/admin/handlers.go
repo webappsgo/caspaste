@@ -772,6 +772,70 @@ func listBackupFiles(dir string) ([]backupEntry, error) {
 	return out, nil
 }
 
+// handleAdminInviteAccept handles admin invite acceptance (GET shows form, POST creates account).
+// Route: GET/POST /server/auth/invite/server/{token} per AI.md PART 17.
+func (p *Panel) handleAdminInviteAccept(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if token == "" {
+		p.renderErrorPage(w, r, "Invalid invite link.")
+		return
+	}
+
+	inv, err := p.getAdminInviteByToken(token)
+	if err != nil {
+		p.renderErrorPage(w, r, "Database error. Please try again.")
+		return
+	}
+	if inv == nil {
+		p.renderErrorPage(w, r, "This invite link is invalid or has already been used.")
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		p.renderInviteAcceptPage(w, r, token, "")
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		p.renderInviteAcceptPage(w, r, token, "Failed to parse form.")
+		return
+	}
+
+	username := strings.TrimSpace(r.FormValue("username"))
+	email := strings.TrimSpace(r.FormValue("email"))
+	password := r.FormValue("password")
+	passwordConfirm := r.FormValue("password_confirm")
+
+	if username == "" || password == "" {
+		p.renderInviteAcceptPage(w, r, token, "Username and password are required.")
+		return
+	}
+	if len(username) < 3 || len(username) > 64 {
+		p.renderInviteAcceptPage(w, r, token, "Username must be 3–64 characters.")
+		return
+	}
+	if len(password) < 8 {
+		p.renderInviteAcceptPage(w, r, token, "Password must be at least 8 characters.")
+		return
+	}
+	if password != passwordConfirm {
+		p.renderInviteAcceptPage(w, r, token, "Passwords do not match.")
+		return
+	}
+
+	ok, err := p.acceptAdminInvite(token, username, password, email)
+	if err != nil {
+		p.renderInviteAcceptPage(w, r, token, "Failed to create account. Username may already be taken.")
+		return
+	}
+	if !ok {
+		p.renderInviteAcceptPage(w, r, token, "This invite link has already been used.")
+		return
+	}
+
+	http.Redirect(w, r, "/server/auth/login", http.StatusSeeOther)
+}
+
 // humanSize converts bytes to a human-readable string
 func humanSize(n int64) string {
 	const (
