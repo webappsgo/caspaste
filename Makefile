@@ -1,5 +1,5 @@
 # CasPb Makefile - Local Development Only
-# Targets: dev, local, build, test, release, docker, clean
+# Targets: dev, local, build, test, release, docker (exactly 6 per AI.md PART 26)
 # All Go builds/tests run inside Docker (casjaysdev/go:latest)
 # DO NOT ADD MORE TARGETS per AI.md PART 26
 
@@ -48,12 +48,13 @@ REGISTRY ?= ghcr.io/$(PROJECTORG)/$(PROJECTNAME)
 # Build platforms (8 platforms per AI.md PART 26)
 PLATFORMS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64,freebsd/amd64,freebsd/arm64
 
-.PHONY: build local release docker test dev clean
+.PHONY: build local release docker test dev
 
 # =============================================================================
 # BUILD — Build all platforms + local binary (via Docker with cached modules)
 # =============================================================================
-build: clean
+build:
+	@rm -rf $(BINDIR) $(RELDIR)
 	@mkdir -p $(BINDIR)
 	@echo "Building version $(VERSION)..."
 	@$(GO_DOCKER) go mod tidy
@@ -86,7 +87,8 @@ build: clean
 # =============================================================================
 # LOCAL — Build local binaries only (fast development builds)
 # =============================================================================
-local: clean
+local:
+	@rm -rf $(BINDIR)
 	@mkdir -p $(BINDIR)
 	@echo "Building local binaries version $(VERSION)..."
 	@$(GO_DOCKER) go mod tidy
@@ -178,8 +180,3 @@ dev:
 		fi && \
 		echo "Test: docker run --rm -it --name $(PROJECTNAME)-test -v $$BUILD_DIR:/app alpine:latest /app/$(PROJECTNAME) --help"
 
-# =============================================================================
-# CLEAN — Remove build artifacts
-# =============================================================================
-clean:
-	@rm -rf $(BINDIR) $(RELDIR) coverage.out
