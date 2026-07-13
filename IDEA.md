@@ -1,166 +1,225 @@
+# caspaste
+
 ## Project description
 
-CasPaste is a self-hosted, privacy-focused pastebin service with URL shortening capabilities. It provides a fast, secure platform for sharing text snippets and code with syntax highlighting, uploading files, and creating short URLs. Designed as a single static binary with all assets embedded and zero external runtime dependencies, it targets developers, teams, and privacy-conscious self-hosters who want to avoid public pastebin services.
+CasPaste is a self-hostable pastebin and code-sharing service that drops in
+for Pastebin, Microbin, Lenpaste, Stikked, Termbin, Hastebin, and Sprunge —
+existing clients keep working after only changing the hostname. It provides a
+fast, secure, privacy-focused platform for sharing text snippets, code (with
+syntax highlighting), files, and short URLs, packaged as a single static
+binary with all assets embedded and zero external runtime dependencies.
+CasPaste is enterprise-ready with multi-user support, organizations, and
+custom domains, and 100% of features are available free under the project's
+open-source license (no paid tiers, no feature gating, no phone-home).
+
+Target users:
+
+- Developers sharing code snippets, logs, and files
+- DevOps teams collaborating on configurations
+- Teams needing private paste hosting and branded/organization pastebins
+- Privacy-conscious users and self-hosters avoiding public pastebin services
+- CLI users piping content from existing tools (sprunge, ix, termbin,
+  pastebin, stikked, microbin, lenpaste, hastebin workflows)
+- Open source projects self-hosting pastebin infrastructure
+
+Official site: https://pste.us
 
 ## Project variables
 
-project_name:     caspb
+```
+project_name:     caspaste
 project_org:      casapps
-internal_name:    caspb
-app_name:         CasPb
+internal_name:    caspaste
+app_name:         CasPaste
+app_tagline:      Self-hostable pastebin & code-sharing service
 official_site:    https://pste.us
 maintainer_name:  CasjaysDev
 maintainer_email: casjay@yahoo.com
-binary_name:      caspb
-cli_binary_name:  caspb-cli
+binary_name:      caspaste
+cli_binary_name:  caspaste-cli
 default_port:     80
+```
+
+`internal_name` is FROZEN — it was set once at first-time setup and is never
+edited. A project rename only changes `project_name`; `internal_name` stays so
+`{config_dir}` / `{data_dir}` / `{log_dir}` / `{cache_dir}` / systemd unit /
+`{plist_name}` remain stable on every host.
+
+`{plist_name}` is NOT stored — it is derived at substitution time as
+`io.github.casapps.caspaste`.
 
 ## Business logic
 
-**Target users:**
-- Developers sharing code snippets and files
-- Teams needing private paste hosting
-- Privacy-conscious users avoiding public pastebin services
-- Self-hosters wanting simple, lightweight paste and URL shortening
-- CLI users piping content from existing tools (sprunge, ix, termbin, pastebin workflows)
+### Product scope & non-goals
 
-**Features:**
-- **Paste creation**: text with optional syntax highlighting (all common languages), optional title, optional author attribution
-- **File upload**: any file type, automatic MIME detection, stored in database
-- **URL shortener**: create short links that redirect to original URLs
-- **Burn-after-reading**: one-use flag — paste deleted immediately after first successful view
-- **Private pastes**: excluded from public listing; direct URL still accessible
-- **Paste expiration**: configurable (never, 10 min, 1 hour, 1 day, 1 week, 1 month, 1 year)
-- **Editable pastes**: update content after creation when created with editable flag
-- **Server modes**: public (open creation) or single-password (auth required) — see PART 6
-- **Admin panel**: full server management — see PART 17
-- **API token management**: admin-generated tokens for programmatic API access
-- **Localization**: en, de, bn_IN, ru — see PART 31
-- **PWA support**: installable as progressive web app
-- **QR code generation**: for paste URLs
-- **Embedded view**: paste in iframe for third-party sites
-- **External API compatibility**: per-request compat layer — clients for sprunge, ix, termbin, pastebin.com, stikked, microbin, lenpaste, hastebin work without modification by changing only the endpoint URL; mode detected from Host header or env var
+In scope:
 
-**Not in scope (current version):**
-- Multi-user accounts, registration, or per-user tokens (optional feature — see PART 34)
-- Organizations (optional — see PART 35)
-- Custom domain mapping (optional — see PART 36)
-- Email notifications (admin email config via PART 18 is in scope; user notifications are not)
-- Paid tiers or feature gating
-- Telemetry (opt-in only if ever added)
+- Pastebin / code-sharing with raw text, syntax highlighting, multi-file
+  pastes (Gist-style), file uploads (up to 5MB by default, configurable).
+- URL shortener: create short links that redirect to original URLs; server
+  never fetches the destination (SSRF prevention).
+- Anonymous pastes at `/p/{paste_id}`; registered-user vanity URLs at
+  `/{username}/{paste_id}`; org vanity URLs at `/{orgname}/{paste_id}`;
+  custom-domain vanity URLs at `https://{domain}/{username-or-org}/{paste_id}`.
+- Visibility modes: public (default) / unlisted / private; password
+  protection; expiration (never / time-based 10 min–10y / burn-after-read
+  1–9,999,998 views, deleted before the response is written).
+- Drop-in compatibility shims for sprunge, ix, Termbin (TCP port 9999
+  netcat), Stikked, Lenpaste, Microbin, Hastebin, and pastebin.com — mode
+  detected per-request from the Host header or an env var override; the same
+  server instance can serve multiple compat modes simultaneously on
+  different virtual hostnames; response format exactly matches the target
+  service (no CasPaste envelope on compat routes).
+- Multi-user, organizations, and custom domains — all NON-NEGOTIABLE for
+  caspaste (not optional, unlike a generic PART 34/35/36 project).
+- Server admin panel covering every server setting; setup-token first-run
+  flow; primary admin (undeletable).
+- Built-in scheduler for backups, GeoIP/blocklist/CVE updates, log rotation,
+  session cleanup, SSL renewal, health checks.
+- Tor hidden service (auto-enabled when `tor` is on PATH and not explicitly
+  disabled).
+- Built-in metrics, GeoIP, email (SMTP), backup/restore, in-process update.
+- Localization (multiple languages).
+- PWA support (installable as progressive web app).
+- QR code generation for paste URLs; embedded/iframe view for third-party
+  sites.
 
-**Data model:**
+Non-goals:
 
-Paste — primary entity, unified model for text, files, and URLs:
+- No paid tiers, "pro/plus/enterprise" editions, feature flags based on
+  payment, license keys, or phone-home authorization.
+- No AI / ML features; no ML-based content moderation (admins moderate
+  manually).
+- No bulk file storage / general-purpose object storage — caspaste is a
+  paste/code service, not a CDN.
+- No client-side rendering frameworks (React/Vue/Angular/Svelte) —
+  server-side rendering with progressive enhancement only.
+- No external schedulers — built-in only.
+- No SSRF surface: the server NEVER fetches URLs supplied by users (no
+  link-preview, no remote-image inlining, no fetching URL-shortener
+  destinations).
 
-| Field         | Type    | Notes                                                          |
-|---------------|---------|----------------------------------------------------------------|
-| id            | string  | 8-char cryptographically random identifier                     |
-| title         | string  | Optional paste title (max configurable, default 120 chars)    |
-| body          | string  | Content: text, file data (encoded), or empty for URL entries  |
-| syntax        | string  | Language name for syntax highlighting                          |
-| create_time   | int64   | Unix timestamp of creation                                     |
-| delete_time   | int64   | Unix timestamp for expiration (0 = never)                      |
-| one_use       | bool    | Burn-after-reading — deleted after first view                  |
-| author        | string  | Optional author name                                           |
-| author_email  | string  | Optional author email (PII — not exposed in public listing)   |
-| author_url    | string  | Optional author website                                        |
-| is_file       | bool    | True if this is a file upload                                  |
-| file_name     | string  | Original filename for file uploads                             |
-| mime_type     | string  | MIME type for file uploads                                     |
-| is_editable   | bool    | True if paste can be edited after creation                     |
-| is_private    | bool    | True if paste is not listed publicly                           |
-| is_url        | bool    | True if this is a URL shortener entry                          |
-| original_url  | string  | Destination URL for shortener entries                          |
+### Roles & permissions
 
-**Sensitivity classification:**
-- `body`: user content — may contain secrets, credentials, PII; treat as sensitive in logs
-- `author_email`: PII — never expose in public listing responses
-- Burn-after-reading pastes: delete must complete before response returns
+| Role | Realm | Powers |
+|---|---|---|
+| Anonymous visitor | Public site + `/p/` | View public pastes; create anonymous pastes (random ID); rate-limited per-IP |
+| Registered user | `/{username}/...` | Own pastes (vanity URLs); custom slugs; API tokens; profile/preferences; org membership |
+| Organization member | `/{orgname}/...` | Create pastes under the org's vanity URL |
+| Organization owner / admin | org-scoped | Manage members, custom domains, org-scoped tokens, ownership transfer |
+| Server Admin (NOT OS root) | admin panel | Manage the application: config, users, orgs, custom domains, scheduler, backups, SSL, GeoIP, allow/blocklists |
+| Primary Admin | admin panel | All Server Admin powers; cannot be deleted |
 
-**Business rules:**
-- Paste IDs are 8-char cryptographically random (not sequential)
-- Private pastes excluded from list endpoints; direct URL still accessible
-- Burn-after-reading delete occurs before the response is written (prevents race)
-- Body and title lengths are configurable maximums
-- Public server mode: anonymous paste creation allowed
-- Single-password server mode: valid session required for all actions
-- Compat endpoints are CSRF-exempt (consumed by CLI tools that cannot send tokens)
-- Admin credentials stored in `admins` table, not config file
-- All compat inputs are validated and rate-limited the same as native inputs
-- Rate limiting: configurable windows (5 min / 15 min / 1 hour) on creation endpoints
-- Brute-force protection: 5 failed login attempts triggers timed lockout
-- URL shortener entries do not have the server fetch the destination (SSRF prevention)
-- Files are stored in the database, not on the filesystem (no path traversal risk)
-- SSRF via URL shortener: destination URL validated; server never fetches it
+Server Admin accounts and Regular User accounts are separate identities;
+username collisions across the two namespaces are not allowed. Server Admin
+authentication and recovery flows are mandatory; Regular User MFA is
+suggested, not forced.
 
-**External API compatibility:**
+Server Admins cannot view another admin's credentials or account details
+(password, API token, 2FA secret) — only total admin count and
+online-status/username are visible to peers. A locked-out non-primary admin
+can only be recovered by delete-and-re-invite; even the primary admin cannot
+reset another admin's password, view their credentials, or disable their 2FA
+directly. If multi-user is enabled (PART 34), the same privacy boundary
+applies one level down: Server Admin can never set, reset directly, or view
+a Regular User's password, 2FA secret, or private data — invite/reset-link
+only.
 
-Mode is detected per-request (Host header leftmost label or `CASPASTE_API_MODE` env var). The same server instance can serve multiple compat modes simultaneously on different virtual hostnames.
+### Compatibility / parity requirements
 
-| Emulated service | Detection                              | What's supported                                                   |
-|------------------|----------------------------------------|--------------------------------------------------------------------|
-| sprunge.us       | always active                          | Create paste → plain text URL                                      |
-| ix.io            | always active                          | Create paste → plain text URL                                      |
-| termbin.com      | always active / Host `tb.*`/`nc.*`     | Create paste (raw body) → plain text URL                           |
-| lenpaste         | Host `lp.*`/`lenpaste.*`               | Create, get paste, server info                                      |
-| stikked          | Host `sk.*`/`stikked.*`/`stikq.*`     | Create, get, recent, trending, language list, paginated listing    |
-| microbin         | Host `mb.*`/`microbin.*`               | Create, list, archive, get, edit, delete paste                     |
-| hastebin         | Host `haste.*`/`hastebin.*`            | Create paste, get paste                                            |
-| pastebin.com     | Host `pb.*`/`pastebin.*`               | Create, delete, list, trends, raw get                              |
+Existing clients for the following services must work against caspaste
+unmodified, by only changing the hostname:
 
-Response format exactly matches the target service — no CasPaste envelope on compat routes.
+| Emulated service | What's supported |
+|---|---|
+| sprunge / ix | Create paste → plain text URL |
+| Termbin (TCP 9999) | Create paste (raw body) → plain text URL |
+| Lenpaste | Create, get paste, server info |
+| Stikked | Create, get, recent, trending, language list, paginated listing |
+| Microbin | Create, list, archive, get, edit, delete paste |
+| Hastebin | Create paste, get paste |
+| pastebin.com | Create, delete, list, trends, raw get |
 
-**Endpoint capabilities (WHAT — see PART 14 for route patterns):**
+### Data model & sensitivity
 
-Web (HTML, content-negotiated):
-- View/create/edit/delete paste
-- List public pastes
-- URL shortener redirect
-- Download paste as file attachment
-- Embedded paste view for iframes
-- QR code for paste URL
-- Server health check
-- About pages (authors, license, source, security policy)
-- Documentation pages (API, CLI, libraries, customization)
-- Login/logout (shared auth — see PART 17)
-- UI settings
-- Terms of use
-- Sitemap, robots.txt, favicon, PWA manifest and service worker
-- Security.txt well-known
+| Entity | Sensitivity | Notes |
+|---|---|---|
+| Paste | **Mixed** — users may paste secrets, tokens, PII | Random ID; password-protected pastes hashed; visibility/expiry enforced server-side; body/title lengths configurable maximums |
+| User | **PII** — email, display name | Password never stored plaintext; email-verification + password-reset flow |
+| Admin | **Privileged** | Same hashing rules as users; separate identity from users; primary admin cannot be deleted |
+| API / session tokens | **Secret** | Hashed at rest; plaintext shown ONCE on creation, never retrievable |
+| Organization | Public-by-default | Slug + display name; default cap on orgs/user (configurable; admin can override) |
+| Custom domain | **Privileged** — per-domain SSL key | Owner type (user/org), DNS verification, cert renewed by scheduler |
+| Audit log | **Security telemetry** | Who/what/when/IP for auth, config changes, admin actions |
+| Backup | Privileged — full data dump | Encrypted at rest; password never stored |
 
-API (JSON — see PART 14):
-- Health check with paste stats
-- Server info
-- Create paste
-- List pastes
-- Get paste by ID
-- Admin panel API — see PART 17
+### Trust boundaries & external services
 
-**Healthz extension (see PART 13):**
-- `features.syntax_highlighting: true`
-- `stats.pastes_total`: total paste count
-- `stats.pastes_24h`: pastes created in last 24 hours
-- `checks.storage`: database read/write probe (ok / degraded / down)
+| Boundary | Trusted? | Failure mode |
+|---|---|---|
+| HTTP / HTTPS server | Public, hostile | Default-secure (HTTPS, HSTS, CSP, CSRF, rate limits, GeoIP) |
+| TCP Termbin listener (port 9999) | Public, plain-text by design | Same rate limiter and visibility rules apply; admin can disable the listener |
+| Tor hidden service | Owned by the server binary | Auto-enabled if `tor` on PATH unless explicitly disabled |
+| SMTP (outbound) | External | Auto-detect; never blocks startup; queues retries on transient failure |
+| GeoIP DB / blocklist / CVE feeds | External fetch, scheduled | Verified checksum; scheduled update; allowlist always overrides denylist |
+| Let's Encrypt ACME | External | Renew ahead of expiry via scheduler |
+| User-supplied URL fetches (link previews, OG cards) | **NOT supported** | SSRF surface deliberately not built |
+| Reverse-proxy headers | Trusted ONLY from configured proxy allowlist | Otherwise treated as user input |
+| User-supplied paste / file content | **UNTRUSTED, always** | Rendered as text or sanitized markdown; served with safe MIME / attachment disposition; never executed |
+| User-supplied custom-slug / custom-domain | **UNTRUSTED** | Canonicalized, validated against a reserved-name list, collision-checked |
 
-**Trust boundaries:**
-- Browser is untrusted; all state-changing requests require CSRF protection
-- Compat endpoints are CSRF-exempt (see business rules)
-- Trusted proxy headers honored only from IPs in `server.trusted_proxies`
-- API clients authenticate with admin token (Bearer) for admin endpoints
-- No external runtime service dependencies — all assets embedded at build time
+### Abuse cases & required defenses
 
-**Threat model:**
+| Goal | Abuse case | Required defense |
+|---|---|---|
+| Spam | Mass paste creation, throwaway-account flooding | Per-IP rate limits; optional captcha; admin-configurable registration mode; content-size caps |
+| Scraping | Bulk enumeration of unlisted/private pastes | Cryptographically random IDs; visibility enforced server-side on every read; no bulk-listing of private/unlisted content |
+| Privilege escalation | Path-namespace abuse (a username/orgname/slug shadowing a reserved route) | Reserved-slug allowlist; case-insensitive collision checks across users and orgs |
+| Cross-tenant leak | A user reading another user's/org's data directly | Every user/org-scoped query must include the owner predicate |
+| Malicious uploads | Executable HTML/JS, SVG with embedded scripts, MIME spoofing | Extension allowlist; MIME verification; attachment-only serving; content never executed |
+| Credential stuffing / brute force | Login flooding | Attempt limit then lockout; generic error messages; optional MFA |
+| Password-reset enumeration | Probing which emails are registered | Rate limited; silent response regardless of whether the email exists; single-use, short-lived tokens |
+| Session hijacking | Stolen cookie | Secure cookie flags; CSRF tokens on state-changing forms; session rotation on privilege change |
+| Custom-domain hijack | TXT-record bypass, ACME challenge spoofing | DNS ownership verification before cert issuance; admin can revoke/suspend; every domain event audited |
+| DoS / resource exhaustion | Huge paste, deep burn-after-read counter, decompression bomb | Configurable content-size cap; capped burn-after-read counter; request timeouts and body-size limits |
+| Drop-in compat shim abuse | Bypassing CSRF/captcha via legacy shim endpoints (which cannot send tokens) | Same rate limiter, visibility rules, and content cap as native routes apply to every compat shim |
+| Admin lockout / takeover | Compromise of primary admin | Primary admin undeletable; recovery flow on MFA compromise; setup token shown once and single-use |
+| Audit-log tamper | Attacker editing the audit trail after compromise | Append-only by convention; admin actions on the audit log are themselves audited |
+| SSRF via URL shortener | Server fetching an attacker-controlled destination | Destination URL validated on save; the server never fetches it |
 
-| Threat                    | Defense policy                                                          |
-|---------------------------|-------------------------------------------------------------------------|
-| Anonymous paste spam      | Rate limiting on create endpoints (configurable windows)                |
-| Brute-force login         | Timed lockout after failed attempts                                     |
-| XSS via paste body        | Server-side syntax highlighting; raw view returns text/plain            |
-| Paste ID enumeration      | IDs are cryptographically random; private mode available                |
-| Path traversal            | Paste IDs validated; files served from database, not filesystem         |
-| CSRF on state changes     | CSRF protection on all non-exempt browser-facing routes                 |
-| Private paste exposure    | Private pastes excluded from listing; no ownership leak                 |
-| Resource exhaustion       | Configurable body/title length limits; rate limiting on all create paths|
-| SSRF via URL shortener    | Destination URL validated; server does not fetch it                     |
-| Malicious file upload     | Files stored in database and not executed; MIME from upload header only |
+Non-goals (explicit non-defenses, with reasoning):
+
+- No SSRF defense layer is needed because the server never initiates
+  outbound fetches against user-supplied URLs (no link-preview, no
+  remote-image inlining, no URL-shortener destination fetch).
+- No ML-based content moderation — admins moderate manually; spam
+  mitigation relies on rate limits, optional captcha, and admin delete.
+
+### Security decisions & exceptions
+
+Intentional tradeoffs where caspaste chooses convenience or compatibility
+over a maximally locked-down posture:
+
+- **Anonymous paste creation** is allowed and is the core pastebin UX;
+  mitigated by rate limits, content-size caps, optional captcha, and an
+  admin delete-and-audit flow.
+- **Drop-in compatibility shims** intentionally accept POSTs without a CSRF
+  token because the legacy clients they emulate don't send one; mitigated by
+  applying the same rate limiter, visibility rules, and content cap as
+  native routes, and by letting the admin disable any shim individually.
+- **Termbin TCP listener (port 9999)** is plain text by design — netcat
+  compatibility is the point, and netcat does not speak TLS; the admin can
+  disable the listener.
+- **Public visibility is the default** for new pastes; mitigated by making
+  the visibility selector prominent and making unlisted/private/
+  password-protected options first-class.
+- **Tor hidden service auto-enabled** when `tor` is on PATH; the admin can
+  disable this behavior.
+- **Internal `/metrics` endpoint** is not exposed publicly; the app warns on
+  startup if it is reachable from the public address.
+
+### Not in scope (explicitly deferred)
+
+- Telemetry beyond opt-in (never on by default).
+- Paid tiers or feature gating of any kind.
+</content>
