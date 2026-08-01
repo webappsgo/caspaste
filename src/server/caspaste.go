@@ -9,14 +9,11 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
-	"expvar"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -1064,112 +1061,6 @@ func checkStatus(dbDriver, dbSource string, address string) {
 	}
 }
 
-// Debug endpoint handlers per AI.md PART 6
-// Only registered when --debug flag is set
-
-// handleDebugConfig returns sanitized configuration (passwords/secrets redacted)
-func handleDebugConfig(cfg *config.YAMLConfig) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		// Create sanitized copy (secrets redacted)
-		sanitized := map[string]interface{}{
-			"server": map[string]interface{}{
-				"title":       cfg.Server.Title,
-				"tagline":     cfg.Server.TagLine,
-				"description": cfg.Server.Description,
-				"fqdn":        cfg.Server.FQDN,
-				"public":      cfg.Server.Public,
-				"listen":      cfg.Server.Listen,
-				"port":        cfg.Server.Port,
-				"timeouts": map[string]interface{}{
-					"read":  cfg.Server.Timeouts.Read,
-					"write": cfg.Server.Timeouts.Write,
-					"idle":  cfg.Server.Timeouts.Idle,
-				},
-			},
-			"database": map[string]interface{}{
-				"driver":         cfg.Database.Driver,
-				"source":         "[REDACTED]",
-				"cleanup_period": cfg.Database.CleanupPeriod,
-				"max_open_conns": cfg.Database.MaxOpenConns,
-				"max_idle_conns": cfg.Database.MaxIdleConns,
-			},
-			"security": map[string]interface{}{
-				"tls": map[string]interface{}{
-					"min_version": cfg.Security.TLS.MinVersion,
-					"cert_file":   cfg.Security.TLS.CertFile,
-					"key_file":    cfg.Security.TLS.KeyFile,
-				},
-			},
-			"logging": map[string]interface{}{
-				"level": cfg.Logging.Level,
-			},
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		data, _ := json.MarshalIndent(sanitized, "", "  ")
-		w.Write(data)
-		w.Write([]byte("\n"))
-	}
-}
-
-// handleDebugMemory returns memory statistics
-func handleDebugMemory(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	stats := map[string]interface{}{
-		"alloc_bytes":       m.Alloc,
-		"total_alloc_bytes": m.TotalAlloc,
-		"sys_bytes":         m.Sys,
-		"mallocs":           m.Mallocs,
-		"frees":             m.Frees,
-		"heap_alloc_bytes":  m.HeapAlloc,
-		"heap_sys_bytes":    m.HeapSys,
-		"heap_idle_bytes":   m.HeapIdle,
-		"heap_inuse_bytes":  m.HeapInuse,
-		"heap_released":     m.HeapReleased,
-		"heap_objects":      m.HeapObjects,
-		"stack_inuse_bytes": m.StackInuse,
-		"stack_sys_bytes":   m.StackSys,
-		"gc_runs":           m.NumGC,
-		"gc_pause_ns":       m.PauseNs[(m.NumGC+255)%256],
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	data, _ := json.MarshalIndent(stats, "", "  ")
-	w.Write(data)
-	w.Write([]byte("\n"))
-}
-
-// handleDebugGoroutines returns goroutine count
-func handleDebugGoroutines(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	stats := map[string]interface{}{
-		"count":     runtime.NumGoroutine(),
-		"gomaxproc": runtime.GOMAXPROCS(0),
-		"num_cpu":   runtime.NumCPU(),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	data, _ := json.MarshalIndent(stats, "", "  ")
-	w.Write(data)
-	w.Write([]byte("\n"))
-}
-
 func main() {
 	// Handle --shell completions/init commands first (per AI.md PART 8/33)
 	// This must run before other flag parsing since --shell takes subcommands
@@ -1248,7 +1139,7 @@ func main() {
 	// Additional flags per AI.md PART 8
 	flagBackupDir := c.AddStringVar("backup", "", "Backup directory. Default: /mnt/Backups/casapps/caspaste or ~/.local/share/Backups/casapps/caspaste", nil)
 	flagPidFile := c.AddStringVar("pid", "", "PID file path. Default: /var/run/casapps/caspaste.pid or ~/.local/share/casapps/caspaste/caspaste.pid", nil)
-	flagMode := c.AddStringVar("mode", "", "Application mode: production or development (default: production)", nil)
+	flagMode := c.AddStringVar("mode", "", "Application mode: production, development, or debug (default: production)", nil)
 	flagUpdate := c.AddStringVar("update", "", "Update management: check, yes, branch {stable|beta|daily}, --help", nil)
 	// Color output flag per AI.md PART 8
 	flagColor := c.AddStringVar("color", "auto", "Color output: auto, yes, no (default: auto, respects NO_COLOR)", nil)
@@ -2078,7 +1969,7 @@ func main() {
 	
 	// Open debug.log - DEBUG messages (only when --debug flag is used)
 	var debugLogFd *os.File
-	if *flagDebug {
+	if mode.IsDebugEnabled() {
 		debugLogPath := filepath.Join(logsDir, debugLogFile)
 		debugLogFd, err = os.OpenFile(debugLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
@@ -2163,7 +2054,14 @@ func main() {
 	// Create logger with format configuration
 	log := logger.New("2006/01/02 15:04:05")
 	// Set log level: info, warn, error (affects stdout only)
-	log.SetLevel(yamlCfg.Logging.Level)
+	// Per AI.md PART 6 Four Operational States: development mode (and the
+	// debug flag) always get verbose debug-level logging regardless of the
+	// configured level; production respects the configured level.
+	logLevel := yamlCfg.Logging.Level
+	if mode.IsAppModeDev() || mode.IsDebugEnabled() {
+		logLevel = "debug"
+	}
+	log.SetLevel(logLevel)
 	log.SetFormat(logger.LogFormat{
 		Access: yamlCfg.Logging.Access.Format,
 		Error:  yamlCfg.Logging.Error.Format,
@@ -2180,7 +2078,7 @@ func main() {
 		// Debug logs
 		log.SetDebugWriter(debugLogFd)
 	}
-	log.SetDebugMode(*flagDebug)
+	log.SetDebugMode(mode.IsDebugEnabled())
 	
 	log.Debug("Configuration loaded from: " + configFilePath)
 	log.Debug("Data directory: " + *flagDataDir)
@@ -2209,19 +2107,23 @@ func main() {
 	}
 	log.Debug("Database connection pool created successfully")
 
+	// Per AI.md PART 6 Four Operational States: rate limiting is relaxed
+	// (disabled) in development mode and enforced per config in production.
+	rateLimitGet := netshare.NewRateLimitSystem(yamlCfg.Limits.RateLimit.GetPastes.Per5Min, yamlCfg.Limits.RateLimit.GetPastes.Per15Min, yamlCfg.Limits.RateLimit.GetPastes.Per1Hour)
+	rateLimitNew := netshare.NewRateLimitSystem(yamlCfg.Limits.RateLimit.NewPastes.Per5Min, yamlCfg.Limits.RateLimit.NewPastes.Per15Min, yamlCfg.Limits.RateLimit.NewPastes.Per1Hour)
+	if mode.IsAppModeDev() {
+		rateLimitGet = netshare.NewRateLimitSystem(0, 0, 0)
+		rateLimitNew = netshare.NewRateLimitSystem(0, 0, 0)
+	}
+
 	cfg := config.Config{
 		Log:               log,
-		RateLimitGet:      netshare.NewRateLimitSystem(yamlCfg.Limits.RateLimit.GetPastes.Per5Min, yamlCfg.Limits.RateLimit.GetPastes.Per15Min, yamlCfg.Limits.RateLimit.GetPastes.Per1Hour),
-		RateLimitNew:      netshare.NewRateLimitSystem(yamlCfg.Limits.RateLimit.NewPastes.Per5Min, yamlCfg.Limits.RateLimit.NewPastes.Per15Min, yamlCfg.Limits.RateLimit.NewPastes.Per1Hour),
+		RateLimitGet:      rateLimitGet,
+		RateLimitNew:      rateLimitNew,
 		Version:           Version,
 		BuildCommit:       CommitID,
 		BuildDate:         BuildDate,
-		Mode: func() string {
-			if *flagDebug {
-				return "development"
-			}
-			return "production"
-		}(),
+		Mode:              mode.GetCurrentAppMode().String(),
 		ServerTagline:     yamlCfg.Server.TagLine,
 		ServerDescription: yamlCfg.Server.Description,
 		TitleMaxLen:       yamlCfg.Limits.TitleMaxLength,
@@ -2330,7 +2232,10 @@ func main() {
 	}
 
 	// Handlers
-	mux := http.NewServeMux()
+	// A recording mux is used (instead of a bare *http.ServeMux) so that
+	// /debug/routes (AI.md PART 6) can introspect every route actually
+	// registered, rather than a hand-maintained/guessed list.
+	mux := newRecordingMux()
 
 	// External API Compatibility routes per AI.md "External API Compatibility"
 	// These are registered before "/" to ensure specific matching
@@ -2416,31 +2321,6 @@ func main() {
 
 	// Admin API handler
 	mux.Handle(adminAPIPath+"/", http.StripPrefix(adminAPIPath, adminPanel.APIHandler()))
-
-	// Register debug/pprof endpoints per AI.md PART 6
-	// Only enabled when --debug flag is set
-	if *flagDebug {
-		// pprof endpoints
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-		mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-		mux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
-		mux.Handle("/debug/pprof/block", pprof.Handler("block"))
-		mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
-		mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-
-		// expvar endpoint per AI.md PART 6
-		mux.Handle("/debug/vars", expvar.Handler())
-
-		// Custom debug endpoints per AI.md PART 6
-		mux.HandleFunc("/debug/config", handleDebugConfig(yamlCfg))
-		mux.HandleFunc("/debug/memory", handleDebugMemory)
-		mux.HandleFunc("/debug/goroutines", handleDebugGoroutines)
-	}
 
 	// Register OpenAPI/Swagger endpoints per AI.md PART 14
 	swaggerCfg := &swagger.Config{
@@ -2541,7 +2421,10 @@ func main() {
 	// Per AI.md PART 21: Metrics middleware for HTTP request tracking
 	handler := web.URLNormalizeMiddleware(
 		web.PathSecurityMiddleware(
-			web.PanicRecoveryMiddleware(*flagDebug)(
+			// Per AI.md PART 6 Four Operational States: verbose (stack-trace)
+			// panic responses in development mode or whenever the debug flag
+			// is enabled; production without --debug stays generic.
+			web.PanicRecoveryMiddleware(mode.IsAppModeDev() || mode.IsDebugEnabled())(
 				web.RequestIDMiddleware(
 					metric.Middleware(metricsCfg)(
 						web.SecurityHeadersMiddleware(securityHeadersCfg)(
@@ -2653,6 +2536,12 @@ func main() {
 	// Inject scheduler into admin panel now that it is running
 	adminPanel.SetScheduler(sched)
 
+	// Register /debug/* endpoints per AI.md PART 6 (pprof, expvar, config,
+	// routes, cache, db, scheduler). registerDebugRoutes is a no-op unless
+	// mode.IsDebugEnabled() is true — the endpoints are never registered on
+	// the mux (and therefore never reachable) in a non-debug run.
+	registerDebugRoutes(mux, yamlCfg, db, sched)
+
 	// Determine ports (HTTP and optionally HTTPS)
 	var httpPort, httpsPort int
 
@@ -2751,15 +2640,18 @@ func main() {
 	dbDisplay := formatDatabaseDisplay(yamlCfg.Database.Driver, yamlCfg.Database.Source)
 	printStartupBanner(Version, fqdn, yamlCfg.Server.Title, configFilePath, dbDisplay, httpPort, httpsPort, generatedUser, generatedPass)
 
+	// Announce the effective application mode per AI.md PART 6
+	modeEmoji := "🔒"
+	if mode.IsAppModeDev() {
+		modeEmoji = "🔧"
+	}
+	fmt.Printf("%s Running in mode: %s\n", modeEmoji, mode.GetAppModeString())
+
 	// Track server start time for uptime calculation
 	serverStartTime := time.Now()
 
 	// Log server started event to audit log per AI.md PART 11
-	serverMode := "production"
-	if *flagDebug {
-		serverMode = "development"
-	}
-	audit.ServerStarted(Version, serverMode)
+	audit.ServerStarted(Version, mode.GetCurrentAppMode().String())
 
 	// Create HTTP server with timeouts
 	srv := &http.Server{

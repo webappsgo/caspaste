@@ -20,17 +20,11 @@ const (
 )
 
 // requireAuth wraps a handler requiring an authenticated admin session.
-// In debug mode authentication is bypassed per AI.md PART 6.
+// Per AI.md PART 6, debug mode affects verbosity/diagnostics ONLY — it MUST
+// NEVER bypass authentication or any other security check, in any mode,
+// including production.
 func (p *Panel) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Debug mode bypasses auth entirely per AI.md PART 6
-		if p.debug {
-			ctx := context.WithValue(r.Context(), ctxKeyAdminID, int64(0))
-			ctx = context.WithValue(ctx, ctxKeyAdminUsername, "debug")
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-
 		adminID := p.validateAdminSession(r)
 		if adminID == 0 {
 			// Not authenticated — redirect to shared auth login per AI.md PART 15
