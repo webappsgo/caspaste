@@ -9,34 +9,6 @@ CRITICAL NEVER/ALWAYS sections, key rules summary, reference line) sourced
 from the corresponding AI.md PARTs. This requires reading PARTs 7-36, which
 was out of scope for this reconciliation pass.
 
-## [ ] Verify LICENSE.md copyright year
-Read: AI.md PART 2
-PART 2 requires copyright year = "current year or year of first publication".
-Copyright holder updated to "webappsgo" (= project_org) as part of the
-caspaste/webappsgo naming-conflict resolution. LICENSE.md currently states
-"Copyright (c) 2024 webappsgo". The year 2024 predates the first commit
-visible in this git history (2026) — could be correct if the project was
-first published elsewhere in 2024, or could be stale. Needs human
-confirmation of the actual first-publication year; not changed in this pass.
-
-## [ ] Fix GHCR push permission denial in Docker Images workflow
-Read: .github/workflows/docker-images.yml
-`docker/build-push-action` fails with `denied: permission_denied:
-write_package` pushing to `ghcr.io/webappsgo/caspaste`. The workflow
-already declares `permissions: packages: write`, but the org
-`webappsgo` has "Write permissions for workflows" disabled at the
-org level, which overrides the repo/workflow setting (confirmed via
-`gh api repos/webappsgo/caspaste/actions/permissions/workflow` →
-`default_workflow_permissions: read`; attempting to PUT `write` returned
-409 "Write permissions for workflows are disabled by the organization").
-Requires org-admin action: either enable write workflow permissions for
-this repo at the org level, or switch the login step to a PAT with
-`write:packages` scope stored as a secret instead of `GITHUB_TOKEN`.
-The `origin` remote was corrected from `casjay-forks/caspaste` to
-`webappsgo/caspaste` (the actual org) and history fast-forward-pushed
-there; the org-level policy is the same on webappsgo, so this did not
-resolve on its own.
-
 ## [ ] Implement PART 6 Application Modes (mode/debug system is dead code)
 Read: AI.md PART 6 (line 9251)
 Correction to a prior (mischaracterized) entry: PART 6 is "APPLICATION
