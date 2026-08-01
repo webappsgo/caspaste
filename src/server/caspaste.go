@@ -41,6 +41,7 @@ import (
 	"github.com/webappsgo/caspaste/src/graphql"
 	"github.com/webappsgo/caspaste/src/logger"
 	"github.com/webappsgo/caspaste/src/metric"
+	"github.com/webappsgo/caspaste/src/mode"
 	"github.com/webappsgo/caspaste/src/netshare"
 	"github.com/webappsgo/caspaste/src/portutil"
 	"github.com/webappsgo/caspaste/src/privilege"
@@ -1305,20 +1306,31 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Handle --mode flag per AI.md PART 8
-	// mode=development enables debug features, mode=production is default
+	// Application mode and debug detection per AI.md PART 6.
+	// Priority — mode: --mode flag > MODE env > default production.
+	// Priority — debug: --debug flag > DEBUG env > mode debug alias > default false.
+	mode.FromEnv()
 	if *flagMode != "" {
 		switch strings.ToLower(*flagMode) {
-		case "development", "dev":
-			// Development mode enables debug features
-			*flagDebug = true
-		case "production", "prod":
-			// Production mode is default (debug disabled unless explicitly set)
+		case "dev", "devel", "development", "prod", "production", "debug":
+			mode.Set(*flagMode)
 		default:
-			fmt.Fprintf(os.Stderr, "Error: invalid mode '%s'. Use 'production' or 'development'\n", *flagMode)
+			fmt.Fprintf(os.Stderr, "Error: invalid mode '%s'. Use 'production', 'development', or 'debug'\n", *flagMode)
 			os.Exit(1)
 		}
+		// An explicit DEBUG env var still wins over the "--mode debug" alias,
+		// even when --mode was supplied on the command line.
+		if val, wasSet := validation.ParseBool(os.Getenv("DEBUG")); wasSet {
+			mode.SetDebug(val)
+		}
 	}
+	// The --debug flag is the highest-priority source and always wins.
+	if *flagDebug {
+		mode.SetDebug(true)
+	}
+	// Keep the legacy --debug bool in sync so existing call sites that still
+	// read it directly reflect the fully-resolved debug state.
+	*flagDebug = mode.IsDebugEnabled()
 
 	// Setup log directory (needed early for daemon mode)
 	if *flagLog == "" && *flagLogsDir != "" {

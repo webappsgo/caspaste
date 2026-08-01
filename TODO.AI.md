@@ -1,14 +1,3 @@
-## [ ] Create .claude/rules/*.md cheatsheet files (14 files)
-Read: AI.md PART 0
-PART 0 "Session Initialization" mandates creating
-.claude/rules/{ai,project,config,binary,backend,api,frontend,features,
-service,makefile,docker,cicd,testing,optional}-rules.md if the .claude/rules/
-directory does not exist. It currently does not exist. Each file must follow
-the required format (header with PART numbers, NON-NEGOTIABLE warning,
-CRITICAL NEVER/ALWAYS sections, key rules summary, reference line) sourced
-from the corresponding AI.md PARTs. This requires reading PARTs 7-36, which
-was out of scope for this reconciliation pass.
-
 ## [ ] Implement PART 6 Application Modes (mode/debug system is dead code)
 Read: AI.md PART 6 (line 9251)
 Correction to a prior (mischaracterized) entry: PART 6 is "APPLICATION

@@ -11,6 +11,8 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strings"
+
+	"github.com/webappsgo/caspaste/src/mode"
 )
 
 // ETagFromContent generates an ETag from content bytes
@@ -47,9 +49,17 @@ func CheckETagMatch(r *http.Request, etag string) bool {
 
 // SetCacheHeaders sets appropriate cache headers for different content types
 // contentType: "static" (1 year), "dynamic" (no-cache), "api" (short cache)
+// Per AI.md PART 6 Four Operational States: template/static caching is
+// disabled in development mode so local edits are picked up without a
+// restart (hot reload); production keeps the long-lived cache.
 func SetCacheHeaders(w http.ResponseWriter, contentType string, etag string) {
 	if etag != "" {
 		w.Header().Set("ETag", etag)
+	}
+
+	if contentType == "static" && mode.IsAppModeDev() {
+		w.Header().Set("Cache-Control", "no-cache")
+		return
 	}
 
 	switch contentType {
