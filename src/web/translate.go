@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/webappsgo/caspaste/src/config"
 )
 
 const baseLocale = "en"
@@ -129,7 +131,13 @@ func (locales Locales) findLocale(req *http.Request) Locale {
 		}
 	}
 
-	// Load default locale
+	// Load default locale — prefer the configured default language per AI.md
+	// PART 31, silently falling back to the base "en" locale when unavailable.
+	if def := config.DefaultLang(); def != baseLocale {
+		if locale, ok := locales[def]; ok {
+			return locale
+		}
+	}
 	locale := locales[baseLocale]
 	return locale
 }

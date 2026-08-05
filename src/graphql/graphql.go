@@ -4,7 +4,7 @@
 // See LICENSE.md file for details.
 
 // Package graphql provides GraphQL API per AI.md PART 14
-// Route: /graphql (GET for GraphiQL UI, POST for queries)
+// Routes: /server/docs/graphql (GraphiQL UI) and /api/graphql (queries) per AI.md PART 14
 package graphql
 
 import (
@@ -302,7 +302,7 @@ func generateGraphiQLHTML(title, theme string) string {
   <script src="https://unpkg.com/graphiql@3/graphiql.min.js"></script>
   <script>
     const fetcher = GraphiQL.createFetcher({
-      url: '/graphql',
+      url: '/api/graphql',
     });
 
     ReactDOM.createRoot(document.getElementById('graphiql')).render(

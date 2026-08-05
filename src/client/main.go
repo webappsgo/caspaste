@@ -21,6 +21,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/webappsgo/caspaste/src/completion"
+	"github.com/webappsgo/caspaste/src/config"
 	"github.com/webappsgo/caspaste/src/display"
 	"github.com/webappsgo/caspaste/src/tui"
 )
@@ -46,6 +47,7 @@ type Config struct {
 var (
 	flagToken     string
 	flagTokenFile string
+	flagLang      string
 )
 
 // APIResponse is the unified response wrapper per AI.md PART 16
@@ -134,7 +136,7 @@ func main() {
 	}
 
 	// Parse global flags before command processing per AI.md PART 33
-	// Global flags: --token, --token-file, --color
+	// Global flags: --token, --token-file, --color, --lang
 	args := parseGlobalFlags(os.Args[1:])
 
 	// Detect display mode per AI.md PART 33
@@ -247,6 +249,7 @@ Global Options:
   --token TOKEN       API token for authentication
   --token-file FILE   Read token from file
   --color MODE        Color output: always, never, auto (default: auto)
+  --lang CODE         Output language: en, es, zh, fr, ar, de, ja (default: en)
 
 Commands:
   config              Show or edit configuration
@@ -374,7 +377,7 @@ func saveConfig(cfg Config) error {
 }
 
 // parseGlobalFlags extracts global flags before command processing per AI.md PART 33
-// Global flags: --token, --token-file, --color
+// Global flags: --token, --token-file, --color, --lang
 // Returns remaining args after extracting global flags
 func parseGlobalFlags(args []string) []string {
 	var remaining []string
@@ -402,6 +405,13 @@ func parseGlobalFlags(args []string) []string {
 				continue
 			}
 			i++
+		case "--lang":
+			if i+1 < len(args) {
+				flagLang = config.NormalizeLang(args[i+1])
+				i += 2
+				continue
+			}
+			i++
 		default:
 			// Check for --flag=VALUE format
 			if strings.HasPrefix(args[i], "--token=") {
@@ -416,6 +426,11 @@ func parseGlobalFlags(args []string) []string {
 			}
 			if strings.HasPrefix(args[i], "--color=") {
 				display.SetColorMode(strings.TrimPrefix(args[i], "--color="))
+				i++
+				continue
+			}
+			if strings.HasPrefix(args[i], "--lang=") {
+				flagLang = config.NormalizeLang(strings.TrimPrefix(args[i], "--lang="))
 				i++
 				continue
 			}
@@ -467,6 +482,22 @@ func getToken(cfg Config) string {
 }
 
 // makeRequest makes an HTTP request with token or basic auth per AI.md PART 33
+// resolveLang returns the output language per AI.md PART 31 detection order:
+// --lang flag, then LC_ALL / LANG env vars, else the default "en". Every value
+// is normalized and unsupported languages silently fall back to English.
+func resolveLang() string {
+	if flagLang != "" {
+		return flagLang
+	}
+	if lang := os.Getenv("LC_ALL"); lang != "" {
+		return config.NormalizeLang(lang)
+	}
+	if lang := os.Getenv("LANG"); lang != "" {
+		return config.NormalizeLang(lang)
+	}
+	return config.DefaultLanguage
+}
+
 func makeRequest(method, endpoint string, body io.Reader, contentType string, cfg Config) (*http.Response, error) {
 	if cfg.Server == "" {
 		return nil, fmt.Errorf("server not configured. Run 'caspaste-cli login' first")
@@ -481,6 +512,10 @@ func makeRequest(method, endpoint string, body io.Reader, contentType string, cf
 
 	// Set User-Agent per AI.md requirement
 	req.Header.Set("User-Agent", filepath.Base(os.Args[0])+"/"+Version)
+
+	// Advertise the resolved output language so the server can translate
+	// API responses per AI.md PART 31 (--lang > LANG/LC_ALL env > en).
+	req.Header.Set("Accept-Language", resolveLang())
 
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)

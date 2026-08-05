@@ -4,7 +4,7 @@
 // See LICENSE.md file for details.
 
 // Package swagger provides OpenAPI/Swagger documentation per AI.md PART 14
-// Routes: /openapi (UI) and /openapi.json (spec)
+// Routes: /server/docs/swagger (UI) and /api/swagger (spec) per AI.md PART 14
 package swagger
 
 import (
@@ -452,7 +452,7 @@ func generateSwaggerUIHTML(theme string) string {
   <script>
     window.onload = function() {
       SwaggerUIBundle({
-        url: "/openapi.json",
+        url: "/api/swagger",
         dom_id: '#swagger-ui',
         presets: [
           SwaggerUIBundle.presets.apis,

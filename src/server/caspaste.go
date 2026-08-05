@@ -16,12 +16,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	chromaLexers "github.com/alecthomas/chroma/v2/lexers"
@@ -1143,8 +1141,17 @@ func main() {
 	flagUpdate := c.AddStringVar("update", "", "Update management: check, yes, branch {stable|beta|daily}, --help", nil)
 	// Color output flag per AI.md PART 8
 	flagColor := c.AddStringVar("color", "auto", "Color output: auto, yes, no (default: auto, respects NO_COLOR)", nil)
+	// Language flag per AI.md PART 8/31 (universal). Unsupported values silently fall back to "en".
+	flagLang := c.AddStringVar("lang", "", "UI/CLI language code (en, es, zh, fr, ar, de, ja). Unsupported values fall back to en.", nil)
+	// Base URL path prefix for sub-path hosting per AI.md PART 8/12.
+	flagBaseURL := c.AddStringVar("baseurl", "", "Base URL path prefix for reverse-proxy sub-path hosting (default: /).", nil)
 
 	c.Parse()
+
+	// Apply --lang immediately per AI.md PART 31: normalize with silent "en" fallback.
+	if *flagLang != "" {
+		config.SetDefaultLang(config.NormalizeLang(*flagLang))
+	}
 
 	// Apply --color flag immediately after parsing per AI.md PART 8
 	if *flagColor != "" {
@@ -1161,9 +1168,11 @@ func main() {
 		fmt.Println("  --daemon            Start in background (daemon mode)")
 		fmt.Println("  --debug             Enable debug logging")
 		fmt.Println("  --color MODE        Color output: auto, yes, no (default: auto, respects NO_COLOR)")
+		fmt.Println("  --lang CODE         UI/CLI language: en, es, zh, fr, ar, de, ja (default: en)")
 		fmt.Println("\nServer Configuration:")
 		fmt.Println("  --address ADDR      Listen address (default: :80)")
 		fmt.Println("  --port PORT         Listen port (alternative to --address)")
+		fmt.Println("  --baseurl PREFIX    Base URL path prefix for sub-path hosting (default: /)")
 		fmt.Println("  --mode MODE         Application mode: production or development (default: production)")
 		fmt.Println("\nDirectories:")
 		fmt.Println("  --data DIR          Data directory")
@@ -1420,6 +1429,17 @@ func main() {
 	// ALWAYS apply security-critical environment overrides (every run)
 	// This allows containerized deployments to change auth settings without deleting config
 	config.ApplyCriticalOverrides(yamlCfg)
+
+	// Resolve base URL precedence per AI.md PART 12: flag > env > config > default "/".
+	baseURL := yamlCfg.Web.BaseURL
+	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
+		baseURL = envBaseURL
+	}
+	if *flagBaseURL != "" {
+		baseURL = *flagBaseURL
+	}
+	yamlCfg.Web.BaseURL = config.NormalizeBaseURL(baseURL)
+	config.SetBaseURL(yamlCfg.Web.BaseURL)
 
 	// Handle authentication setup
 	// If server.public=false (private instance), auto-generate admin credentials if needed
@@ -2151,6 +2171,7 @@ func main() {
 		Public:               yamlCfg.Server.Public,
 		CasPasswdFile:        yamlCfg.Security.PasswordFile,
 		DataDir:              dataDir,
+		HealthzRootEnabled:   yamlCfg.Server.Healthz.Root.Enabled,
 	}
 
 	apiv1Data := apiv1.Load(db, cfg)
@@ -2331,8 +2352,12 @@ func main() {
 		Host:        "localhost",
 	}
 	swaggerHandler := swagger.NewHandler(swaggerCfg)
-	mux.HandleFunc("/openapi", swaggerHandler.ServeUI)
-	mux.HandleFunc("/openapi.json", swaggerHandler.ServeSpec)
+	// Swagger UI on the frontend; OpenAPI JSON spec on the versioned API path
+	// plus the unversioned alias, both served directly (no redirect) per
+	// AI.md PART 14. Old /openapi and /openapi.json paths are removed.
+	mux.HandleFunc("/server/docs/swagger", swaggerHandler.ServeUI)
+	mux.HandleFunc("/api/swagger", swaggerHandler.ServeSpec)
+	mux.HandleFunc(config.APIBasePath()+"/server/swagger", swaggerHandler.ServeSpec)
 
 	// Register GraphQL endpoint per AI.md PART 14
 	// GET = GraphiQL UI, POST = query execution
@@ -2349,7 +2374,12 @@ func main() {
 		Title:   yamlCfg.Server.Title,
 		Version: cfg.Version,
 	}, graphqlResolvers)
-	mux.Handle("/graphql", graphqlHandler)
+	// GraphiQL UI on the frontend; GraphQL query endpoint on the versioned API
+	// path plus the unversioned alias, both served directly (no redirect) per
+	// AI.md PART 14. Old root /graphql path is removed.
+	mux.HandleFunc("/server/docs/graphql", graphqlHandler.ServeGraphiQL)
+	mux.Handle("/api/graphql", http.HandlerFunc(graphqlHandler.HandleQuery))
+	mux.Handle(config.APIBasePath()+"/server/graphql", http.HandlerFunc(graphqlHandler.HandleQuery))
 
 	// Register Prometheus metrics endpoint per AI.md PART 21
 	// INTERNAL ONLY - should be firewalled from public access
@@ -2693,10 +2723,10 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Setup signal handling for graceful shutdown
-	// Works on Windows, macOS, BSD, and Linux
+	// Setup signal handling per AI.md PART 8 signal table
+	// Platform-specific registration lives in signals_*.go
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+	registerSignals(sigChan)
 
 	// Start HTTP server in a goroutine
 	httpErrors := make(chan error, 1)
@@ -2811,54 +2841,109 @@ func main() {
 		}()
 	}
 
-	// Wait for interrupt signal or server error
-	select {
-	case err := <-httpErrors:
-		if err != nil && err != http.ErrServerClosed {
-			exitOnError(err)
-		}
-
-	case err := <-httpsErrors:
-		if err != nil && err != http.ErrServerClosed {
-			exitOnError(err)
-		}
-
-	case sig := <-sigChan:
-		log.Info(fmt.Sprintf("Received signal %v, shutting down gracefully...", sig))
-
-		// Log server stopped event to audit log per AI.md PART 11
-		uptime := time.Since(serverStartTime)
-		audit.ServerStopped(fmt.Sprintf("signal: %v", sig), uptime)
-		audit.CloseGlobal()
-
-		// Create shutdown context with timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		// Attempt graceful shutdown for both servers
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Error(fmt.Errorf("HTTP server shutdown error: %w", err))
-			srv.Close()
-		}
-
-		if srvHTTPS != nil {
-			if err := srvHTTPS.Shutdown(ctx); err != nil {
-				log.Error(fmt.Errorf("HTTPS server shutdown error: %w", err))
-				srvHTTPS.Close()
+	// reopenLogs re-opens each log file in place so an external rotator can move
+	// or truncate them, then rebinds the logger writers per AI.md PART 8 (SIGUSR1).
+	reopenLogs := func() {
+		reopen := func(path string, cur *os.File) *os.File {
+			fd, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				log.Error(fmt.Errorf("reopen log %s: %w", path, err))
+				return cur
 			}
-		}
-
-		// Stop Tor hidden service per AI.md PART 32
-		if torManager != nil {
-			if err := torManager.Stop(); err != nil {
-				log.Error(fmt.Errorf("tor shutdown error: %w", err))
+			if cur != nil {
+				cur.Close()
 			}
+			return fd
 		}
+		accessLogFd = reopen(accessLogPath, accessLogFd)
+		serverLogFd = reopen(serverLogPath, serverLogFd)
+		errorLogFd = reopen(errorLogPath, errorLogFd)
+		log.SetAccessLogWriter(io.Writer(accessLogFd))
+		log.SetFileWriters(serverLogFd, errorLogFd)
+		if debugLogFd != nil {
+			debugLogFd = reopen(filepath.Join(logsDir, debugLogFile), debugLogFd)
+			log.SetDebugWriter(debugLogFd)
+		}
+	}
 
-		// Stop built-in scheduler per AI.md PART 19
-		sched.Stop()
-		log.Info("Scheduler stopped")
+	// dumpStatus writes a runtime snapshot to the log per AI.md PART 8 (SIGUSR2).
+	dumpStatus := func() {
+		uptime := time.Since(serverStartTime).Round(time.Second)
+		log.Info(fmt.Sprintf("Status dump: uptime=%s address=%s port=%d goroutines=%d",
+			uptime, listenAddr, httpPort, runtime.NumGoroutine()))
+	}
 
-		log.Info("Server stopped")
+	// Wait for a terminal signal or a fatal server error. Non-terminal signals
+	// (SIGHUP/SIGUSR1/SIGUSR2) are handled in place and the loop keeps serving.
+	for {
+		select {
+		case err := <-httpErrors:
+			if err != nil && err != http.ErrServerClosed {
+				exitOnError(err)
+			}
+			return
+
+		case err := <-httpsErrors:
+			if err != nil && err != http.ErrServerClosed {
+				exitOnError(err)
+			}
+			return
+
+		case sig := <-sigChan:
+			switch classifySignal(sig) {
+			case sigIgnore:
+				// SIGHUP: configuration auto-reloads via the file watcher
+				log.Info(fmt.Sprintf("Received signal %v, ignoring (config auto-reloads)", sig))
+				continue
+
+			case sigReopenLogs:
+				log.Info(fmt.Sprintf("Received signal %v, reopening log files", sig))
+				reopenLogs()
+				continue
+
+			case sigStatusDump:
+				log.Info(fmt.Sprintf("Received signal %v, dumping status", sig))
+				dumpStatus()
+				continue
+			}
+
+			log.Info(fmt.Sprintf("Received signal %v, shutting down gracefully...", sig))
+
+			// Log server stopped event to audit log per AI.md PART 11
+			uptime := time.Since(serverStartTime)
+			audit.ServerStopped(fmt.Sprintf("signal: %v", sig), uptime)
+			audit.CloseGlobal()
+
+			// Create shutdown context with timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Attempt graceful shutdown for both servers
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Error(fmt.Errorf("HTTP server shutdown error: %w", err))
+				srv.Close()
+			}
+
+			if srvHTTPS != nil {
+				if err := srvHTTPS.Shutdown(ctx); err != nil {
+					log.Error(fmt.Errorf("HTTPS server shutdown error: %w", err))
+					srvHTTPS.Close()
+				}
+			}
+
+			// Stop Tor hidden service per AI.md PART 32
+			if torManager != nil {
+				if err := torManager.Stop(); err != nil {
+					log.Error(fmt.Errorf("tor shutdown error: %w", err))
+				}
+			}
+
+			// Stop built-in scheduler per AI.md PART 19
+			sched.Stop()
+			log.Info("Scheduler stopped")
+
+			log.Info("Server stopped")
+			return
+		}
 	}
 }

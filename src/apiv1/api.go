@@ -119,8 +119,11 @@ func (data *Data) Hand(rw http.ResponseWriter, req *http.Request) {
 
 	// Route API requests
 	switch routePath {
-	// Health check per AI.md PART 13
+	// Health check per AI.md PART 13 — versioned path plus the unversioned
+	// /api/healthz alias, both served directly (no redirect).
 	case apiBase + "/server/healthz":
+		err = data.handleHealthz(rw, req)
+	case "/api/healthz":
 		err = data.handleHealthz(rw, req)
 	// API v1 endpoints per AI.md PART 14 (noun-based REST routes)
 	case apiBase + "/pastes":
@@ -128,6 +131,22 @@ func (data *Data) Hand(rw http.ResponseWriter, req *http.Request) {
 		err = data.handlePastes(rw, req)
 	case apiBase + "/server/info":
 		err = data.handleServerInfo(rw, req)
+
+	// Public server content pages per AI.md PART 14 (versioned only, no alias).
+	case apiBase + "/server/about":
+		err = data.handleServerPage(rw, req, "about", data.ServerAbout)
+	case apiBase + "/server/help":
+		err = data.handleServerPage(rw, req, "help", data.ServerRules)
+	case apiBase + "/server/terms":
+		err = data.handleServerPage(rw, req, "terms", data.ServerTermsOfUse)
+	case apiBase + "/server/privacy":
+		err = data.handleServerPage(rw, req, "privacy", data.ServerTermsOfUse)
+	case apiBase + "/server/contact":
+		err = data.handleServerPage(rw, req, "contact", data.AdminMail)
+
+	// Public discovery document per AI.md PART 14 (unversioned, no secrets).
+	case "/api/autodiscover":
+		err = data.handleAutodiscover(rw, req)
 
 	// External API Compatibility endpoints per AI.md "External API Compatibility"
 	// pastebin.com compatibility

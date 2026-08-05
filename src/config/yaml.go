@@ -38,6 +38,16 @@ type YAMLConfig struct {
 		// When empty, mode is auto-detected per-request from the Host header.
 		APIMode string `yaml:"api_mode"`
 
+		// Health check options per AI.md PART 13
+		Healthz struct {
+			// Optional root-level /healthz alias (default: false)
+			// When true, /healthz mounts the same handler as /server/healthz.
+			Root struct {
+				// Enable the /healthz root alias (default: false)
+				Enabled bool `yaml:"enabled"`
+			} `yaml:"root"`
+		} `yaml:"healthz"`
+
 		Proxy struct {
 			// Additional trusted proxy IPs/CIDRs (appended to default private ranges)
 			Allowed []string `yaml:"allowed"`
@@ -210,6 +220,9 @@ type YAMLConfig struct {
 	} `yaml:"security"`
 
 	Web struct {
+		// Base URL path prefix for sub-path hosting (default: /) per AI.md PART 12
+		BaseURL string `yaml:"base_url"`
+
 		UI struct {
 			// Default paste lifetime
 			DefaultLifetime string `yaml:"default_lifetime"`

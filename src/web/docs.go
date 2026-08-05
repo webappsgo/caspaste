@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"net/http"
 
+	"github.com/webappsgo/caspaste/src/config"
 	"github.com/webappsgo/caspaste/src/netshare"
 )
 
@@ -46,9 +47,14 @@ type docsApiV1Tmpl struct {
 	Translate func(string, ...interface{}) template.HTML
 }
 
-// serverBaseURL returns the scheme+host of the current request.
+// serverBaseURL returns the scheme+host of the current request, including the
+// configured base URL path prefix per AI.md PART 12 when sub-path hosted.
 func serverBaseURL(req *http.Request) string {
-	return netshare.GetProtocol(req) + "://" + netshare.GetHost(req)
+	base := netshare.GetProtocol(req) + "://" + netshare.GetHost(req)
+	if prefix := config.BaseURL(); prefix != "/" {
+		base += prefix
+	}
+	return base
 }
 
 // Pattern: /docs

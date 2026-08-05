@@ -161,15 +161,16 @@ CGO_ENABLED=0) as of session start.
 
 ### Routing / API path compliance (PART 14 / 16)
 
-- [ ] Swagger UI served at forbidden /openapi + /openapi.json (AI.md:22012
-  removes these); required /server/docs/swagger, /api/{v}/server/swagger,
-  /api/swagger NOT mounted.
-- [ ] GraphQL served at forbidden /graphql; required /server/docs/graphql,
-  /api/{v}/server/graphql, /api/graphql NOT mounted.
-- [ ] Missing routes: /api/autodiscover, /api/healthz alias, /server (301→
-  /server/about), /server/privacy, /server/contact, and all
-  /api/{v}/server/{about,privacy,contact,help,terms}; /server/consent POST.
-- [ ] /server/terms served only at /terms (wrong canonical path).
+- [x] Swagger relocated: removed /openapi + /openapi.json; mounted
+  /server/docs/swagger (UI), /api/swagger + /api/{v}/server/swagger (spec);
+  UI now fetches /api/swagger. No redirects.
+- [x] GraphQL relocated: removed /graphql; mounted /server/docs/graphql
+  (GraphiQL), /api/graphql + /api/{v}/server/graphql (query POST).
+- [x] Added routes: /api/autodiscover (public-safe, no admin_path/secrets),
+  /api/healthz alias, /server (301→/server/about), /server/privacy,
+  /server/contact, /api/{v}/server/{about,privacy,contact,help,terms},
+  /server/consent POST.
+- [x] /server/terms is now canonical; /terms 301-redirects to it.
 
 ### PART 7/8/13 (server binary / CLI / versioning)
 
@@ -192,13 +193,16 @@ CGO_ENABLED=0) as of session start.
   querying the running instance/PID (AI.md:11695) — not addressed, LOG.)
 - [ ] (LOG) hand-rolled arg parser (src/cli/cli.go:271) vs PART 8 requirement
   to use stdlib flag package (AI.md:10666).
-- [ ] --lang flag (all binaries, AI.md:10624) NOT registered anywhere.
-- [ ] --baseurl flag (AI.md:10841) NOT registered.
-- [ ] signals: only Interrupt/SIGTERM/SIGINT handled (caspaste.go:2762);
-  missing SIGQUIT (graceful), SIGHUP (ignore), SIGUSR1 (reopen logs), SIGUSR2
-  (status dump), SIGRTMIN+3 (AI.md:11731).
-- [ ] /healthz root alias registered unconditionally (web.go:436); PART 13
-  (AI.md:19623) gates it on server.healthz.root.enabled.
+- [x] --lang flag registered on server (caspaste.go) and CLI (client/main.go);
+  unsupported values fall back to en; wired to i18n/Accept-Language.
+- [x] --baseurl flag registered on server (flag > env BASE_URL > config >
+  default /); wired into base-URL resolution.
+- [x] signals: added SIGQUIT (graceful), SIGHUP (ignore/auto-reload), SIGUSR1
+  (reopen logs), SIGUSR2 (status dump), SIGRTMIN+3 (graceful) via
+  platform-split signals_{unix,linux,unix_other,windows}.go.
+- [x] /healthz root alias now gated on server.healthz.root.enabled
+  (config Server.Healthz.Root.Enabled); disabled falls through like any
+  unknown path; /server/healthz stays canonical/unconditional.
 - [ ] (minor) embedded-asset layout: code embeds src/web/data/* only; spec
   expects src/server/template|static + src/data (AI.md:9898).
 

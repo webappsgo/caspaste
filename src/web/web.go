@@ -55,6 +55,8 @@ type Data struct {
 	ListPage       *template.Template
 	About          *template.Template
 	TermsOfUse     *template.Template
+	Privacy        *template.Template
+	Contact        *template.Template
 	Authors        *template.Template
 	License        *template.Template
 	SourceCodePage *template.Template
@@ -115,6 +117,9 @@ type Data struct {
 	// true = open/public (no auth), false = auth required
 	Public        bool
 	CasPasswdFile string
+
+	// HealthzRootEnabled gates the optional /healthz root alias per AI.md PART 13
+	HealthzRootEnabled bool
 
 	// Brute force protection for login (5 attempts, 15 min lockout per AI.md)
 	BruteForce *caspasswd.BruteForceProtection
@@ -177,6 +182,7 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 	data.UiDefaultLifeTime = cfg.UiDefaultLifetime
 	data.UiDefaultTheme = cfg.UiDefaultTheme
 	data.Public = cfg.Public
+	data.HealthzRootEnabled = cfg.HealthzRootEnabled
 	// Anonymous pastebin: no multi-user, so login link shown only when
 	// an htpasswd file is configured (server.public=false).
 	data.ShowLogin = cfg.CasPasswdFile != ""
@@ -328,6 +334,18 @@ func Load(db storage.DB, cfg config.Config) (*Data, error) {
 		return nil, err
 	}
 
+	// privacy.tmpl
+	data.Privacy, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/privacy.tmpl")
+	if err != nil {
+		return nil, err
+	}
+
+	// contact.tmpl
+	data.Contact, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/contact.tmpl")
+	if err != nil {
+		return nil, err
+	}
+
 	// authors.tmpl
 	data.Authors, err = template.ParseFS(embFS, "data/base.tmpl", "data/_header.tmpl", "data/_nav.tmpl", "data/_footer.tmpl", "data/authors.tmpl")
 	if err != nil {
@@ -431,10 +449,15 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 
 	switch req.URL.Path {
 	// Health checks per AI.md PART 13
-	// /healthz and /server/healthz — content-negotiated (HTML/JSON/text)
+	// /server/healthz — canonical, always served (content-negotiated HTML/JSON/text)
+	// /healthz — optional root alias, only when server.healthz.root.enabled is true
 	// /api/v1/server/healthz — JSON API (handled by apiv1 package)
 	case "/healthz":
-		err = data.handleHealthz(rw, req)
+		if data.HealthzRootEnabled {
+			err = data.handleHealthz(rw, req)
+		} else {
+			err = data.handleGetPaste(rw, req)
+		}
 	case "/server/healthz":
 		err = data.handleHealthz(rw, req)
 	// Search engines
@@ -474,8 +497,18 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 	case "/sw.js":
 		err = data.handleServiceWorker(rw, req)
 	// Server routes - Per AI.md PART 16
+	case "/server":
+		http.Redirect(rw, req, "/server/about", http.StatusMovedPermanently)
 	case "/server/about":
 		err = data.handleAbout(rw, req)
+	case "/server/privacy":
+		err = data.handlePrivacy(rw, req)
+	case "/server/contact":
+		err = data.handleContact(rw, req)
+	case "/server/terms":
+		err = data.handleTermsOfUse(rw, req)
+	case "/server/consent":
+		err = data.handleConsent(rw, req)
 	case "/server/about/authors":
 		err = data.handleAuthors(rw, req)
 	case "/server/about/license":
@@ -532,8 +565,9 @@ func (data *Data) Handler(rw http.ResponseWriter, req *http.Request) {
 		err = data.handleList(rw, req)
 	case "/settings":
 		err = data.handleSettings(rw, req)
+	// Legacy /terms route — 301 redirect to canonical /server/terms
 	case "/terms":
-		err = data.handleTermsOfUse(rw, req)
+		http.Redirect(rw, req, "/server/terms", http.StatusMovedPermanently)
 	// Else
 	default:
 		if strings.HasPrefix(req.URL.Path, "/dl/") {

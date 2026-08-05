@@ -1,0 +1,21 @@
+{{/*
+   This file is part of CasPaste.
+
+   CasPaste is free software released under the MIT License.
+   See LICENSE file for details.
+*/}}
+
+{{define "titlePrefix"}}{{ call .Translate `contact.Title`}} | {{end}}
+{{define "headAppend"}}{{end}}
+{{define "article"}}
+<h3>{{ call .Translate `contact.Title` }}</h3>
+<p>{{ call .Translate `contact.Intro` }}</p>
+{{if ne .AdminName ``}}
+<p>{{ call .Translate `contact.Administrator` }} {{ .AdminName }}</p>
+{{end}}
+{{if ne .AdminMail ``}}
+<p>{{ call .Translate `contact.Email` }} <a href="mailto:{{ .AdminMail }}">{{ .AdminMail }}</a></p>
+{{else}}
+<p>{{ call .Translate `contact.NoContact` }}</p>
+{{end}}
+{{end}}

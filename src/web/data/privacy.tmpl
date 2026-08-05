@@ -1,0 +1,21 @@
+{{/*
+   This file is part of CasPaste.
+
+   CasPaste is free software released under the MIT License.
+   See LICENSE file for details.
+*/}}
+
+{{define "titlePrefix"}}{{ call .Translate `privacy.Title`}} | {{end}}
+{{define "headAppend"}}{{end}}
+{{define "article"}}
+<h3>{{ call .Translate `privacy.Title` }}</h3>
+<p>{{ call .Translate `privacy.Intro` }}</p>
+<ul>
+  <li>{{ call .Translate `privacy.Collect` }}</li>
+  <li>{{ call .Translate `privacy.Retention` }}</li>
+  <li>{{ call .Translate `privacy.NoTracking` }}</li>
+</ul>
+{{if ne .AdminMail ``}}
+<p>{{ call .Translate `privacy.Contact` }} <a href="mailto:{{ .AdminMail }}">{{ .AdminMail }}</a></p>
+{{end}}
+{{end}}

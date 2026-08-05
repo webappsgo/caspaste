@@ -332,6 +332,11 @@ func ApplyEnvironmentOverrides(cfg *YAMLConfig) {
 	if val := getEnv("API_MODE"); val != "" {
 		cfg.Server.APIMode = val
 	}
+
+	// Base URL path prefix for sub-path hosting per AI.md PART 12.
+	if val := getEnv("BASE_URL"); val != "" {
+		cfg.Web.BaseURL = val
+	}
 }
 
 // ApplyCriticalOverrides applies security-critical environment variables on EVERY run
