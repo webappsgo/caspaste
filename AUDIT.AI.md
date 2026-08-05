@@ -62,7 +62,7 @@ CGO_ENABLED=0) as of session start.
 
 ## Pass 2: Code Quality
 
-- [ ] admin/api.go: THREE production handlers return HTTP 501 "not yet
+- [ ] (LOG) admin/api.go: THREE production handlers return HTTP 501 "not yet
   implemented": apiPatchSettings (:74), apiCreateBackup (:236), apiEmailTest
   (:257). All three are spec-mandated (PART 17: PATCH /config/settings :31487,
   POST /config/backup :31605, POST /config/email/test :31582). (LOG — needs
@@ -72,10 +72,10 @@ CGO_ENABLED=0) as of session start.
   (computeContentChecksum); verify recomputes it over the extracted files
   (skipping manifest.json) and fails on mismatch. Removed dead calculateChecksum;
   added verify_test.go round-trip + determinism tests.
-- [ ] email: src/email/email.go Send()/NewClient() are never called anywhere
+- [ ] (LOG) email: src/email/email.go Send()/NewClient() are never called anywhere
   (dead code) — no welcome/verification/reset/invite email wired to any event.
   (LOG — subsystem integration.)
-- [ ] token/token.go user+org token CRUD (CreateUserToken/CreateOrgToken/
+- [ ] (LOG) token/token.go user+org token CRUD (CreateUserToken/CreateOrgToken/
   ListOrgTokens/…) never called outside package — dead until multi-user/orgs
   are wired (PART 34/35). (LOG.)
 
@@ -212,7 +212,7 @@ CGO_ENABLED=0) as of session start.
 - [x] /healthz root alias now gated on server.healthz.root.enabled
   (config Server.Healthz.Root.Enabled); disabled falls through like any
   unknown path; /server/healthz stays canonical/unconditional.
-- [ ] (minor) embedded-asset layout: code embeds src/web/data/* only; spec
+- [ ] (LOG) (minor) embedded-asset layout: code embeds src/web/data/* only; spec
   expects src/server/template|static + src/data (AI.md:9898).
 
 ### PART 6 runtime-mode dispatch
@@ -236,12 +236,13 @@ CGO_ENABLED=0) as of session start.
   written, no change. Only PORT is genuinely ambiguous (AI.md self-contradicts:
   CASPASTE_PORT at 13300/11229 vs bare PORT at 589/617) — logged to TODO.AI.md
   as a human-only naming decision rather than guessed.
-- [ ] Many PART 12 config trees absent from YAMLConfig struct: server.baseurl,
-  compression, session, full rate_limit, i18n, contact, tracking, privacy.
+- [ ] (LOG) Many PART 12 config trees absent from YAMLConfig struct: server.baseurl,
+  compression, session, full rate_limit, i18n, contact, tracking, privacy
+  (feature-sized config-tree expansion, not a targeted bug fix).
 
 ## Pass 6: Code Flow Trace
 
-- [ ] Dead public API: token user/org CRUD (see Pass 2); email Send/NewClient
+- [ ] (LOG) Dead public API: token user/org CRUD (see Pass 2); email Send/NewClient
   (see Pass 2) — both unreachable until their subsystems are wired.
 - [x] Env var completeness: verified every operational runtime var the code
   actually reads bare (MODE, DEBUG, DOMAIN, BASE_URL, NO_COLOR, TZ, SMTP_HOST/
