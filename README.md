@@ -67,8 +67,7 @@ services:
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
     environment:
-      - TZ=America/New_York
-      - MODE=production
+      TZ: America/New_York
 ```
 
 **With PostgreSQL:**
@@ -86,19 +85,18 @@ services:
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
     environment:
-      - TZ=America/New_York
-      - MODE=production
-      - CASPASTE_DB_DRIVER=postgres
-      - CASPASTE_DB_SOURCE=postgres://caspaste:changeme@caspaste-db:5432/caspaste?sslmode=disable
+      TZ: America/New_York
+      CASPASTE_DB_DRIVER: postgres
+      CASPASTE_DB_SOURCE: postgres://caspaste:changeme@caspaste-db:5432/caspaste?sslmode=disable
 
   caspaste-db:
     image: postgres:16-alpine
     restart: always
     pull_policy: always
     environment:
-      - POSTGRES_DB=caspaste
-      - POSTGRES_USER=caspaste
-      - POSTGRES_PASSWORD=changeme
+      POSTGRES_DB: caspaste
+      POSTGRES_USER: caspaste
+      POSTGRES_PASSWORD: changeme
     volumes:
       - ./volumes/data/db/postgres/caspaste:/var/lib/postgresql/data:z
 ```
@@ -217,6 +215,16 @@ the source of truth for subsequent runs.
 | `CASPASTE_BACKUP_DIR` | Backup directory |
 | `CASPASTE_DB_DRIVER` | `sqlite` (default), `postgres`, `mysql` |
 | `CASPASTE_DB_SOURCE` | Connection string or SQLite filename |
+| `MODE` | `production` (default) or `development` |
+| `DEBUG` | `true` enables debug output and `/debug/*` endpoints |
+| `DOMAIN` | Public FQDN clients use to reach the server |
+| `BASE_URL` | Base path when served behind a sub-path proxy (default `/`) |
+| `NO_COLOR` | Any non-empty value disables colored/emoji output |
+| `TZ` | Container/process time zone |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server host and port |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | SMTP authentication credentials |
+| `SMTP_FROM_NAME` / `SMTP_FROM_EMAIL` | Sender identity for outbound email |
+| `SMTP_TLS` | Enable TLS for the SMTP connection |
 
 ### Authentication (Private Mode)
 

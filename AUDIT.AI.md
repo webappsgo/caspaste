@@ -243,9 +243,14 @@ CGO_ENABLED=0) as of session start.
 
 - [ ] Dead public API: token user/org CRUD (see Pass 2); email Send/NewClient
   (see Pass 2) — both unreachable until their subsystems are wired.
-- [ ] Env var completeness: PORT/SMTP_*/MODE/DEBUG read without CASPASTE_
-  prefix (see PART 5/12). Verify all read env vars are documented in README/
-  docs and docker-compose defaults once the config decision is made.
+- [x] Env var completeness: verified every operational runtime var the code
+  actually reads bare (MODE, DEBUG, DOMAIN, BASE_URL, NO_COLOR, TZ, SMTP_HOST/
+  PORT/USERNAME/PASSWORD/FROM_NAME/FROM_EMAIL/TLS — all confirmed via grep of
+  src/) is now documented in README "Key Environment Variables". Also fixed the
+  two README production docker-compose examples that still used list-style env
+  with MODE (PART 27) to match the corrected docker/docker-compose.yml. The
+  bare-vs-`CASPASTE_`-prefixed PORT name remains the one genuinely ambiguous
+  case (AI.md self-contradicts) — logged to TODO.AI.md, not guessed.
 
 ## Docker (PART 27)
 
