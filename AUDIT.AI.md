@@ -211,9 +211,11 @@ CGO_ENABLED=0) as of session start.
 
 - [ ] GenerateDefaultYAMLConfig hardcodes Linux-only dir defaults
   (yaml.go:670); runtime resolvers are per-OS so impact limited.
-- [ ] Bare unprefixed env vars coexist with CASPASTE_ convention: PORT
-  (caspaste.go:2646), SMTP_* (email.go:55), MODE/DEBUG (mode.go:114) — needs
-  an explicit decision (deliberate PaaS convention vs gap).
+- [x] Bare unprefixed env vars: RESOLVED. MODE/DEBUG are spec-authored bare
+  (AI.md:9858, 9863) and SMTP_* is spec-authored bare (PART 18) — correct as
+  written, no change. Only PORT is genuinely ambiguous (AI.md self-contradicts:
+  CASPASTE_PORT at 13300/11229 vs bare PORT at 589/617) — logged to TODO.AI.md
+  as a human-only naming decision rather than guessed.
 - [ ] Many PART 12 config trees absent from YAMLConfig struct: server.baseurl,
   compression, session, full rate_limit, i18n, contact, tracking, privacy.
 

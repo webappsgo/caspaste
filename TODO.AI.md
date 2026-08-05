@@ -24,3 +24,18 @@ Revisit if/when CORS config, security-header config, or the template
 loader gain the hooks needed to distinguish "default" from
 "user-configured" behavior.
 
+## [ ] Decide the PORT env-var name (bare `PORT` vs `CASPASTE_PORT`)
+Read: AI.md PART 8 flag table (line 13300) and port-resolution flow
+(lines 11229, 11264) vs the Docker/container sections (lines 589, 617).
+AI.md is internally contradictory for the listen-port env var: the flag
+table and startup port-resolution flow specify `{PROJECT_NAME}_PORT`
+(= `CASPASTE_PORT`), while the container/Docker sections and the distilled
+config-rules init-only list specify a bare `PORT`. The code currently reads
+bare `PORT` (src/server/caspaste.go:2646). This is a naming decision only
+the user can settle; do not guess. Once decided, align the code and document
+the chosen name in README + docker-compose defaults.
+NOTE: the other flagged env vars are NOT ambiguous and need no change —
+`MODE`/`DEBUG` are spec-authored bare (AI.md:9858, 9863) and `SMTP_*` are
+spec-authored bare (PART 18 "honor SMTP_* env vars"); the bare forms in
+src/server/mode.go and src/notify/email.go are correct as written.
+
