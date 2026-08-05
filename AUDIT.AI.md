@@ -88,9 +88,10 @@ CGO_ENABLED=0) as of session start.
   PingContext check added to NewPool.
 - [x] server: random-port range was 64000-65535 (caspaste.go:~2665);
   AI.md:18150 specifies 64000-64999. Fixed.
-- [ ] privilege/privilege_linux.go:29-37 findAvailableUID iterates 200..900
-  ascending with NO reserved-ID skip list; PART 24 (AI.md:36365) mandates
-  skipping 65534, 999-980, 170-179, 101-110 and range top 899, descending.
+- [x] privilege/privilege_linux.go findAvailableUID — FIXED: now scans 899→200
+  descending, skips reservedIDs map (65534, 999-980, 170-179, 101-110), and
+  requires both UID and GID free (user.LookupId + LookupGroupId + /etc/passwd
+  fallback), per PART 24 (AI.md:37358-37408).
 - [ ] updater/update_unix.go:29 uses os.CreateTemp("") then os.Rename onto the
   binary — cross-filesystem target (/usr/local/bin) fails EXDEV, no copy
   fallback. LOW.

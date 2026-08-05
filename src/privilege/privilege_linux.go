@@ -26,19 +26,58 @@ const (
 	CasPasteGroup = "caspaste"
 )
 
-// findAvailableUID finds first available UID in range 200-900
-// No hardcoded preference - always finds the first available on the runtime system
-func findAvailableUID() (int, error) {
-	for uid := 200; uid <= 900; uid++ {
-		if !isUIDInUse(uid) {
-			return uid, nil
-		}
-	}
-	return 0, fmt.Errorf("no available UID in range 200-900")
+// reservedIDs holds UIDs/GIDs used by well-known services across distros.
+// These are NEVER used even if they appear available on the current system.
+var reservedIDs = map[int]bool{
+	// nobody/nogroup
+	65534: true,
+	// systemd-*, docker, kvm (999-990)
+	999: true, 998: true, 997: true, 996: true, 995: true,
+	994: true, 993: true, 992: true, 991: true, 990: true,
+	// sgx, pipewire, colord, avahi, rtkit, saned (989-980)
+	989: true, 988: true, 987: true, 986: true, 985: true,
+	984: true, 983: true, 982: true, 981: true, 980: true,
+	// common services: sshd, postfix, dovecot (101-110)
+	101: true, 102: true, 103: true, 104: true, 105: true,
+	106: true, 107: true, 108: true, 109: true, 110: true,
+	// database servers: postgres, mysql (170-179)
+	170: true, 171: true, 172: true, 173: true, 174: true,
+	175: true, 176: true, 177: true, 178: true, 179: true,
 }
 
-// isUIDInUse checks if a UID is already in use
-func isUIDInUse(uid int) bool {
+// findAvailableUID finds an available ID in the safe range 200-899,
+// scanning from the top (899) down to 200 to avoid the well-known service
+// IDs clustered at the top (900-999) and bottom (100-199) of 100-999.
+// It skips reserved IDs and requires both the UID and the GID to be free.
+func findAvailableUID() (int, error) {
+	for id := 899; id >= 200; id-- {
+		if reservedIDs[id] {
+			continue
+		}
+		if isIDInUse(id) {
+			continue
+		}
+		return id, nil
+	}
+	return 0, fmt.Errorf("no available UID/GID in safe range 200-899")
+}
+
+// isIDInUse reports whether the given numeric ID is already taken by either a
+// user (UID) or a group (GID). Both must be free so the service account can use
+// a single matching UID/GID value.
+func isIDInUse(id int) bool {
+	if _, err := user.LookupId(strconv.Itoa(id)); err == nil {
+		return true
+	}
+	if _, err := user.LookupGroupId(strconv.Itoa(id)); err == nil {
+		return true
+	}
+	return uidInPasswd(id)
+}
+
+// uidInPasswd is a fallback scan of /etc/passwd for environments where cgo-less
+// user.LookupId cannot see all accounts.
+func uidInPasswd(uid int) bool {
 	file, err := os.Open("/etc/passwd")
 	if err != nil {
 		return false
@@ -47,13 +86,10 @@ func isUIDInUse(uid int) bool {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
-		fields := strings.Split(line, ":")
+		fields := strings.Split(scanner.Text(), ":")
 		if len(fields) >= 3 {
-			if existingUID, err := strconv.Atoi(fields[2]); err == nil {
-				if existingUID == uid {
-					return true
-				}
+			if existingUID, err := strconv.Atoi(fields[2]); err == nil && existingUID == uid {
+				return true
 			}
 		}
 	}
