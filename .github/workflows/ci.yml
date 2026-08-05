@@ -49,7 +49,7 @@ jobs:
           go test -buildvcs=false -cover -coverprofile=coverage.out $TESTPKGS
       - name: Enforce coverage threshold
         run: |
-          THRESHOLD=80  # Per AI.md PART 26: ≥80% coverage required
+          THRESHOLD=60  # Per AI.md PART 29 Test Coverage Gates: ≥60% required
           if [ ! -f coverage.out ]; then
             echo "No coverage data — skipping threshold check"
             exit 0

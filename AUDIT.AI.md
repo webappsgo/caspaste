@@ -117,6 +117,15 @@ CGO_ENABLED=0) as of session start.
 
 ## Pass 5: Spec and Rules Compliance
 
+- [x] ci.yml coverage gate set THRESHOLD=80 and mislabeled it "Per AI.md PART 26"
+  — no such 80% requirement exists; AI.md PART 29 Test Coverage Gates (:44165,
+  :44171) mandates ≥60%. FIXED: threshold corrected to 60 with accurate spec
+  reference. Also restored the gate to green (it was red at 59%) by adding
+  backup tests (encryption_test.go, service_test.go) covering encryption
+  round-trips, service getters/List/Delete, copyDir/moveFile, error
+  classifiers and retention clamping — backup pkg 32.3% → 48.6%, CI aggregate
+  59% → 66.7%.
+
 ### Major NOT-IMPLEMENTED feature layers (LOG — feature-sized; needs a
 ### human scope decision. These are core business logic, so per the audit
 ### "red flags — stop and ask" rule they are recorded, not auto-built.)
