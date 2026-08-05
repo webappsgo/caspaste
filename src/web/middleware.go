@@ -99,24 +99,80 @@ func SecurityHeadersMiddleware(cfg SecurityHeadersConfig) func(http.Handler) htt
 	}
 }
 
-// CORSMiddleware adds CORS headers to all responses
-func CORSMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Allow all origins (as requested by user)
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-		// 24 hours
-		w.Header().Set("Access-Control-Max-Age", "86400")
+// CORSConfig holds the resolved CORS policy per AI.md PART 16 → CORS.
+type CORSConfig struct {
+	// Enabled: when false, no CORS headers are emitted (same-origin only).
+	Enabled bool
+	// AllowedOrigins is the resolved explicit allow-list (config + DOMAIN env +
+	// proxy-learned hosts). An empty list means "fall back to *".
+	AllowedOrigins []string
+	AllowedMethods []string
+	AllowedHeaders []string
+	MaxAge         int
+}
 
-		// Handle preflight requests
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusNoContent)
-			return
+// CORSMiddleware adds credential-aware CORS headers per AI.md PART 16 → CORS.
+// Credentials (Access-Control-Allow-Credentials: true) are sent only when the
+// resolved origin list is explicit — never with the "*" fallback.
+func CORSMiddleware(cfg CORSConfig) func(http.Handler) http.Handler {
+	methods := "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+	if len(cfg.AllowedMethods) > 0 {
+		methods = strings.Join(cfg.AllowedMethods, ", ")
+	}
+	headers := "Content-Type, Accept, X-Requested-With, Authorization, X-API-Key, X-Api-Key, API-Key, ApiKey, X-Auth-Token, X-Access-Token, X-Token, Token, X-CSRF-Token, X-XSRF-Token, X-Session-ID, X-Service-Token, X-Internal-Token"
+	if len(cfg.AllowedHeaders) > 0 {
+		headers = strings.Join(cfg.AllowedHeaders, ", ")
+	}
+	maxAge := "86400"
+	if cfg.MaxAge > 0 {
+		maxAge = fmt.Sprintf("%d", cfg.MaxAge)
+	}
+
+	// Explicit list excludes the "*" sentinel (which means "unset → fallback").
+	explicit := make([]string, 0, len(cfg.AllowedOrigins))
+	for _, o := range cfg.AllowedOrigins {
+		if o != "" && o != "*" {
+			explicit = append(explicit, o)
 		}
+	}
 
-		next.ServeHTTP(w, r)
-	})
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !cfg.Enabled {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if len(explicit) > 0 {
+				// Credential-aware: echo the specific origin only when it
+				// matches the allow-list, and only then allow credentials.
+				origin := r.Header.Get("Origin")
+				for _, allowed := range explicit {
+					if strings.EqualFold(origin, allowed) {
+						w.Header().Set("Access-Control-Allow-Origin", origin)
+						w.Header().Set("Access-Control-Allow-Credentials", "true")
+						w.Header().Add("Vary", "Origin")
+						break
+					}
+				}
+			} else {
+				// Fallback: allow all origins, credentials NOT allowed.
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			}
+
+			w.Header().Set("Access-Control-Allow-Methods", methods)
+			w.Header().Set("Access-Control-Allow-Headers", headers)
+			w.Header().Set("Access-Control-Max-Age", maxAge)
+
+			// Handle preflight requests
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // MaintenanceMiddleware checks for maintenance mode file

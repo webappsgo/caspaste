@@ -47,9 +47,12 @@ CGO_ENABLED=0) as of session start.
   logout/session-revoke. Fixed: added all headers to SecurityHeadersMiddleware
   (config-driven, spec defaults), Clear-Site-Data set on web+admin logout,
   HSTS default bumped to 2yr+preload.
-- [ ] web/middleware:66-83 CORSMiddleware hardcodes
+- [x] web/middleware:66-83 CORSMiddleware hardcodes
   `Access-Control-Allow-Origin: *`. Not credential-aware/auto-detected per
-  PART 16 CORS model. (Allow-Credentials unset, so not directly exploitable.)
+  PART 16 CORS model. Fixed: CORSMiddleware now takes CORSConfig; resolves
+  explicit config origins + DOMAIN env entries, echoes the specific matched
+  origin with Allow-Credentials:true, falls back to "*" (no creds) only when
+  the list is empty; full spec auth-header list; Vary: Origin.
 - [ ] backup: extraction has Zip-Slip guard (good) but no max-uncompressed-
   size / file-count / compression-bomb limit (AI.md:15228). Admin-only. LOW.
 

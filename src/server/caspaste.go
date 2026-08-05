@@ -2382,6 +2382,29 @@ func main() {
 		APIVersion:              config.APIVersion(),
 	}
 
+	// CORS policy per AI.md PART 16 → "CORS Allow-list Resolution Order":
+	// explicit config origins → DOMAIN env entries → "*" fallback. When the
+	// resolved list is explicit, credentials are allowed and the specific
+	// origin is echoed; the "*" fallback never sends credentials.
+	corsOrigins := make([]string, 0, len(yamlCfg.Security.CORS.AllowedOrigins))
+	for _, o := range yamlCfg.Security.CORS.AllowedOrigins {
+		if o != "" && o != "*" {
+			corsOrigins = append(corsOrigins, o)
+		}
+	}
+	for _, host := range strings.Fields(strings.ReplaceAll(os.Getenv("DOMAIN"), ",", " ")) {
+		if host != "" {
+			corsOrigins = append(corsOrigins, "https://"+host)
+		}
+	}
+	corsCfg := web.CORSConfig{
+		Enabled:        yamlCfg.Security.CORS.Enabled,
+		AllowedOrigins: corsOrigins,
+		AllowedMethods: yamlCfg.Security.CORS.AllowedMethods,
+		AllowedHeaders: yamlCfg.Security.CORS.AllowedHeaders,
+		MaxAge:         yamlCfg.Security.CORS.MaxAge,
+	}
+
 	// CSRF protection config per AI.md PART 11
 	csrfCfg := web.CSRFConfig{
 		Enabled:     yamlCfg.Security.CSRF.Enabled,
@@ -2436,7 +2459,7 @@ func main() {
 				web.RequestIDMiddleware(
 					metric.Middleware(metricsCfg)(
 						web.SecurityHeadersMiddleware(securityHeadersCfg)(
-							web.CORSMiddleware(
+							web.CORSMiddleware(corsCfg)(
 								web.CSRFMiddleware(csrfCfg)(
 									web.MaintenanceMiddleware(dataDir,
 										compatData.Middleware(mux))))))))))

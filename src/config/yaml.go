@@ -606,8 +606,16 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// CORS Configuration
 	defaultConfig.Security.CORS.Enabled = true
 	defaultConfig.Security.CORS.AllowedOrigins = []string{"*"}
-	defaultConfig.Security.CORS.AllowedMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"}
-	defaultConfig.Security.CORS.AllowedHeaders = []string{"Content-Type", "Authorization", "X-Requested-With"}
+	defaultConfig.Security.CORS.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	// Full auth-header list per AI.md PART 16 → CORS Headers (never "*", since
+	// wildcard Allow-Headers excludes Authorization and is invalid with creds)
+	defaultConfig.Security.CORS.AllowedHeaders = []string{
+		"Content-Type", "Accept", "X-Requested-With", "Authorization",
+		"X-API-Key", "X-Api-Key", "API-Key", "ApiKey",
+		"X-Auth-Token", "X-Access-Token", "X-Token", "Token",
+		"X-CSRF-Token", "X-XSRF-Token", "X-Session-ID",
+		"X-Service-Token", "X-Internal-Token",
+	}
 	// 24 hours
 	defaultConfig.Security.CORS.MaxAge = 86400
 
