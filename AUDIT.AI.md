@@ -222,8 +222,15 @@ CGO_ENABLED=0) as of session start.
 
 ### PART 5 / 12 config
 
-- [ ] GenerateDefaultYAMLConfig hardcodes Linux-only dir defaults
-  (yaml.go:670); runtime resolvers are per-OS so impact limited.
+- [ ] (LOG) GenerateDefaultYAMLConfig hardcodes Linux-only dir defaults
+  (yaml.go:713-718). Investigating this uncovered a deeper split-brain: the
+  org segment of every OS path disagrees across the tree — src/path/path.go
+  uses `webappsgo` (imported ONLY by src/ssl), while server/storage/config/
+  client/tui hardcode `casapps`, and IDEA.md self-contradicts (line 33
+  webappsgo vs line 50 plist casapps). The correct fix is to route yaml.go
+  through the shared per-OS resolver, but which org that resolver bakes in is
+  a FROZEN-identifier decision only the user can make (data-path relocation
+  risk). Logged to TODO.AI.md; no code changed to avoid guessing.
 - [x] Bare unprefixed env vars: RESOLVED. MODE/DEBUG are spec-authored bare
   (AI.md:9858, 9863) and SMTP_* is spec-authored bare (PART 18) — correct as
   written, no change. Only PORT is genuinely ambiguous (AI.md self-contradicts:
