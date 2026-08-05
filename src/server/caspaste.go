@@ -2606,11 +2606,11 @@ func main() {
 	// Determine ports (HTTP and optionally HTTPS)
 	var httpPort, httpsPort int
 
-	// Check for PORT environment variable override
-	portEnv := os.Getenv("PORT")
-	if portEnv == "" {
-		portEnv = os.Getenv("CASPASTE_PORT")
-	}
+	// Check for CASPASTE_PORT environment variable override per AI.md PART 8
+	// flag table ({PROJECT_NAME}_PORT). Bare PORT is a Docker-only convention
+	// already translated into --port by docker/rootfs/.../entrypoint.sh
+	// before the binary ever runs, so the binary itself never reads it.
+	portEnv := os.Getenv("CASPASTE_PORT")
 
 	if portEnv != "" {
 		// ENV overrides config
