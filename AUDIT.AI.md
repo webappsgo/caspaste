@@ -98,22 +98,21 @@ CGO_ENABLED=0) as of session start.
 
 ## Pass 4: Documentation Completeness
 
-- [ ] docs/: missing security.md, integrations.md, stylesheets/dark.css
-  (PART 3 tree). (Pre-logged in TODO.AI.md item 3.)
+- [x] docs/: security.md, integrations.md, stylesheets/dark.css, light.css all
+  present with real content (resolved in commit 5ff3569).
 - [x] .readthedocs.yml should be .readthedocs.yaml (AI.md:45579); pins
   ubuntu-22.04/py3.11, template wants ubuntu-24.04/py3.12. Fixed: renamed,
   bumped.
 - [x] docs/requirements.txt missing mkdocs-minify-plugin>=0.7.0 and
   pymdown-extensions>=10.0 (AI.md:45761). Fixed: both added.
-- [ ] mkdocs.yml: minify plugin now added (this pass); still missing
-  extra_css/stylesheets (blocked on the missing dark.css/light.css files —
-  pre-logged TODO.AI.md item 3), incomplete markdown_extensions, nav
-  missing Security+Integrations pages, no extra:/social.
-- [ ] README.md section order does not match PART 1. (Pre-logged item 2.)
-- [ ] .claude/rules/*.md (14 cheatsheet files) not created (PART 0).
-  (Pre-logged item 1.)
-- [ ] LICENSE.md "Copyright (c) 2024 webappsgo" — year needs human
-  confirmation of first-publication year. (Pre-logged item 4 — HUMAN.)
+- [x] mkdocs.yml: extra_css (dark.css/light.css), full markdown_extensions,
+  nav with Security+Integrations, extra:/social all present (commit 5ff3569).
+- [x] README.md section order now matches PART 1 (About → Official Site →
+  Features → Production → Client → Configuration → API → Other → Development →
+  Disclaimer → License), verified in commit 5ff3569.
+- [x] .claude/rules/*.md — all 14 cheatsheet files present.
+- [x] LICENSE.md already reads "Copyright (c) 2026 webappsgo", matching the
+  repo's first-commit year (2026-02-01). No human decision needed.
 
 ## Pass 5: Spec and Rules Compliance
 
