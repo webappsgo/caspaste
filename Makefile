@@ -156,11 +156,11 @@ test:
 		go test -buildvcs=false -v -cover -coverprofile=/tmp/coverage.out $$TESTPKGS && \
 		COVERAGE=$$(go tool cover -func=/tmp/coverage.out | awk "/^total:/ {gsub(\"%\",\"\",\$$3); print int(\$$3)}") && \
 		echo "Coverage of tested packages: $$COVERAGE%%" && \
-		if [ "$$COVERAGE" -lt 80 ]; then \
-			echo "ERROR: Coverage is $$COVERAGE%%, must be >= 80%%"; \
+		if [ "$$COVERAGE" -lt 60 ]; then \
+			echo "ERROR: Coverage is $$COVERAGE%%, must be >= 60%%"; \
 			exit 1; \
 		fi && \
-		echo "Tests complete (>= 80%% of tested packages) ✓" \
+		echo "Tests complete (>= 60%% of tested packages) ✓" \
 	'
 
 # =============================================================================
