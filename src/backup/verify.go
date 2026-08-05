@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -152,11 +153,24 @@ func (s *Service) VerifyDetailed(backupPath string, opts VerifyOptions) *VerifyR
 	}
 	result.ManifestValid = true
 
-	// Verify checksum if present
+	// Verify checksum: recompute the content checksum over the extracted files
+	// (excluding manifest.json, which is not part of the staged content that was
+	// hashed at creation time) and compare against the value in the manifest.
 	if manifest.Checksum != "" {
-		// Assume valid for now
+		actual, err := computeContentChecksum(extractDir, "manifest.json")
+		if err != nil {
+			result.Valid = false
+			result.ChecksumValid = false
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to compute checksum: %v", err))
+			return result
+		}
+		if actual != manifest.Checksum {
+			result.Valid = false
+			result.ChecksumValid = false
+			result.Errors = append(result.Errors, "backup corrupted: checksum mismatch")
+			return result
+		}
 		result.ChecksumValid = true
-		// Note: Full checksum verification would require storing checksum before encryption
 	} else {
 		result.ChecksumValid = true
 	}
@@ -278,6 +292,61 @@ func CalculateFileChecksum(filePath string) (string, error) {
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
 		return "", err
+	}
+
+	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// computeContentChecksum computes a deterministic combined SHA256 over every
+// regular file under root (relative path + content, in sorted path order),
+// skipping any file whose base name is listed in skip. Because the value is
+// derived from staged content rather than the wrapping tar/gzip stream, the
+// same checksum can be recomputed from an extracted archive on the verify side,
+// which makes real (non-fake) checksum verification possible.
+func computeContentChecksum(root string, skip ...string) (string, error) {
+	skipSet := make(map[string]bool, len(skip))
+	for _, name := range skip {
+		skipSet[name] = true
+	}
+
+	var relPaths []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !info.Mode().IsRegular() {
+			return nil
+		}
+		if skipSet[filepath.Base(path)] {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relPaths = append(relPaths, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	sort.Strings(relPaths)
+
+	hash := sha256.New()
+	for _, rel := range relPaths {
+		if _, err := io.WriteString(hash, rel+"\n"); err != nil {
+			return "", err
+		}
+		f, err := os.Open(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			return "", err
+		}
+		if _, err := io.Copy(hash, f); err != nil {
+			f.Close()
+			return "", err
+		}
+		f.Close()
 	}
 
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil

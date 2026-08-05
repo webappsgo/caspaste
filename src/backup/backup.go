@@ -131,28 +131,24 @@ func (s *Service) Create(ctx context.Context, opts BackupOptions) (*BackupResult
 		return nil, fmt.Errorf("failed to stage backup files: %w", err)
 	}
 
-	// Create tar.gz archive
-	archivePath := filepath.Join(tempDir, filename+".tar.gz")
-	if err := s.createArchive(tempDir, archivePath, manifest); err != nil {
-		return nil, fmt.Errorf("failed to create archive: %w", err)
-	}
-
-	// Calculate checksum
-	checksum, err := s.calculateChecksum(archivePath)
+	// Calculate the content checksum over the staged files (before the manifest
+	// is written), so it can be recomputed and verified from an extracted archive.
+	checksum, err := computeContentChecksum(tempDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate checksum: %w", err)
 	}
-	manifest.Checksum = "sha256:" + checksum
+	manifest.Checksum = checksum
 
-	// Save manifest to archive
+	// Save manifest to the staging directory so it is included in the archive
 	manifestPath := filepath.Join(tempDir, "manifest.json")
 	if err := manifest.Save(manifestPath); err != nil {
 		return nil, fmt.Errorf("failed to save manifest: %w", err)
 	}
 
-	// Re-create archive with manifest
+	// Create the tar.gz archive with the manifest embedded
+	archivePath := filepath.Join(tempDir, filename+".tar.gz")
 	if err := s.createArchive(tempDir, archivePath, manifest); err != nil {
-		return nil, fmt.Errorf("failed to create final archive: %w", err)
+		return nil, fmt.Errorf("failed to create archive: %w", err)
 	}
 
 	// Final filename and path
@@ -627,22 +623,6 @@ func (s *Service) extractArchive(archivePath, destDir string) error {
 	}
 
 	return nil
-}
-
-// calculateChecksum calculates SHA256 checksum of a file
-func (s *Service) calculateChecksum(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 // copyFile copies a file from src to dst

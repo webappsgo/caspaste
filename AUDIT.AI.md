@@ -67,9 +67,11 @@ CGO_ENABLED=0) as of session start.
   (:257). All three are spec-mandated (PART 17: PATCH /config/settings :31487,
   POST /config/backup :31605, POST /config/email/test :31582). (LOG — needs
   real backend wiring; overlaps email/backup subsystems below.)
-- [ ] backup/verify.go:155-162 ChecksumValid hardcoded `true` — checksum
-  verification is a no-op (fake). Needs pre-encryption checksum stored +
-  recomputed on verify.
+- [x] backup/verify.go:155-162 ChecksumValid hardcoded `true` — FIXED: manifest
+  now stores a deterministic combined SHA-256 over staged content
+  (computeContentChecksum); verify recomputes it over the extracted files
+  (skipping manifest.json) and fails on mismatch. Removed dead calculateChecksum;
+  added verify_test.go round-trip + determinism tests.
 - [ ] email: src/email/email.go Send()/NewClient() are never called anywhere
   (dead code) — no welcome/verification/reset/invite email wired to any event.
   (LOG — subsystem integration.)
