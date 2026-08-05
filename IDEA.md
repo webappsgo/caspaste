@@ -47,7 +47,7 @@ edited. A project rename only changes `project_name`; `internal_name` stays so
 `{plist_name}` remain stable on every host.
 
 `{plist_name}` is NOT stored — it is derived at substitution time as
-`io.github.casapps.caspaste`.
+`io.github.webappsgo.caspaste`.
 
 ## Business logic
 

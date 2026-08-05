@@ -130,8 +130,8 @@ caspaste
 
 # Specify directories
 caspaste --port 8080 \
-  --data /var/lib/casapps/caspaste \
-  --config /etc/casapps/caspaste
+  --data /var/lib/webappsgo/caspaste \
+  --config /etc/webappsgo/caspaste
 ```
 
 ### Service Management
@@ -240,9 +240,9 @@ On first run in private mode, a setup token is printed to stdout. Visit
 
 | Directory | Linux (root) | Linux (user) | macOS |
 |-----------|-------------|--------------|-------|
-| Config | `/etc/casapps/caspaste` | `~/.config/casapps/caspaste` | `~/Library/Application Support/CasPaste/Config` |
-| Data | `/var/lib/casapps/caspaste` | `~/.local/share/casapps/caspaste` | `~/Library/Application Support/CasPaste` |
-| Logs | `/var/log/casapps/caspaste` | `~/.local/log/casapps/caspaste` | `~/Library/Logs/CasPaste` |
+| Config | `/etc/webappsgo/caspaste` | `~/.config/webappsgo/caspaste` | `~/Library/Application Support/CasPaste/Config` |
+| Data | `/var/lib/webappsgo/caspaste` | `~/.local/share/webappsgo/caspaste` | `~/Library/Application Support/CasPaste` |
+| Logs | `/var/log/webappsgo/caspaste` | `~/.local/log/webappsgo/caspaste` | `~/Library/Logs/CasPaste` |
 
 ## API
 

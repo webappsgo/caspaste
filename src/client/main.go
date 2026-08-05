@@ -292,7 +292,7 @@ Examples:
   %s --token usr_abc123 new -f file.txt
 
 Configuration:
-  Config file: ~/.config/casapps/caspaste/cli.yml
+  Config file: ~/.config/webappsgo/caspaste/cli.yml
 
   Token priority (highest to lowest):
     1. --token flag
@@ -313,14 +313,14 @@ Configuration:
 func getConfigPath() string {
 	// Check XDG_CONFIG_HOME first
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "casapps", "caspaste", "cli.yml")
+		return filepath.Join(xdg, "webappsgo", "caspaste", "cli.yml")
 	}
 	// Fall back to ~/.config
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".config", "casapps", "caspaste", "cli.yml")
+	return filepath.Join(home, ".config", "webappsgo", "caspaste", "cli.yml")
 }
 
 // loadConfig loads configuration from file and environment

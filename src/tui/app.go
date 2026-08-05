@@ -246,7 +246,7 @@ func (m AppModel) settingsView() string {
 		b.WriteString("API Token: (not configured)\n")
 	}
 
-	b.WriteString("\n" + subtitleStyle.Render("Edit ~/.config/casapps/caspaste/cli.yml to change settings"))
+	b.WriteString("\n" + subtitleStyle.Render("Edit ~/.config/webappsgo/caspaste/cli.yml to change settings"))
 
 	return b.String()
 }

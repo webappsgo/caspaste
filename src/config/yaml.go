@@ -593,9 +593,9 @@ func GenerateDefaultYAMLConfig(path string) error {
 		"TLS_CHACHA20_POLY1305_SHA256",
 	}
 	// Auto-detected from Let's Encrypt
-	defaultConfig.Security.TLS.CertFile = "/etc/casapps/caspaste/tls/cert.pem"
+	defaultConfig.Security.TLS.CertFile = "/etc/webappsgo/caspaste/tls/cert.pem"
 	// Auto-detected from Let's Encrypt
-	defaultConfig.Security.TLS.KeyFile = "/etc/casapps/caspaste/tls/key.pem"
+	defaultConfig.Security.TLS.KeyFile = "/etc/webappsgo/caspaste/tls/key.pem"
 	
 	// Upload Security
 	// 50MB
@@ -710,12 +710,12 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// DIRECTORIES
 	// ============================================================================
 	// Platform-specific defaults
-	defaultConfig.Directories.Data = "/var/lib/casapps/caspaste"
-	defaultConfig.Directories.Config = "/etc/casapps/caspaste"
+	defaultConfig.Directories.Data = "/var/lib/webappsgo/caspaste"
+	defaultConfig.Directories.Config = "/etc/webappsgo/caspaste"
 	// Database directory - if under data dir, included in data backup
-	defaultConfig.Directories.Db = "/var/lib/casapps/caspaste/db"
+	defaultConfig.Directories.Db = "/var/lib/webappsgo/caspaste/db"
 	defaultConfig.Directories.Cache = "/var/cache/caspaste"
-	defaultConfig.Directories.Logs = "/var/log/casapps/caspaste"
+	defaultConfig.Directories.Logs = "/var/log/webappsgo/caspaste"
 
 	// ============================================================================
 	// LOGGING

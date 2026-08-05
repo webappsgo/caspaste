@@ -173,21 +173,21 @@ func getDefaultDataDir() string {
 		return os.Getenv("PROGRAMDATA") + "\\CasPaste\\Data"
 	case "darwin":
 		if isRunningAsRoot() {
-			return "/var/lib/casapps/caspaste"
+			return "/var/lib/webappsgo/caspaste"
 		}
 		if home := os.Getenv("HOME"); home != "" {
 			return home + "/Library/Application Support/CasPaste"
 		}
-		return "/var/lib/casapps/caspaste"
+		return "/var/lib/webappsgo/caspaste"
 	// Linux, BSD, etc.
 	default:
 		if isRunningAsRoot() {
-			return "/var/lib/casapps/caspaste"
+			return "/var/lib/webappsgo/caspaste"
 		}
 		if home := os.Getenv("HOME"); home != "" {
-			return home + "/.local/share/casapps/caspaste"
+			return home + "/.local/share/webappsgo/caspaste"
 		}
-		return "/var/lib/casapps/caspaste"
+		return "/var/lib/webappsgo/caspaste"
 	}
 }
 
@@ -205,26 +205,26 @@ func getDefaultConfigDir() string {
 		return os.Getenv("PROGRAMDATA") + "\\CasPaste\\Config"
 	case "darwin":
 		if isRunningAsRoot() {
-			return "/etc/casapps/caspaste"
+			return "/etc/webappsgo/caspaste"
 		}
 		if home := os.Getenv("HOME"); home != "" {
 			return home + "/Library/Application Support/CasPaste/Config"
 		}
-		return "/etc/casapps/caspaste"
+		return "/etc/webappsgo/caspaste"
 	// Linux, BSD, etc.
 	default:
 		if isRunningAsRoot() {
-			return "/etc/casapps/caspaste"
+			return "/etc/webappsgo/caspaste"
 		}
 		if home := os.Getenv("HOME"); home != "" {
-			return home + "/.config/casapps/caspaste"
+			return home + "/.config/webappsgo/caspaste"
 		}
-		return "/etc/casapps/caspaste"
+		return "/etc/webappsgo/caspaste"
 	}
 }
 
 // getPIDFilePath returns the platform-specific PID file path per AI.md PART 8
-// Default: /var/run/casapps/caspaste.pid (root) or ~/.local/share/casapps/caspaste/caspaste.pid (user)
+// Default: /var/run/webappsgo/caspaste.pid (root) or ~/.local/share/webappsgo/caspaste/caspaste.pid (user)
 func getPIDFilePath(dataDir string) string {
 	switch runtime.GOOS {
 	case "windows":
@@ -250,10 +250,10 @@ func getPIDFilePath(dataDir string) string {
 	// Linux, BSD, etc.
 	default:
 		if isRunningAsRoot() {
-			return "/var/run/casapps/caspaste.pid"
+			return "/var/run/webappsgo/caspaste.pid"
 		}
 		if home := os.Getenv("HOME"); home != "" {
-			return home + "/.local/share/casapps/caspaste/caspaste.pid"
+			return home + "/.local/share/webappsgo/caspaste/caspaste.pid"
 		}
 		if dataDir != "" {
 			return filepath.Join(dataDir, "caspaste.pid")
@@ -1128,15 +1128,15 @@ func main() {
 
 	// Directory flags
 	flagPort := c.AddStringVar("port", "", "Port to listen on (alternative to specifying in --address). Examples: 80, 8080, 443.", nil)
-	flagLog := c.AddStringVar("log", "", "Log directory for access.log and debug.log. Default: /var/log/casapps/caspaste", nil)
-	flagDataDir := c.AddStringVar("data", "", "Data directory. Examples: /var/lib/casapps/caspaste, ~/.local/share/casapps/caspaste", nil)
-	flagConfigDir := c.AddStringVar("config", "", "Configuration directory. Examples: /etc/casapps/caspaste, ~/.config/casapps/caspaste", nil)
+	flagLog := c.AddStringVar("log", "", "Log directory for access.log and debug.log. Default: /var/log/webappsgo/caspaste", nil)
+	flagDataDir := c.AddStringVar("data", "", "Data directory. Examples: /var/lib/webappsgo/caspaste, ~/.local/share/webappsgo/caspaste", nil)
+	flagConfigDir := c.AddStringVar("config", "", "Configuration directory. Examples: /etc/webappsgo/caspaste, ~/.config/webappsgo/caspaste", nil)
 	flagCacheDir := c.AddStringVar("cache", "", "Cache directory. Examples: /var/cache/caspaste, ~/.cache/caspaste", nil)
-	flagLogsDir := c.AddStringVar("logs", "", "Logs directory (alias for --log). Examples: /var/log/casapps/caspaste, ~/.local/log/casapps/caspaste", nil)
+	flagLogsDir := c.AddStringVar("logs", "", "Logs directory (alias for --log). Examples: /var/log/webappsgo/caspaste, ~/.local/log/webappsgo/caspaste", nil)
 
 	// Additional flags per AI.md PART 8
-	flagBackupDir := c.AddStringVar("backup", "", "Backup directory. Default: /mnt/Backups/casapps/caspaste or ~/.local/share/Backups/casapps/caspaste", nil)
-	flagPidFile := c.AddStringVar("pid", "", "PID file path. Default: /var/run/casapps/caspaste.pid or ~/.local/share/casapps/caspaste/caspaste.pid", nil)
+	flagBackupDir := c.AddStringVar("backup", "", "Backup directory. Default: /mnt/Backups/webappsgo/caspaste or ~/.local/share/Backups/webappsgo/caspaste", nil)
+	flagPidFile := c.AddStringVar("pid", "", "PID file path. Default: /var/run/webappsgo/caspaste.pid or ~/.local/share/webappsgo/caspaste/caspaste.pid", nil)
 	flagMode := c.AddStringVar("mode", "", "Application mode: production, development, or debug (default: production)", nil)
 	flagUpdate := c.AddStringVar("update", "", "Update management: check, yes, branch {stable|beta|daily}, --help", nil)
 	// Color output flag per AI.md PART 8
@@ -1237,14 +1237,14 @@ func main() {
 		*flagLog = *flagLogsDir
 	}
 	if *flagLog == "" {
-		*flagLog = "/var/log/casapps/caspaste"
+		*flagLog = "/var/log/webappsgo/caspaste"
 	}
 	os.MkdirAll(*flagLog, 0755)
 
 	// Handle --daemon mode (fork process and exit)
 	if *flagDaemon {
 		if *flagDataDir == "" {
-			*flagDataDir = "/var/lib/casapps/caspaste"
+			*flagDataDir = "/var/lib/webappsgo/caspaste"
 		}
 		os.MkdirAll(*flagDataDir, 0755)
 		
@@ -1378,7 +1378,7 @@ func main() {
 		defaultConfigDir := getDefaultConfigDir()
 		configPaths = append(configPaths,
 			defaultConfigDir+"/server.yml",
-			"/etc/casapps/caspaste/server.yml",
+			"/etc/webappsgo/caspaste/server.yml",
 			"/config/server.yml",
 		)
 	}
@@ -1587,7 +1587,7 @@ func main() {
 				backupDir = "/var/backups/caspaste"
 			} else {
 				if home := os.Getenv("HOME"); home != "" {
-					backupDir = home + "/.local/share/casapps/caspaste/backups"
+					backupDir = home + "/.local/share/webappsgo/caspaste/backups"
 				} else {
 					backupDir = dataDir + "/backups"
 				}
@@ -1691,17 +1691,17 @@ func main() {
 		switch runtime.GOOS {
 		case "linux":
 			if isRoot {
-				logsDir = "/var/log/casapps/caspaste"
+				logsDir = "/var/log/webappsgo/caspaste"
 			} else {
 				if home := os.Getenv("HOME"); home != "" {
-					logsDir = home + "/.local/log/casapps/caspaste"
+					logsDir = home + "/.local/log/webappsgo/caspaste"
 				} else {
 					logsDir = dataDir + "/logs"
 				}
 			}
 		case "darwin":
 			if isRoot {
-				logsDir = "/var/log/casapps/caspaste"
+				logsDir = "/var/log/webappsgo/caspaste"
 			} else {
 				if home := os.Getenv("HOME"); home != "" {
 					logsDir = home + "/Library/Logs/CasPaste"
@@ -1721,10 +1721,10 @@ func main() {
 			}
 		case "freebsd", "openbsd":
 			if isRoot {
-				logsDir = "/var/log/casapps/caspaste"
+				logsDir = "/var/log/webappsgo/caspaste"
 			} else {
 				if home := os.Getenv("HOME"); home != "" {
-					logsDir = home + "/.local/log/casapps/caspaste"
+					logsDir = home + "/.local/log/webappsgo/caspaste"
 				} else {
 					logsDir = dataDir + "/logs"
 				}
@@ -1793,8 +1793,8 @@ func main() {
 			configPath = *flagConfigDir + "/server.yml"
 		} else {
 			// Try to find config in standard locations
-			if _, err := os.Stat("/etc/casapps/caspaste/server.yml"); err == nil {
-				configPath = "/etc/casapps/caspaste/server.yml"
+			if _, err := os.Stat("/etc/webappsgo/caspaste/server.yml"); err == nil {
+				configPath = "/etc/webappsgo/caspaste/server.yml"
 			} else if _, err := os.Stat("/config/server.yml"); err == nil {
 				configPath = "/config/server.yml"
 			}
@@ -1811,7 +1811,7 @@ func main() {
 		// Determine directories from config
 		dataDir := *flagDataDir
 		if dataDir == "" {
-			dataDir = "/var/lib/casapps/caspaste"
+			dataDir = "/var/lib/webappsgo/caspaste"
 		}
 		
 		cfgDir := *flagConfigDir

@@ -122,21 +122,21 @@ func getDefaultDbPath() string {
 		return os.Getenv("PROGRAMDATA") + "\\CasPaste\\Data\\db\\caspaste.db"
 	case "darwin":
 		if isRunningAsRoot() {
-			return "/var/lib/casapps/caspaste/db/caspaste.db"
+			return "/var/lib/webappsgo/caspaste/db/caspaste.db"
 		}
 		if home := os.Getenv("HOME"); home != "" {
 			return home + "/Library/Application Support/CasPaste/db/caspaste.db"
 		}
-		return "/var/lib/casapps/caspaste/db/caspaste.db"
+		return "/var/lib/webappsgo/caspaste/db/caspaste.db"
 	// Linux, BSD, etc.
 	default:
 		if isRunningAsRoot() {
-			return "/var/lib/casapps/caspaste/db/caspaste.db"
+			return "/var/lib/webappsgo/caspaste/db/caspaste.db"
 		}
 		if home := os.Getenv("HOME"); home != "" {
-			return home + "/.local/share/casapps/caspaste/db/caspaste.db"
+			return home + "/.local/share/webappsgo/caspaste/db/caspaste.db"
 		}
-		return "/var/lib/casapps/caspaste/db/caspaste.db"
+		return "/var/lib/webappsgo/caspaste/db/caspaste.db"
 	}
 }
 
