@@ -507,12 +507,35 @@ func (s *Service) createArchive(sourceDir, archivePath string, manifest *Manifes
 }
 
 // extractArchive extracts a tar.gz archive
+// Archive extraction safety limits per AI.md PART 11 → "Archive Extraction
+// Safety". These guard against compression bombs and runaway extraction.
+const (
+	// maxExtractFiles caps the number of entries extracted from one archive.
+	maxExtractFiles = 200000
+	// maxExtractSingleFile caps the uncompressed size of any single entry.
+	maxExtractSingleFile int64 = 4 << 30 // 4 GiB
+	// maxExtractTotalSize caps the total uncompressed size of the archive.
+	maxExtractTotalSize int64 = 20 << 30 // 20 GiB
+	// maxCompressionRatio caps expanded/compressed ratio (bomb detection).
+	maxCompressionRatio int64 = 200
+)
+
 func (s *Service) extractArchive(archivePath, destDir string) error {
 	file, err := os.Open(archivePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
+
+	archiveInfo, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	// Compression-bomb ceiling derived from the on-disk archive size.
+	ratioCeiling := archiveInfo.Size() * maxCompressionRatio
+	if ratioCeiling < maxExtractSingleFile {
+		ratioCeiling = maxExtractSingleFile
+	}
 
 	gzReader, err := gzip.NewReader(file)
 	if err != nil {
@@ -522,6 +545,11 @@ func (s *Service) extractArchive(archivePath, destDir string) error {
 
 	tarReader := tar.NewReader(gzReader)
 
+	var (
+		fileCount int
+		totalSize int64
+	)
+
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -529,6 +557,16 @@ func (s *Service) extractArchive(archivePath, destDir string) error {
 		}
 		if err != nil {
 			return err
+		}
+
+		fileCount++
+		if fileCount > maxExtractFiles {
+			return fmt.Errorf("archive exceeds max file count (%d)", maxExtractFiles)
+		}
+
+		// Reject absolute/empty names and path traversal before touching disk.
+		if header.Name == "" || filepath.IsAbs(header.Name) || strings.Contains(header.Name, "..") {
+			return fmt.Errorf("invalid file name in archive: %q", header.Name)
 		}
 
 		// Sanitize path to prevent directory traversal
@@ -543,6 +581,11 @@ func (s *Service) extractArchive(archivePath, destDir string) error {
 				return err
 			}
 		case tar.TypeReg:
+			// Reject an oversized single entry up front via the header size.
+			if header.Size > maxExtractSingleFile {
+				return fmt.Errorf("archive entry %q exceeds max single-file size", header.Name)
+			}
+
 			// Ensure parent directory exists
 			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 				return err
@@ -553,16 +596,33 @@ func (s *Service) extractArchive(archivePath, destDir string) error {
 				return err
 			}
 
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				outFile.Close()
+			// Bound the copy so a lying header cannot exhaust the disk, and
+			// stop when the cumulative total or compression ratio is exceeded.
+			limit := maxExtractSingleFile + 1
+			written, err := io.Copy(outFile, io.LimitReader(tarReader, limit))
+			outFile.Close()
+			if err != nil {
 				return err
 			}
-			outFile.Close()
+			if written >= limit {
+				return fmt.Errorf("archive entry %q exceeds max single-file size", header.Name)
+			}
+
+			totalSize += written
+			if totalSize > maxExtractTotalSize {
+				return fmt.Errorf("archive exceeds max total uncompressed size")
+			}
+			if totalSize > ratioCeiling {
+				return fmt.Errorf("archive exceeds max compression ratio (possible bomb)")
+			}
 
 			// Set permissions
 			if err := os.Chmod(targetPath, os.FileMode(header.Mode)); err != nil {
 				return err
 			}
+		default:
+			// Reject symlinks, hard links, device/special files per PART 11.
+			return fmt.Errorf("archive entry %q has unsupported type %d", header.Name, header.Typeflag)
 		}
 	}
 

@@ -53,8 +53,12 @@ CGO_ENABLED=0) as of session start.
   explicit config origins + DOMAIN env entries, echoes the specific matched
   origin with Allow-Credentials:true, falls back to "*" (no creds) only when
   the list is empty; full spec auth-header list; Vary: Origin.
-- [ ] backup: extraction has Zip-Slip guard (good) but no max-uncompressed-
+- [x] backup: extraction has Zip-Slip guard (good) but no max-uncompressed-
   size / file-count / compression-bomb limit (AI.md:15228). Admin-only. LOW.
+  Fixed: extractArchive enforces max file count, max single-file size,
+  max total uncompressed size, compression-ratio ceiling (bomb detection),
+  LimitReader-bounded copy, and rejects absolute/.. names + symlink/special
+  entry types.
 
 ## Pass 2: Code Quality
 
