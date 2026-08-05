@@ -254,6 +254,12 @@ CGO_ENABLED=0) as of session start.
 - [x] docker/Dockerfile:84 HEALTHCHECK timings fixed: was
   start-period=10m/interval=5m/timeout=15s; now
   start-period=90s/interval=10s/timeout=5s (AI.md:39093).
+- [x] docker/docker-compose.yml converted both services' `environment:`
+  blocks from list style (`- KEY=value`) to map style (`KEY: value`) and
+  removed `MODE=production`/`DEBUG=false` from the production compose
+  (AI.md:39246 map-style only; AI.md:39247 never set MODE/DEBUG in prod
+  compose). PORT=80 (container internal port) and the CASPASTE_*/DB/TZ/UI
+  settings retained as map entries. `docker compose config` parses OK.
 
 ## i18n (PART 31)
 

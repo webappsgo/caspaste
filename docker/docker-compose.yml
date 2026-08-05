@@ -19,17 +19,15 @@ services:
     pull_policy: always
     logging: *default-logging
     environment:
-      - MODE=production
-      - PORT=80
-      - DEBUG=false
-      - TZ=${TZ:-America/New_York}
-      - CASPASTE_DB_DRIVER=postgres
-      - CASPASTE_DB_SOURCE=postgres://${DB_USER:-caspaste}:${DB_PASSWORD:-caspaste}@caspaste-db:5432/${DB_NAME:-caspaste}?sslmode=disable
-      - CASPASTE_TITLE_MAX_LENGTH=120
-      - CASPASTE_BODY_MAX_LENGTH=9999999999999999
-      - CASPASTE_MAX_PASTE_LIFETIME=unlimited
-      - CASPASTE_UI_DEFAULT_LIFETIME=never
-      - CASPASTE_UI_DEFAULT_THEME=dark
+      PORT: 80
+      TZ: ${TZ:-America/New_York}
+      CASPASTE_DB_DRIVER: postgres
+      CASPASTE_DB_SOURCE: postgres://${DB_USER:-caspaste}:${DB_PASSWORD:-caspaste}@caspaste-db:5432/${DB_NAME:-caspaste}?sslmode=disable
+      CASPASTE_TITLE_MAX_LENGTH: 120
+      CASPASTE_BODY_MAX_LENGTH: 9999999999999999
+      CASPASTE_MAX_PASTE_LIFETIME: unlimited
+      CASPASTE_UI_DEFAULT_LIFETIME: never
+      CASPASTE_UI_DEFAULT_THEME: dark
     volumes:
       - './volumes/config:/config:z'
       - './volumes/data:/data:z'
@@ -54,10 +52,10 @@ services:
     restart: always
     logging: *default-logging
     environment:
-      - POSTGRES_DB=${DB_NAME:-caspaste}
-      - POSTGRES_USER=${DB_USER:-caspaste}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-caspaste}
-      - TZ=${TZ:-America/New_York}
+      POSTGRES_DB: ${DB_NAME:-caspaste}
+      POSTGRES_USER: ${DB_USER:-caspaste}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-caspaste}
+      TZ: ${TZ:-America/New_York}
     volumes:
       - './volumes/data/db/postgres/caspaste:/var/lib/postgresql/data:z'
     healthcheck:
