@@ -275,6 +275,8 @@ func (data *Data) handleLoginError(rw http.ResponseWriter, req *http.Request, re
 // Pattern: GET /logout
 func (data *Data) handleLogout(rw http.ResponseWriter, req *http.Request) error {
 	clearSessionCookie(rw)
+	// Clear-Site-Data on session revoke per AI.md PART 11
+	rw.Header().Set("Clear-Site-Data", `"cache", "cookies", "storage"`)
 	writeRedirect(rw, req, "/", 302)
 	return nil
 }

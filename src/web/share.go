@@ -18,6 +18,16 @@ type SecurityHeadersConfig struct {
 	ReferrerPolicy          string
 	PermissionsPolicy       string
 	StrictTransportSecurity string
+	// Cross-origin isolation + modern headers per AI.md PART 11
+	OriginAgentCluster  bool
+	CrossDomainPolicies string
+	COOP                string
+	COEP                string
+	CORP                string
+	// Reporting-Endpoints / Report-To / NEL per AI.md PART 11
+	ReportingEnabled bool
+	NELEnabled       bool
+	APIVersion       string
 }
 
 func getCookie(req *http.Request, name string) string {

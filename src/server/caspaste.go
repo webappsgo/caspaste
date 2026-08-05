@@ -2372,6 +2372,14 @@ func main() {
 		ReferrerPolicy:          yamlCfg.Security.Headers.ReferrerPolicy,
 		PermissionsPolicy:       yamlCfg.Security.Headers.PermissionsPolicy,
 		StrictTransportSecurity: yamlCfg.Security.Headers.StrictTransportSecurity,
+		OriginAgentCluster:      yamlCfg.Security.Headers.OriginAgentCluster,
+		CrossDomainPolicies:     yamlCfg.Security.Headers.CrossDomainPolicies,
+		COOP:                    yamlCfg.Security.Headers.COOP,
+		COEP:                    yamlCfg.Security.Headers.COEP,
+		CORP:                    yamlCfg.Security.Headers.CORP,
+		ReportingEnabled:        yamlCfg.Security.Headers.ReportingEnabled,
+		NELEnabled:              yamlCfg.Security.Headers.NELEnabled,
+		APIVersion:              config.APIVersion(),
 	}
 
 	// CSRF protection config per AI.md PART 11

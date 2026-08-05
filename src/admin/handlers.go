@@ -92,6 +92,8 @@ func (p *Panel) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 // handleLogout clears the admin session and redirects to shared login per AI.md PART 15
 func (p *Panel) handleLogout(w http.ResponseWriter, r *http.Request) {
 	p.deleteAdminSession(w, r)
+	// Clear-Site-Data on session revoke per AI.md PART 11
+	w.Header().Set("Clear-Site-Data", `"cache", "cookies", "storage"`)
 	http.Redirect(w, r, "/server/auth/login", http.StatusSeeOther)
 }
 

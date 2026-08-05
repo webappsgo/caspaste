@@ -52,11 +52,46 @@ func SecurityHeadersMiddleware(cfg SecurityHeadersConfig) func(http.Handler) htt
 				w.Header().Set("Permissions-Policy", cfg.PermissionsPolicy)
 			}
 
+			// Origin-Agent-Cluster: ?1 (always-on hygiene) per AI.md PART 11
+			if cfg.OriginAgentCluster {
+				w.Header().Set("Origin-Agent-Cluster", "?1")
+			}
+
+			// X-Permitted-Cross-Domain-Policies (blocks Flash/PDF cross-domain)
+			if cfg.CrossDomainPolicies != "" {
+				w.Header().Set("X-Permitted-Cross-Domain-Policies", cfg.CrossDomainPolicies)
+			}
+
+			// Cross-Origin isolation headers per AI.md PART 11
+			if cfg.COOP != "" {
+				w.Header().Set("Cross-Origin-Opener-Policy", cfg.COOP)
+			}
+			if cfg.COEP != "" {
+				w.Header().Set("Cross-Origin-Embedder-Policy", cfg.COEP)
+			}
+			if cfg.CORP != "" {
+				w.Header().Set("Cross-Origin-Resource-Policy", cfg.CORP)
+			}
+
 			// HSTS: emit when the connection is HTTPS either directly or via a
 			// terminating reverse proxy (X-Forwarded-Proto=https) per AI.md PART 11
-			if cfg.StrictTransportSecurity != "" &&
-				(r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https") {
+			isHTTPS := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+			if cfg.StrictTransportSecurity != "" && isHTTPS {
 				w.Header().Set("Strict-Transport-Security", cfg.StrictTransportSecurity)
+			}
+
+			// Reporting-Endpoints / Report-To / NEL per AI.md PART 11
+			if cfg.ReportingEnabled && r.Host != "" {
+				proto := "http"
+				if isHTTPS {
+					proto = "https"
+				}
+				reportURL := proto + "://" + r.Host + "/api/" + cfg.APIVersion + "/server/reports/default"
+				w.Header().Set("Reporting-Endpoints", `default="`+reportURL+`"`)
+				w.Header().Set("Report-To", `{"group":"default","max_age":10886400,"endpoints":[{"url":"`+reportURL+`"}]}`)
+				if cfg.NELEnabled {
+					w.Header().Set("NEL", `{"report_to":"default","max_age":2592000,"include_subdomains":true}`)
+				}
 			}
 
 			next.ServeHTTP(w, r)

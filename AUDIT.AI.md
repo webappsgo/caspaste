@@ -40,11 +40,13 @@ CGO_ENABLED=0) as of session start.
 - [x] web cookies: session (auth.go:138) and CSRF (csrf.go:230) cookies used
   SameSite=Lax; AI.md:15185/15264 specify SameSite=Strict as default. Fixed:
   both set to Strict.
-- [ ] web/middleware: security-header set missing several MUST headers
+- [x] web/middleware: security-header set missing several MUST headers
   (AI.md:15321-15352): Origin-Agent-Cluster,
   X-Permitted-Cross-Domain-Policies, Cross-Origin-Opener/Embedder/Resource-
   Policy, Reporting-Endpoints/Report-To/NEL, and Clear-Site-Data on
-  logout/session-revoke.
+  logout/session-revoke. Fixed: added all headers to SecurityHeadersMiddleware
+  (config-driven, spec defaults), Clear-Site-Data set on web+admin logout,
+  HSTS default bumped to 2yr+preload.
 - [ ] web/middleware:66-83 CORSMiddleware hardcodes
   `Access-Control-Allow-Origin: *`. Not credential-aware/auto-detected per
   PART 16 CORS model. (Allow-Credentials unset, so not directly exploitable.)

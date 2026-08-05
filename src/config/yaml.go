@@ -145,6 +145,20 @@ type YAMLConfig struct {
 			PermissionsPolicy string `yaml:"permissions_policy"`
 			// Strict-Transport-Security header
 			StrictTransportSecurity string `yaml:"strict_transport_security"`
+			// Origin-Agent-Cluster: ?1 when true
+			OriginAgentCluster bool `yaml:"origin_agent_cluster"`
+			// X-Permitted-Cross-Domain-Policies header
+			CrossDomainPolicies string `yaml:"cross_domain_policies"`
+			// Cross-Origin-Opener-Policy header
+			COOP string `yaml:"coop"`
+			// Cross-Origin-Embedder-Policy header
+			COEP string `yaml:"coep"`
+			// Cross-Origin-Resource-Policy header
+			CORP string `yaml:"corp"`
+			// Emit Reporting-Endpoints / Report-To reporting headers
+			ReportingEnabled bool `yaml:"reporting_enabled"`
+			// Emit NEL (Network Error Logging) header
+			NELEnabled bool `yaml:"nel_enabled"`
 		} `yaml:"headers"`
 
 		TLS struct {
@@ -546,8 +560,16 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Security.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
 	defaultConfig.Security.Headers.ReferrerPolicy = "strict-origin-when-cross-origin"
 	defaultConfig.Security.Headers.PermissionsPolicy = "geolocation=(), microphone=(), camera=()"
-	defaultConfig.Security.Headers.StrictTransportSecurity = "max-age=31536000; includeSubDomains"
-	
+	defaultConfig.Security.Headers.StrictTransportSecurity = "max-age=63072000; includeSubDomains; preload"
+	// Cross-origin isolation + modern headers per AI.md PART 11 (defaults: "everyone")
+	defaultConfig.Security.Headers.OriginAgentCluster = true
+	defaultConfig.Security.Headers.CrossDomainPolicies = "none"
+	defaultConfig.Security.Headers.COOP = "unsafe-none"
+	defaultConfig.Security.Headers.COEP = "unsafe-none"
+	defaultConfig.Security.Headers.CORP = "cross-origin"
+	defaultConfig.Security.Headers.ReportingEnabled = true
+	defaultConfig.Security.Headers.NELEnabled = true
+
 	// TLS Configuration
 	defaultConfig.Security.TLS.MinVersion = "1.2"
 	defaultConfig.Security.TLS.CipherSuites = []string{
