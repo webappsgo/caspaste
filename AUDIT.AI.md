@@ -92,9 +92,10 @@ CGO_ENABLED=0) as of session start.
   descending, skips reservedIDs map (65534, 999-980, 170-179, 101-110), and
   requires both UID and GID free (user.LookupId + LookupGroupId + /etc/passwd
   fallback), per PART 24 (AI.md:37358-37408).
-- [ ] updater/update_unix.go:29 uses os.CreateTemp("") then os.Rename onto the
-  binary — cross-filesystem target (/usr/local/bin) fails EXDEV, no copy
-  fallback. LOW.
+- [x] updater/update_unix.go — FIXED: ReplaceBinary now detects EXDEV from the
+  atomic rename and falls back to replaceAcrossFilesystems, which stages a copy
+  in the target directory (same filesystem) and atomically renames it onto the
+  running binary, preserving permissions.
 
 ## Pass 4: Documentation Completeness
 
