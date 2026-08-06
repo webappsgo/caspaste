@@ -1,11 +1,13 @@
 package backup
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,16 +22,86 @@ type RetentionConfig struct {
 	KeepMonthly int `yaml:"keep_monthly" json:"keep_monthly"`
 	// Yearly backups to keep (0 = disabled)
 	KeepYearly int `yaml:"keep_yearly" json:"keep_yearly"`
+	// Hard size cap applied last: percent ("10%") or absolute ("50G"); "" or "0" = disabled
+	MaxTotalSize string `yaml:"max_total_size" json:"max_total_size"`
 }
 
 // DefaultRetentionConfig returns default retention settings
 func DefaultRetentionConfig() RetentionConfig {
 	return RetentionConfig{
-		MaxBackups:  1,
-		KeepWeekly:  0,
-		KeepMonthly: 0,
-		KeepYearly:  0,
+		MaxBackups:   1,
+		KeepWeekly:   0,
+		KeepMonthly:  0,
+		KeepYearly:   0,
+		MaxTotalSize: "10%",
 	}
+}
+
+// sizeSuffixBytes maps a single-letter size suffix to its byte multiplier
+var sizeSuffixBytes = map[byte]int64{
+	'K': 1 << 10,
+	'M': 1 << 20,
+	'G': 1 << 30,
+	'T': 1 << 40,
+}
+
+// parseMaxTotalSize resolves a "max_total_size" value against the total capacity
+// of the filesystem containing backupDir. Returns 0 (no cap) for "", "0", or an
+// unparseable value (logged as a warning per AI.md config-validation rules).
+func parseMaxTotalSize(value, backupDir string) int64 {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "0" {
+		return 0
+	}
+
+	if strings.HasSuffix(value, "%") {
+		pct, err := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
+		if err != nil || pct <= 0 || pct > 100 {
+			log.Printf("backup: max_total_size: %q invalid percentage, disabling size cap", value)
+			return 0
+		}
+
+		total, err := diskTotalBytes(backupDir)
+		if err != nil {
+			log.Printf("backup: max_total_size: failed to stat disk for %s: %v, disabling size cap", backupDir, err)
+			return 0
+		}
+
+		return int64(float64(total) * pct / 100)
+	}
+
+	upper := strings.ToUpper(value)
+	if len(upper) >= 2 {
+		suffix := upper[len(upper)-1]
+		if mult, ok := sizeSuffixBytes[suffix]; ok {
+			num, err := strconv.ParseFloat(strings.TrimSpace(upper[:len(upper)-1]), 64)
+			if err != nil || num <= 0 {
+				log.Printf("backup: max_total_size: %q invalid, disabling size cap", value)
+				return 0
+			}
+			return int64(num * float64(mult))
+		}
+	}
+
+	// Bare number = bytes
+	bytes, err := strconv.ParseInt(upper, 10, 64)
+	if err != nil || bytes <= 0 {
+		log.Printf("backup: max_total_size: %q invalid, disabling size cap", value)
+		return 0
+	}
+	return bytes
+}
+
+// FormatBytes renders a byte count as a human-readable string (base 1024)
+func FormatBytes(n int64) string {
+	units := []string{"B", "K", "M", "G", "T"}
+	f := float64(n)
+	i := 0
+	for f >= 1024 && i < len(units)-1 {
+		f /= 1024
+		i++
+	}
+	return fmt.Sprintf("%.1f%s", f, units[i])
 }
 
 // BackupInfo contains information about a backup file
@@ -220,6 +292,10 @@ func (r *RetentionService) Apply() error {
 		toDelete = append(toDelete, daily[r.config.MaxBackups:]...)
 	}
 
+	// Apply max_total_size hard cap last, oldest deleted first, across whatever
+	// survives the priority-based selection above (per AI.md PART 22 retention order)
+	toDelete = append(toDelete, r.applySizeCap(backups, toDelete)...)
+
 	// Delete old backups
 	for _, backup := range toDelete {
 		if err := os.Remove(backup.FilePath); err != nil {
@@ -234,6 +310,55 @@ func (r *RetentionService) Apply() error {
 	}
 
 	return nil
+}
+
+// applySizeCap returns additional backups to delete (oldest first) so that the
+// total size of survivors (all backups minus alreadyDeleted) fits under the
+// configured max_total_size. Incrementals are never deleted by the size cap —
+// they're each a single always-replaced file, not part of the countable set.
+func (r *RetentionService) applySizeCap(all, alreadyDeleted []BackupInfo) []BackupInfo {
+	sizeCap := parseMaxTotalSize(r.config.MaxTotalSize, r.backupDir)
+	if sizeCap <= 0 {
+		return nil
+	}
+
+	deleted := make(map[string]bool, len(alreadyDeleted))
+	for _, b := range alreadyDeleted {
+		deleted[b.FilePath] = true
+	}
+
+	// Survivors, oldest first (ListBackups returns newest first)
+	survivors := make([]BackupInfo, 0, len(all))
+	var total int64
+	for _, b := range all {
+		if deleted[b.FilePath] || b.Type == "incremental" {
+			continue
+		}
+		survivors = append(survivors, b)
+		total += b.Size
+	}
+	sort.Slice(survivors, func(i, j int) bool {
+		return survivors[i].CreatedAt.Before(survivors[j].CreatedAt)
+	})
+
+	if total <= sizeCap {
+		return nil
+	}
+
+	var extra []BackupInfo
+	for _, b := range survivors {
+		if total <= sizeCap {
+			break
+		}
+		extra = append(extra, b)
+		total -= b.Size
+	}
+
+	if len(extra) > 0 {
+		log.Printf("backup: max_total_size %s exceeded, deleting %d oldest backup(s) to reclaim space", FormatBytes(sizeCap), len(extra))
+	}
+
+	return extra
 }
 
 // CleanupFailed removes backups that failed verification

@@ -52,3 +52,83 @@ be migrated to match:
   note it in README/docs as a breaking path change for anyone who ran a
   pre-migration build.
 
+## [x] Backup/restore CLI now delegates to backup.Service — legacy tar/cp shell-out removed
+Read: AI.md PART 22 (line 35411)
+`performBackup`/`performRestore` in src/server/caspaste.go previously
+shelled out to `tar`/`cp` and silently swallowed subprocess errors, with
+no manifest, checksum, or encryption. Rewritten to call
+`backup.Service.Create`/`Restore` (manifest.json + checksum, optional
+AES-256-GCM+Argon2id encryption via `promptBackupPassword`/
+`BACKUP_PASSWORD`, immediate post-create verify, retention). Server
+startup now also registers `backup_daily` (02:00, enabled per
+`server.backup.enabled`) and `backup_hourly` (hourly, disabled unless
+`server.backup.hourly_enabled`) as scheduler tasks using the same
+`backup.Service`.
+
+## [ ] backup_daily disk-space pre-check (`backup.skipped_disk_full`)
+Read: AI.md PART 19 § "ALWAYS check free space" and PART 22
+Spec requires checking free space (< 2x last backup size, or disk usage
+> 90%) before a *scheduled* backup and skipping with a distinct
+`backup.skipped_disk_full` status if insufficient. `backup.Service.Create`
+does not currently perform this check — `diskTotalBytes` exists
+(src/backup/diskusage_unix.go / _windows.go) but is unexported and
+nothing computes free space or wires a skip path. Needs: an exported
+free-space helper, a `Skipped` result/status distinguishable from
+`Failed` in scheduler history, and the backup_daily task handler (in
+main(), src/server/caspaste.go) calling it before `backupSvc.Create`.
+
+## [ ] GeoIP country-blocking middleware not implemented
+Read: AI.md PART 20 and PART 6 (middleware order)
+`geoip.Client` is now instantiated at startup (src/server/caspaste.go),
+loads its MMDB on boot (warns, doesn't fail, if missing), and is
+refreshed weekly by the new `geoip_update` scheduler task
+(server.geoip.enabled gate). The actual request-time enforcement
+(deny_countries/allow_countries via `geoipClient.LookupRequest`) is NOT
+wired into the middleware chain — PART 6's full order (URLNormalize →
+RequestID → PathSecurity → SecurityHeaders → Allowlist → Blocklist →
+RateLimit → GeoIP → Auth → Logging) doesn't exist yet; the current chain
+in main() only has URLNormalize → PathSecurity → PanicRecovery →
+RequestID → Metrics → SecurityHeaders → CORS → CSRF → Maintenance → App.
+Allowlist, Blocklist, RateLimit, and GeoIP middleware all need to be
+built and inserted in spec order — this is a substantial standalone
+feature, not a small follow-up.
+
+## [ ] ssl_renewal, log_rotation, blocklist_update, cve_update scheduler tasks missing
+Read: AI.md PART 19 § "Built-in Tasks (Required)"
+Only paste_cleanup, session_cleanup, token_cleanup, healthcheck_self,
+backup_daily, backup_hourly, and geoip_update are registered in main().
+Still missing: `ssl_renewal` (needs the ACME/cert-renewal implementation
+from PART 15 to call into), `log_rotation` (src/logger has no rotation
+support to invoke), `blocklist_update`/`cve_update` (no backing
+service/download logic exists for either). `update_check` also appears
+unregistered — verify against src/updater/update.go.
+
+## [ ] cluster_heartbeat / cluster mode (PART 10) and cache drivers (PART 9) not implemented
+Read: AI.md PART 9, PART 10
+No `cluster` or `cache` package exists. Single-instance mode only;
+`valkey`/`redis` cache drivers and cluster-mode distributed locking for
+global scheduler tasks are unimplemented. Required before multi-node
+deployment is possible per spec.
+
+## [ ] Repo-wide gofmt drift predates this session's changes
+Read: AI.md PART 26 (Go formatting via `gofmt`)
+`gofmt -l ./src ./cmd` flags ~75 files across admin/, apiv1/, storage/,
+web/, etc. (leading blank lines before file-header comments, trailing
+whitespace/indent inconsistencies) — confirmed NOT introduced by this
+session's edits (only src/server/caspaste.go and src/config/yaml.go were
+touched and reformatted, both now gofmt-clean). Needs a dedicated
+formatting pass across the full `src/` tree, reviewed as its own change
+so it doesn't get bundled into unrelated commits.
+
+## [ ] Multi-user (PART 34), Organizations (PART 35), Custom Domains (PART 36) unimplemented
+Read: AI.md PART 34, 35, 36
+Optional feature set — confirm with IDEA.md whether CasPaste needs
+end-user accounts/orgs/custom domains before starting; currently no
+`users` table, org model, or domain-verification flow exists.
+
+## [ ] i18n overhaul (PART 31) and admin API expansion (PART 17) outstanding
+Read: AI.md PART 31, PART 17
+en/es/zh/fr/ar/de/ja translation-key coverage and the full admin API
+surface (per PART 17's required routes) have not been audited/completed
+this session.
+

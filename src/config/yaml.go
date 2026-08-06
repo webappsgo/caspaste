@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -181,7 +180,7 @@ type YAMLConfig struct {
 			// TLS key file path (optional, auto-detected)
 			KeyFile string `yaml:"key_file"`
 		} `yaml:"tls"`
-		
+
 		Upload struct {
 			// Max upload size in bytes
 			MaxFileSize int64 `yaml:"max_file_size"`
@@ -264,7 +263,7 @@ type YAMLConfig struct {
 				// Paths to allow in robots.txt
 				Allow string `yaml:"allow"`
 				// Paths to deny in robots.txt
-				Deny string `yaml:"deny"`
+				Deny   string `yaml:"deny"`
 				Agents struct {
 					// User agents to deny
 					Deny []string `yaml:"deny"`
@@ -314,7 +313,7 @@ type YAMLConfig struct {
 		// Logs directory
 		Logs string `yaml:"logs"`
 	} `yaml:"directories"`
-	
+
 	Logging struct {
 		// Log level: info, warn, error (default: info)
 		Level string `yaml:"level"`
@@ -375,6 +374,47 @@ type YAMLConfig struct {
 			IncludeUserAgent bool `yaml:"include_user_agent"`
 		} `yaml:"audit"`
 	} `yaml:"logging"`
+
+	// Compliance mode per AI.md PART 22 — forces encrypted backups
+	Compliance struct {
+		// HIPAA, SOC2, etc. When true, backup.encryption MUST be true
+		// (backup password is never stored in config — prompted on-demand)
+		Enabled bool `yaml:"enabled"`
+	} `yaml:"compliance"`
+
+	// Backup and restore per AI.md PART 22
+	Backup struct {
+		// Enable scheduled backup_daily task (default: true)
+		Enabled bool `yaml:"enabled"`
+		// Enable the hourly incremental backup_hourly task (default: false, per AI.md PART 19)
+		HourlyEnabled bool `yaml:"hourly_enabled"`
+		Encryption    struct {
+			// true if a backup password was set; password itself is NEVER stored
+			Enabled bool `yaml:"enabled"`
+		} `yaml:"encryption"`
+		Retention struct {
+			// Daily full backups to keep, 1-365 (default: 1)
+			MaxBackups int `yaml:"max_backups"`
+			// Sunday backups to keep, 0-52, 0=disabled (default: 0)
+			KeepWeekly int `yaml:"keep_weekly"`
+			// 1st-of-month backups to keep, 0-12, 0=disabled (default: 0)
+			KeepMonthly int `yaml:"keep_monthly"`
+			// January 1st backups to keep, 0-10, 0=disabled (default: 0)
+			KeepYearly int `yaml:"keep_yearly"`
+			// Hard size cap: percent ("10%") or absolute ("50G"), 0=disabled
+			MaxTotalSize string `yaml:"max_total_size"`
+		} `yaml:"retention"`
+	} `yaml:"backup"`
+
+	// GeoIP country blocking per AI.md PART 20
+	GeoIP struct {
+		// Enable GeoIP lookups and the weekly geoip_update task (default: false)
+		Enabled bool `yaml:"enabled"`
+		// Deny these ISO country codes (ignored if allow_countries is also set)
+		DenyCountries []string `yaml:"deny_countries"`
+		// Allow only these ISO country codes; if set, deny_countries is ignored
+		AllowCountries []string `yaml:"allow_countries"`
+	} `yaml:"geoip"`
 }
 
 // LoadYAMLConfig loads configuration from YAML file
@@ -498,11 +538,11 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// Default private ranges (always trusted): 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, ::1, fc00::/7, fe80::/10
 	// Any IPs/CIDRs specified here are APPENDED to these defaults
 	defaultConfig.Server.Proxy.Allowed = []string{}
-	
+
 	defaultConfig.Server.Administrator.Name = "CasPaste Administrator"
 	defaultConfig.Server.Administrator.Email = "administrator@{fqdn}"
 	defaultConfig.Server.Administrator.From = "\"CasPaste\" <no-reply@{fqdn}>"
-	
+
 	defaultConfig.Server.Timeouts.Read = 15
 	defaultConfig.Server.Timeouts.Write = 15
 	defaultConfig.Server.Timeouts.Idle = 60
@@ -565,7 +605,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// ============================================================================
 	// Empty = auto-generate when server.public=false
 	defaultConfig.Security.PasswordFile = ""
-	
+
 	// HTTP Security Headers per AI.md PART 11
 	defaultConfig.Security.Headers.XFrameOptions = "SAMEORIGIN"
 	defaultConfig.Security.Headers.XContentTypeOptions = "nosniff"
@@ -596,7 +636,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Security.TLS.CertFile = "/etc/webappsgo/caspaste/tls/cert.pem"
 	// Auto-detected from Let's Encrypt
 	defaultConfig.Security.TLS.KeyFile = "/etc/webappsgo/caspaste/tls/key.pem"
-	
+
 	// Upload Security
 	// 50MB
 	defaultConfig.Security.Upload.MaxFileSize = 52428800
@@ -615,7 +655,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 		"image/svg+xml",
 		"image/webp",
 	}
-	
+
 	// CORS Configuration
 	defaultConfig.Security.CORS.Enabled = true
 	defaultConfig.Security.CORS.AllowedOrigins = []string{"*"}
@@ -667,11 +707,11 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Web.Branding.Logo = ""
 	// Empty = use embedded default
 	defaultConfig.Web.Branding.Favicon = ""
-	
+
 	// Security Contact (for security.txt)
 	defaultConfig.Web.Security.Contact.Email = "security@{fqdn}"
 	defaultConfig.Web.Security.Contact.Name = "Security Team"
-	
+
 	// SEO / Robots
 	defaultConfig.Web.SEO.Robots.Allow = "*"
 	defaultConfig.Web.SEO.Robots.Deny = "/settings,/history"
@@ -695,12 +735,12 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// 50MB
 	defaultConfig.Limits.BodyMaxLength = 52428800
 	defaultConfig.Limits.MaxPasteLifetime = "never"
-	
+
 	// Rate limiting for GET requests
 	defaultConfig.Limits.RateLimit.GetPastes.Per5Min = 50
 	defaultConfig.Limits.RateLimit.GetPastes.Per15Min = 100
 	defaultConfig.Limits.RateLimit.GetPastes.Per1Hour = 500
-	
+
 	// Rate limiting for POST requests
 	defaultConfig.Limits.RateLimit.NewPastes.Per5Min = 15
 	defaultConfig.Limits.RateLimit.NewPastes.Per15Min = 30
@@ -722,7 +762,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// ============================================================================
 	// info, warn, error (default: info)
 	defaultConfig.Logging.Level = "info"
-	
+
 	// Access Log (HTTP requests)
 	// Don't clutter console with every request
 	defaultConfig.Logging.Access.Stdout = false
@@ -730,7 +770,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// apache (combined), nginx, text, json
 	defaultConfig.Logging.Access.Format = "apache"
 	defaultConfig.Logging.Access.File = "access.log"
-	
+
 	// Error Log (ERROR messages)
 	defaultConfig.Logging.Error.Stdout = false
 	// Errors to stderr by default
@@ -738,7 +778,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// text, json
 	defaultConfig.Logging.Error.Format = "text"
 	defaultConfig.Logging.Error.File = "error.log"
-	
+
 	// Server Log (INFO messages)
 	// Show info messages on console
 	defaultConfig.Logging.Server.Stdout = true
@@ -746,7 +786,7 @@ func GenerateDefaultYAMLConfig(path string) error {
 	// text, json
 	defaultConfig.Logging.Server.Format = "text"
 	defaultConfig.Logging.Server.File = "caspaste.log"
-	
+
 	// Debug Log (DEBUG messages, only with --debug flag)
 	defaultConfig.Logging.Debug.Stdout = true
 	defaultConfig.Logging.Debug.Stderr = false
@@ -759,6 +799,35 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.Logging.Audit.File = "audit.log"
 	defaultConfig.Logging.Audit.MaskEmails = true
 	defaultConfig.Logging.Audit.IncludeUserAgent = true
+
+	// ============================================================================
+	// COMPLIANCE CONFIGURATION
+	// ============================================================================
+	// HIPAA/SOC2 compliance mode off by default per AI.md PART 22
+	defaultConfig.Compliance.Enabled = false
+
+	// ============================================================================
+	// BACKUP CONFIGURATION
+	// ============================================================================
+	// backup_daily task enabled by default per AI.md PART 19
+	defaultConfig.Backup.Enabled = true
+	// backup_hourly task disabled by default per AI.md PART 19
+	defaultConfig.Backup.HourlyEnabled = false
+	// No password set by default - unencrypted backups until admin sets one
+	defaultConfig.Backup.Encryption.Enabled = false
+	defaultConfig.Backup.Retention.MaxBackups = 1
+	defaultConfig.Backup.Retention.KeepWeekly = 0
+	defaultConfig.Backup.Retention.KeepMonthly = 0
+	defaultConfig.Backup.Retention.KeepYearly = 0
+	defaultConfig.Backup.Retention.MaxTotalSize = "10%"
+
+	// ============================================================================
+	// GEOIP CONFIGURATION
+	// ============================================================================
+	// Off by default per AI.md PART 20 - country.mmdb not downloaded until enabled
+	defaultConfig.GeoIP.Enabled = false
+	defaultConfig.GeoIP.DenyCountries = []string{}
+	defaultConfig.GeoIP.AllowCountries = []string{}
 
 	// Write to file
 	data, err := yaml.Marshal(defaultConfig)

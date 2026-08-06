@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -23,16 +22,19 @@ import (
 	"time"
 
 	chromaLexers "github.com/alecthomas/chroma/v2/lexers"
+	"golang.org/x/term"
 
 	"github.com/webappsgo/caspaste/src/admin"
 	"github.com/webappsgo/caspaste/src/apiv1"
-	"github.com/webappsgo/caspaste/src/compat"
 	"github.com/webappsgo/caspaste/src/audit"
+	"github.com/webappsgo/caspaste/src/backup"
 	"github.com/webappsgo/caspaste/src/caspasswd"
 	"github.com/webappsgo/caspaste/src/cli"
+	"github.com/webappsgo/caspaste/src/compat"
 	"github.com/webappsgo/caspaste/src/completion"
 	"github.com/webappsgo/caspaste/src/config"
 	"github.com/webappsgo/caspaste/src/display"
+	"github.com/webappsgo/caspaste/src/geoip"
 	"github.com/webappsgo/caspaste/src/graphql"
 	"github.com/webappsgo/caspaste/src/logger"
 	"github.com/webappsgo/caspaste/src/metric"
@@ -44,10 +46,10 @@ import (
 	"github.com/webappsgo/caspaste/src/scheduler"
 	"github.com/webappsgo/caspaste/src/service"
 	"github.com/webappsgo/caspaste/src/session"
-	"github.com/webappsgo/caspaste/src/token"
 	"github.com/webappsgo/caspaste/src/storage"
 	"github.com/webappsgo/caspaste/src/swagger"
 	"github.com/webappsgo/caspaste/src/template"
+	"github.com/webappsgo/caspaste/src/token"
 	"github.com/webappsgo/caspaste/src/tor"
 	"github.com/webappsgo/caspaste/src/updater"
 	"github.com/webappsgo/caspaste/src/validation"
@@ -109,26 +111,26 @@ func exitOnError(e error) {
 func retryWithBackoff(operation func() error, maxAttempts int, initialDelay time.Duration, maxDelay time.Duration, description string) error {
 	var err error
 	delay := initialDelay
-	
+
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		err = operation()
 		if err == nil {
 			return nil
 		}
-		
+
 		// Check if it's a connection error (retryable)
-		if !strings.Contains(err.Error(), "connection refused") && 
-		   !strings.Contains(err.Error(), "no such host") &&
-		   !strings.Contains(err.Error(), "i/o timeout") {
+		if !strings.Contains(err.Error(), "connection refused") &&
+			!strings.Contains(err.Error(), "no such host") &&
+			!strings.Contains(err.Error(), "i/o timeout") {
 			// Not a connection error, fail immediately
 			return err
 		}
-		
+
 		if attempt < maxAttempts {
-			fmt.Fprintf(os.Stderr, "[WARN]    %s failed (attempt %d/%d): %v - retrying in %v...\n", 
+			fmt.Fprintf(os.Stderr, "[WARN]    %s failed (attempt %d/%d): %v - retrying in %v...\n",
 				description, attempt, maxAttempts, err, delay)
 			time.Sleep(delay)
-			
+
 			// Exponential backoff with max delay
 			delay = delay * 2
 			if delay > maxDelay {
@@ -136,7 +138,7 @@ func retryWithBackoff(operation func() error, maxAttempts int, initialDelay time
 			}
 		}
 	}
-	
+
 	return fmt.Errorf("%s failed after %d attempts: %w", description, maxAttempts, err)
 }
 
@@ -454,10 +456,10 @@ func handleUpdateCommand(command, currentVersion string) {
 	cfg := updater.Config{
 		CurrentVersion: currentVersion,
 		// Default branch
-		Branch:         "stable",
-		GithubOwner:    "webappsgo",
-		GithubRepo:     "caspaste",
-		BinaryName:     "caspaste",
+		Branch:      "stable",
+		GithubOwner: "webappsgo",
+		GithubRepo:  "caspaste",
+		BinaryName:  "caspaste",
 	}
 
 	switch cmd {
@@ -626,7 +628,7 @@ func printServiceHelp() {
 }
 
 // handleMaintenanceCommand processes --maintenance flag commands
-func handleMaintenanceCommand(command, dbDriver, dbSource, dataDir, configDir, backupDir string) {
+func handleMaintenanceCommand(command, dbDriver, dbSource, dataDir, configDir, backupDir string, compliance bool) {
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
 		fmt.Fprintf(os.Stderr, "Maintenance command required\n")
@@ -642,7 +644,7 @@ func handleMaintenanceCommand(command, dbDriver, dbSource, dataDir, configDir, b
 
 	switch action {
 	case "backup":
-		err := performBackup(dbDriver, dbSource, dataDir, configDir, backupDir, arg)
+		err := performBackup(dbDriver, dbSource, dataDir, configDir, backupDir, arg, compliance)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Backup failed: %v\n", err)
 			os.Exit(1)
@@ -650,7 +652,7 @@ func handleMaintenanceCommand(command, dbDriver, dbSource, dataDir, configDir, b
 		os.Exit(0)
 
 	case "restore":
-		err := performRestore(dbDriver, dbSource, dataDir, configDir, backupDir, arg)
+		err := performRestore(dbDriver, dbSource, dataDir, configDir, backupDir, arg, compliance)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Restore failed: %v\n", err)
 			os.Exit(1)
@@ -699,7 +701,7 @@ func printMaintenanceHelp() {
 }
 
 // checkAndMigrateDatabase checks if database driver/source changed and auto-migrates if needed
-func checkAndMigrateDatabase(dataDir, configDir, backupDir, newDriver, newSource string) error {
+func checkAndMigrateDatabase(dataDir, configDir, backupDir, newDriver, newSource string, compliance bool) error {
 	stateFile := dataDir + "/.db-state"
 
 	// Read previous database state if exists
@@ -733,7 +735,13 @@ func checkAndMigrateDatabase(dataDir, configDir, backupDir, newDriver, newSource
 		// Create backup before migration
 		backupFilename := "pre-migration-" + time.Now().Format("20060102-150405") + ".tar.gz"
 		fmt.Printf("Creating safety backup: %s\n", backupDir+"/"+backupFilename)
-		performBackup(oldDriver, oldSource, dataDir, configDir, backupDir, backupFilename)
+		if err := performBackup(oldDriver, oldSource, dataDir, configDir, backupDir, backupFilename, compliance); err != nil {
+			fmt.Println()
+			fmt.Println("❌ Pre-migration safety backup failed!")
+			fmt.Printf("Error: %v\n", err)
+			fmt.Println("Aborting migration — refusing to migrate without a safety backup.")
+			return err
+		}
 
 		// Perform migration
 		err := storage.MigrateDatabase(oldDriver, oldSource, newDriver, newSource)
@@ -778,90 +786,91 @@ func normalizeDriverName(driver string) string {
 }
 
 // performBackup creates a full disaster recovery backup
-func performBackup(dbDriver, dbSource, dataDir, configDir, backupDir, filename string) error {
+// promptBackupPassword reads a backup encryption password from the terminal
+// without echoing it. The password is never persisted to disk or logged
+// (per AI.md PART 22 — "Password Storage: NEVER stored").
+func promptBackupPassword(confirm bool) (string, error) {
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return "", fmt.Errorf("backup password required (compliance mode or encrypted backup): set BACKUP_PASSWORD or run interactively")
+	}
+
+	fmt.Print("Backup password: ")
+	pw, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println()
+	if err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
+	}
+
+	if confirm {
+		fmt.Print("Confirm backup password: ")
+		confirmPw, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			return "", fmt.Errorf("failed to read password confirmation: %w", err)
+		}
+		if string(pw) != string(confirmPw) {
+			return "", fmt.Errorf("passwords do not match")
+		}
+	}
+
+	return string(pw), nil
+}
+
+// performBackup creates a full backup via the backup.Service engine (manifest,
+// checksum, optional AES-256-GCM encryption, immediate verify, retention) per
+// AI.md PART 22. dbDriver/dbSource are accepted for CLI-help symmetry with
+// performRestore but are not needed by the file-based backup engine.
+func performBackup(dbDriver, dbSource, dataDir, configDir, backupDir, filename string, compliance bool) error {
+	_ = dbDriver
+	_ = dbSource
+
 	if dataDir == "" {
 		dataDir = getDefaultDataDir()
 	}
 
-	// Generate filename if not provided
-	if filename == "" {
-		filename = fmt.Sprintf("backup-%s.tar.gz", time.Now().Format("20060102-150405"))
+	svc := backup.NewService(configDir, dataDir, backupDir, Version, nil)
+	svc.SetCompliance(compliance)
+
+	password := os.Getenv("BACKUP_PASSWORD")
+	if password == "" && compliance {
+		var err error
+		password, err = promptBackupPassword(true)
+		if err != nil {
+			return err
+		}
 	}
 
-	// Ensure backup directory exists
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		return fmt.Errorf("failed to create backup directory: %w", err)
-	}
-
-	backupPath := backupDir + "/" + filename
+	customName := strings.TrimSuffix(strings.TrimSuffix(filename, ".tar.gz.enc"), ".tar.gz")
 
 	fmt.Println("Creating disaster recovery backup...")
 	fmt.Println("Backing up:")
 	fmt.Printf("  - Config: %s\n", configDir)
 	fmt.Printf("  - Data: %s\n", dataDir)
-
-	// Check if database is outside data_dir/db
-	expectedDbPath := dataDir + "/db/"
-	dbIsExternal := false
-	if !strings.HasPrefix(dbSource, expectedDbPath) && (dbDriver == "sqlite3" || dbDriver == "sqlite") {
-		dbIsExternal = true
-		fmt.Printf("  - Database: %s (external)\n", dbSource)
-	}
-
-	fmt.Printf("Destination: %s\n", backupPath)
+	fmt.Printf("  - Destination: %s\n", backupDir)
 	fmt.Println()
 
-	// Create temporary directory for staging backup
-	tempDir := dataDir + "/.backup-temp"
-	os.MkdirAll(tempDir, 0755)
-	defer os.RemoveAll(tempDir)
-
-	// Copy data directory
-	cmd := exec.Command("cp", "-r", dataDir, tempDir+"/data")
-	cmd.Run()
-
-	// Copy config directory if exists
-	if configDir != "" {
-		if _, err := os.Stat(configDir); err == nil {
-			cmd = exec.Command("cp", "-r", configDir, tempDir+"/config")
-			cmd.Run()
-		}
-	}
-
-	// Copy external database if needed
-	if dbIsExternal {
-		os.MkdirAll(tempDir+"/external-db", 0755)
-		cmd = exec.Command("cp", dbSource, tempDir+"/external-db/caspaste.db")
-		cmd.Run()
-	}
-
-	// Create tar.gz archive
-	cmd = exec.Command("tar", "-czf", backupPath,
-		"--exclude=backups",
-		"--exclude=.backup-temp",
-		"--exclude=*.tmp",
-		"--exclude=*.lock",
-		"-C", tempDir,
-		".")
-
-	output, err := cmd.CombinedOutput()
+	result, err := svc.Create(context.Background(), backup.BackupOptions{
+		CustomFilename: customName,
+		IncludeData:    true,
+		Password:       password,
+	})
 	if err != nil {
-		return fmt.Errorf("backup failed: %w\nOutput: %s", err, string(output))
+		return err
 	}
 
-	// Get backup file size
-	info, err := os.Stat(backupPath)
-	if err == nil {
-		fmt.Printf("Backup created: %s (%.2f MB)\n", backupPath, float64(info.Size())/1024/1024)
-	} else {
-		fmt.Printf("Backup created: %s\n", backupPath)
-	}
-
+	fmt.Printf("Backup created: %s (%.2f MB, checksum %s)\n", result.FilePath, float64(result.Size)/1024/1024, result.Checksum)
 	return nil
 }
 
 // performRestore performs full disaster recovery restore from backup archive
-func performRestore(dbDriver, dbSource, dataDir, configDir, backupDir, filename string) error {
+// performRestore restores a backup via the backup.Service engine (checksum
+// verify, decrypt, manifest-driven extraction, new setup token) per AI.md
+// PART 22. dbDriver/dbSource are accepted for CLI-help symmetry with
+// performBackup but are not needed by the file-based restore engine.
+func performRestore(dbDriver, dbSource, dataDir, configDir, backupDir, filename string, compliance bool) error {
+	_ = dbDriver
+	_ = dbSource
+
 	if dataDir == "" {
 		dataDir = getDefaultDataDir()
 	}
@@ -877,7 +886,7 @@ func performRestore(dbDriver, dbSource, dataDir, configDir, backupDir, filename 
 		var latestTime int64
 
 		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".tar.gz") {
+			if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".tar.gz") || strings.HasSuffix(entry.Name(), ".tar.gz.enc")) {
 				info, err := entry.Info()
 				if err != nil {
 					continue
@@ -904,54 +913,31 @@ func performRestore(dbDriver, dbSource, dataDir, configDir, backupDir, filename 
 		return fmt.Errorf("backup file not found: %s", backupPath)
 	}
 
-	// Create safety backup of current state
+	svc := backup.NewService(configDir, dataDir, backupDir, Version, nil)
+	svc.SetCompliance(compliance)
+
+	// Create safety backup of current state before restoring
 	fmt.Println("Creating safety backup of current state...")
-	performBackup(dbDriver, dbSource, dataDir, configDir, backupDir, "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz")
+	if err := performBackup(dbDriver, dbSource, dataDir, configDir, backupDir, "pre-restore-"+time.Now().Format("20060102-150405")+".tar.gz", compliance); err != nil {
+		return fmt.Errorf("safety backup before restore failed, aborting restore: %w", err)
+	}
 
-	// Create temporary extraction directory
-	tempDir := dataDir + "/.restore-temp"
-	os.MkdirAll(tempDir, 0755)
-	defer os.RemoveAll(tempDir)
+	password := os.Getenv("BACKUP_PASSWORD")
+	if password == "" && strings.HasSuffix(backupPath, ".enc") {
+		var err error
+		password, err = promptBackupPassword(false)
+		if err != nil {
+			return err
+		}
+	}
 
-	// Extract backup archive to temp directory
 	fmt.Printf("Restoring from: %s\n", backupPath)
-	fmt.Println("Extracting backup archive...")
 
-	cmd := exec.Command("tar", "-xzf", backupPath, "-C", tempDir)
-	output, err := cmd.CombinedOutput()
+	result, err := svc.Restore(context.Background(), backupPath, backup.RestoreOptions{
+		Password: password,
+	})
 	if err != nil {
-		return fmt.Errorf("restore failed: %w\nOutput: %s", err, string(output))
-	}
-
-	// Restore data directory
-	if _, err := os.Stat(tempDir + "/data"); err == nil {
-		fmt.Println("Restoring data directory...")
-		cmd = exec.Command("cp", "-r", tempDir+"/data/.", dataDir)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to restore data directory: %w", err)
-		}
-	}
-
-	// Restore config directory
-	if configDir != "" {
-		if _, err := os.Stat(tempDir + "/config"); err == nil {
-			fmt.Println("Restoring config directory...")
-			cmd = exec.Command("cp", "-r", tempDir+"/config/.", configDir)
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("failed to restore config directory: %w", err)
-			}
-		}
-	}
-
-	// Restore external database if exists
-	if _, err := os.Stat(tempDir + "/external-db/caspaste.db"); err == nil {
-		fmt.Println("Restoring external database...")
-		if dbDriver == "sqlite3" || dbDriver == "sqlite" {
-			cmd = exec.Command("cp", tempDir+"/external-db/caspaste.db", dbSource)
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("failed to restore external database: %w", err)
-			}
-		}
+		return err
 	}
 
 	fmt.Println()
@@ -960,6 +946,12 @@ func performRestore(dbDriver, dbSource, dataDir, configDir, backupDir, filename 
 	fmt.Printf("  - Data: %s\n", dataDir)
 	if configDir != "" {
 		fmt.Printf("  - Config: %s\n", configDir)
+	}
+	if result.SetupRequired {
+		fmt.Println()
+		fmt.Println("Primary Admin re-authentication required. Setup token:")
+		fmt.Printf("  %s\n", result.SetupToken)
+		fmt.Println("Use this token to re-authenticate at the server setup page.")
 	}
 	return nil
 }
@@ -973,7 +965,7 @@ func setMaintenanceMode(dataDir, mode string) error {
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
-	
+
 	maintenanceFile := filepath.Join(dataDir, ".maintenance")
 
 	switch mode {
@@ -1247,7 +1239,7 @@ func main() {
 			*flagDataDir = "/var/lib/webappsgo/caspaste"
 		}
 		os.MkdirAll(*flagDataDir, 0755)
-		
+
 		// Build args without --daemon flag
 		args := []string{}
 		for _, arg := range os.Args[1:] {
@@ -1255,18 +1247,18 @@ func main() {
 				args = append(args, arg)
 			}
 		}
-		
+
 		// Start child process
 		cmd := exec.Command(os.Args[0], args...)
 		cmd.Stdout = nil
 		cmd.Stderr = nil
 		cmd.Stdin = nil
-		
+
 		if err := cmd.Start(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to start daemon: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		// Write PID file per AI.md PART 8
 		// Priority: --pid flag > platform defaults
 		pidFile := *flagPidFile
@@ -1278,7 +1270,7 @@ func main() {
 		if err := os.WriteFile(pidFile, []byte(fmt.Sprintf("%d\n", cmd.Process.Pid)), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write PID file: %v\n", err)
 		}
-		
+
 		fmt.Printf("CasPaste started in background (PID: %d)\n", cmd.Process.Pid)
 		fmt.Printf("Logs: %s/access.log\n", *flagLog)
 		if *flagDebug {
@@ -1394,7 +1386,7 @@ func main() {
 
 	// Track if this is first run (config being generated)
 	isFirstRun := false
-	
+
 	// If no config file found, create default config
 	if yamlCfg == nil {
 		isFirstRun = true
@@ -1491,7 +1483,7 @@ func main() {
 			yamlCfg.Directories.Logs = *flagLog
 		}
 	}
-	
+
 	// Always set flagAddress from config if config has a value (for display purposes)
 	if yamlCfg.Server.FQDN != "" && !isFirstRun {
 		*flagAddress = yamlCfg.Server.FQDN
@@ -1799,7 +1791,7 @@ func main() {
 				configPath = "/config/server.yml"
 			}
 		}
-		
+
 		cfg, err := config.LoadYAMLConfig(configPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to load config for maintenance operation: %v\n", err)
@@ -1807,18 +1799,18 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Maintenance operations require an existing configuration.\n")
 			os.Exit(1)
 		}
-		
+
 		// Determine directories from config
 		dataDir := *flagDataDir
 		if dataDir == "" {
 			dataDir = "/var/lib/webappsgo/caspaste"
 		}
-		
+
 		cfgDir := *flagConfigDir
 		if cfgDir == "" {
 			cfgDir = filepath.Dir(configPath)
 		}
-		
+
 		// Determine backup directory
 		backupDirPath := ""
 		if _, err := os.Stat("/mnt/Backups/caspaste"); err == nil {
@@ -1832,14 +1824,14 @@ func main() {
 			}
 		}
 		os.MkdirAll(backupDirPath, 0755)
-		
+
 		fmt.Printf("Using configuration from: %s\n", configPath)
 		fmt.Printf("Data directory: %s\n", dataDir)
 		fmt.Printf("Config directory: %s\n", cfgDir)
 		fmt.Printf("Backup directory: %s\n", backupDirPath)
 		fmt.Println()
-		
-		handleMaintenanceCommand(*flagMaintenance, cfg.Database.Driver, cfg.Database.Source, dataDir, cfgDir, backupDirPath)
+
+		handleMaintenanceCommand(*flagMaintenance, cfg.Database.Driver, cfg.Database.Source, dataDir, cfgDir, backupDirPath, cfg.Compliance.Enabled)
 		return
 	}
 
@@ -1924,8 +1916,8 @@ func main() {
 
 	// Now create template vars with replaced config values
 	templateVars := template.Variables{
-		FQDN:                 fqdn,
-		Version:              Version,
+		FQDN:    fqdn,
+		Version: Version,
 		// Default to HTTPS for security
 		Protocol:             "https",
 		ServerTitle:          yamlCfg.Server.Title,
@@ -1965,28 +1957,28 @@ func main() {
 	if debugLogFile == "" {
 		debugLogFile = "debug.log"
 	}
-	
+
 	// Open access.log - HTTP requests only
 	accessLogPath := filepath.Join(logsDir, accessLogFile)
 	accessLogFd, err := os.OpenFile(accessLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		exitOnError(fmt.Errorf("failed to open %s: %w", accessLogFile, err))
 	}
-	
+
 	// Open error.log - ERROR messages only
 	errorLogPath := filepath.Join(logsDir, errorLogFile)
 	errorLogFd, err := os.OpenFile(errorLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		exitOnError(fmt.Errorf("failed to open %s: %w", errorLogFile, err))
 	}
-	
+
 	// Open caspaste.log - Application log (INFO messages)
 	serverLogPath := filepath.Join(logsDir, serverLogFile)
 	serverLogFd, err := os.OpenFile(serverLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		exitOnError(fmt.Errorf("failed to open %s: %w", serverLogFile, err))
 	}
-	
+
 	// Open debug.log - DEBUG messages (only when --debug flag is used)
 	var debugLogFd *os.File
 	if mode.IsDebugEnabled() {
@@ -2067,10 +2059,10 @@ func main() {
 	if errorStderr {
 		consoleStderr = os.Stderr
 	}
-	
+
 	// Access log file writer (for HTTP requests)
 	accessFileWriter := io.Writer(accessLogFd)
-	
+
 	// Create logger with format configuration
 	log := logger.New("2006/01/02 15:04:05")
 	// Set log level: info, warn, error (affects stdout only)
@@ -2099,13 +2091,13 @@ func main() {
 		log.SetDebugWriter(debugLogFd)
 	}
 	log.SetDebugMode(mode.IsDebugEnabled())
-	
+
 	log.Debug("Configuration loaded from: " + configFilePath)
 	log.Debug("Data directory: " + *flagDataDir)
 	log.Debug("Config directory: " + *flagConfigDir)
 	log.Debug("Logs directory: " + logsDir)
 	log.Debug("Database: " + yamlCfg.Database.Driver + " (" + yamlCfg.Database.Source + ")")
-	
+
 	// Setup cleanup handler to close log files on shutdown
 	cleanupLogFiles := func() {
 		accessLogFd.Close()
@@ -2137,26 +2129,26 @@ func main() {
 	}
 
 	cfg := config.Config{
-		Log:               log,
-		RateLimitGet:      rateLimitGet,
-		RateLimitNew:      rateLimitNew,
-		Version:           Version,
-		BuildCommit:       CommitID,
-		BuildDate:         BuildDate,
-		Mode:              mode.GetCurrentAppMode().String(),
-		ServerTagline:     yamlCfg.Server.TagLine,
-		ServerDescription: yamlCfg.Server.Description,
-		TitleMaxLen:       yamlCfg.Limits.TitleMaxLength,
-		BodyMaxLen:        yamlCfg.Limits.BodyMaxLength,
-		MaxLifeTime:       maxLifeTime,
-		ServerAbout:       serverAbout,
-		ServerRules:       serverRules,
-		ServerTermsOfUse:  serverTermsOfUse,
-		SecurityTxt:       securityTxt,
-		FQDN:              fqdn,
-		ServerTitle:       yamlCfg.Server.Title,
-		AdminName:         yamlCfg.Server.Administrator.Name,
-		AdminMail:         yamlCfg.Server.Administrator.Email,
+		Log:                  log,
+		RateLimitGet:         rateLimitGet,
+		RateLimitNew:         rateLimitNew,
+		Version:              Version,
+		BuildCommit:          CommitID,
+		BuildDate:            BuildDate,
+		Mode:                 mode.GetCurrentAppMode().String(),
+		ServerTagline:        yamlCfg.Server.TagLine,
+		ServerDescription:    yamlCfg.Server.Description,
+		TitleMaxLen:          yamlCfg.Limits.TitleMaxLength,
+		BodyMaxLen:           yamlCfg.Limits.BodyMaxLength,
+		MaxLifeTime:          maxLifeTime,
+		ServerAbout:          serverAbout,
+		ServerRules:          serverRules,
+		ServerTermsOfUse:     serverTermsOfUse,
+		SecurityTxt:          securityTxt,
+		FQDN:                 fqdn,
+		ServerTitle:          yamlCfg.Server.Title,
+		AdminName:            yamlCfg.Server.Administrator.Name,
+		AdminMail:            yamlCfg.Server.Administrator.Email,
 		SecurityContactEmail: yamlCfg.Web.Security.Contact.Email,
 		SecurityContactName:  yamlCfg.Web.Security.Contact.Name,
 		SiteRobotsAllow:      yamlCfg.Web.SEO.Robots.Allow,
@@ -2222,7 +2214,7 @@ func main() {
 	// Auto-detect and perform database migration if driver changed
 	// NOW safe to migrate since destination database is initialized
 	if *flagDataDir != "" {
-		err := checkAndMigrateDatabase(*flagDataDir, *flagConfigDir, backupDir, yamlCfg.Database.Driver, yamlCfg.Database.Source)
+		err := checkAndMigrateDatabase(*flagDataDir, *flagConfigDir, backupDir, yamlCfg.Database.Driver, yamlCfg.Database.Source, yamlCfg.Compliance.Enabled)
 		if err != nil {
 			// Log error but don't fail startup - migration is optional
 			fmt.Fprintf(os.Stderr, "Warning: database migration failed: %v\n", err)
@@ -2494,6 +2486,24 @@ func main() {
 									web.MaintenanceMiddleware(dataDir,
 										compatData.Middleware(mux))))))))))
 
+	// Initialize GeoIP client per AI.md PART 20. Databases are never embedded —
+	// they are downloaded on first run and refreshed weekly via the
+	// geoip_update scheduler task. A missing database is a warning, not a
+	// startup failure (country blocking is silently skipped until it appears).
+	geoipClient := geoip.NewClient(&geoip.Config{
+		Enabled:        yamlCfg.GeoIP.Enabled,
+		Dir:            filepath.Join(dataDir, "security", "geoip"),
+		DenyCountries:  yamlCfg.GeoIP.DenyCountries,
+		ASNEnabled:     true,
+		CountryEnabled: true,
+		CityEnabled:    false,
+	})
+	if yamlCfg.GeoIP.Enabled {
+		if err := geoipClient.LoadDatabase(); err != nil {
+			log.Warn("GeoIP database not yet available (will download via geoip_update task): " + err.Error())
+		}
+	}
+
 	// Initialize built-in scheduler per AI.md PART 19
 	// ALL projects MUST have a built-in scheduler that is ALWAYS RUNNING
 	// NEVER use external schedulers (cron, systemd timers, etc.)
@@ -2578,6 +2588,95 @@ func main() {
 			return err
 		},
 	})
+
+	// Add backup_daily task per AI.md PART 19/22 — full backup + daily
+	// incremental, verified immediately after creation, retention applied.
+	backupSvc := backup.NewService(configDir, dataDir, backupDir, Version, nil)
+	backupSvc.SetCompliance(yamlCfg.Compliance.Enabled)
+	backupSvc.SetRetentionConfig(backup.RetentionConfig{
+		MaxBackups:   yamlCfg.Backup.Retention.MaxBackups,
+		KeepWeekly:   yamlCfg.Backup.Retention.KeepWeekly,
+		KeepMonthly:  yamlCfg.Backup.Retention.KeepMonthly,
+		KeepYearly:   yamlCfg.Backup.Retention.KeepYearly,
+		MaxTotalSize: yamlCfg.Backup.Retention.MaxTotalSize,
+	})
+	if yamlCfg.Backup.Enabled {
+		sched.AddTask(&scheduler.Task{
+			ID:          "backup_daily",
+			Name:        "Backup Daily",
+			Description: "Full backup + daily incremental",
+			Schedule:    "0 2 * * *",
+			Enabled:     true,
+			Skippable:   true,
+			Handler: func(ctx context.Context) error {
+				// Compliance mode requires an encryption password; scheduled
+				// (non-interactive) runs read it from BACKUP_PASSWORD only —
+				// per AI.md PART 22 the password is never stored, so a
+				// compliance-mode server without BACKUP_PASSWORD set simply
+				// fails this run (visible in scheduler history) rather than
+				// silently producing an unencrypted backup.
+				password := os.Getenv("BACKUP_PASSWORD")
+				result, err := backupSvc.Create(ctx, backup.BackupOptions{
+					CustomFilename: "caspaste-daily",
+					IncludeData:    true,
+					Password:       password,
+				})
+				if err != nil {
+					log.Error(errors.New("Backup daily: " + err.Error()))
+					return err
+				}
+				log.Info("Backup daily created: " + result.FilePath)
+				return nil
+			},
+		})
+	}
+
+	// Add backup_hourly task per AI.md PART 19 — disabled by default, always
+	// replaces the single hourly incremental file.
+	if yamlCfg.Backup.Enabled && yamlCfg.Backup.HourlyEnabled {
+		sched.AddTask(&scheduler.Task{
+			ID:          "backup_hourly",
+			Name:        "Backup Hourly",
+			Description: "Hourly incremental backup",
+			Schedule:    "@hourly",
+			Enabled:     true,
+			Skippable:   true,
+			Handler: func(ctx context.Context) error {
+				password := os.Getenv("BACKUP_PASSWORD")
+				result, err := backupSvc.Create(ctx, backup.BackupOptions{
+					CustomFilename: "caspaste-hourly",
+					IncludeData:    true,
+					Password:       password,
+				})
+				if err != nil {
+					log.Error(errors.New("Backup hourly: " + err.Error()))
+					return err
+				}
+				log.Info("Backup hourly created: " + result.FilePath)
+				return nil
+			},
+		})
+	}
+
+	// Add geoip_update task per AI.md PART 19/20 — weekly database refresh.
+	if yamlCfg.GeoIP.Enabled {
+		sched.AddTask(&scheduler.Task{
+			ID:          "geoip_update",
+			Name:        "GeoIP Update",
+			Description: "Download/update ip-location-db GeoIP databases",
+			Schedule:    "0 3 * * 0",
+			Enabled:     true,
+			Skippable:   true,
+			Handler: func(ctx context.Context) error {
+				if err := geoipClient.UpdateDatabases(); err != nil {
+					log.Error(errors.New("GeoIP update: " + err.Error()))
+					return err
+				}
+				log.Info("GeoIP databases updated")
+				return nil
+			},
+		})
+	}
 
 	// Wire scheduler health check into apiv1Data now that sched is ready
 	apiv1Data.SchedulerStatus = func() string {
@@ -2799,7 +2898,7 @@ func main() {
 	var srvHTTPS *http.Server
 	if httpsListener != nil && tlsCert != nil {
 		httpsErrors = make(chan error, 1)
-		
+
 		// Configure TLS security settings
 		tlsConfig := &tls.Config{
 			// Default to TLS 1.2
@@ -2813,7 +2912,7 @@ func main() {
 			},
 			PreferServerCipherSuites: true,
 		}
-		
+
 		// Apply configured TLS min version
 		switch yamlCfg.Security.TLS.MinVersion {
 		case "1.3":
@@ -2825,7 +2924,7 @@ func main() {
 		case "1.0":
 			tlsConfig.MinVersion = tls.VersionTLS10
 		}
-		
+
 		srvHTTPS = &http.Server{
 			Handler:      handler,
 			ReadTimeout:  15 * time.Second,
