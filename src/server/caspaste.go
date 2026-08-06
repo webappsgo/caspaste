@@ -2609,6 +2609,15 @@ func main() {
 			Enabled:     true,
 			Skippable:   true,
 			Handler: func(ctx context.Context) error {
+				// Per AI.md PART 22 backup_daily step 2: check free space
+				// before attempting a scheduled backup and abort (not fail)
+				// if free < 2x last backup size or disk usage > 90%.
+				if skip, reason, err := backupSvc.CheckDiskSpace(); err != nil {
+					log.Warn("Backup daily: disk space check failed, proceeding anyway: " + err.Error())
+				} else if skip {
+					log.Warn("backup.skipped_disk_full: Backup daily skipped: " + reason)
+					return nil
+				}
 				// Compliance mode requires an encryption password; scheduled
 				// (non-interactive) runs read it from BACKUP_PASSWORD only —
 				// per AI.md PART 22 the password is never stored, so a
@@ -2642,6 +2651,14 @@ func main() {
 			Enabled:     true,
 			Skippable:   true,
 			Handler: func(ctx context.Context) error {
+				// Per AI.md PART 22 backup_daily step 2 (also applied to the
+				// hourly incremental task, same skip semantics).
+				if skip, reason, err := backupSvc.CheckDiskSpace(); err != nil {
+					log.Warn("Backup hourly: disk space check failed, proceeding anyway: " + err.Error())
+				} else if skip {
+					log.Warn("backup.skipped_disk_full: Backup hourly skipped: " + reason)
+					return nil
+				}
 				password := os.Getenv("BACKUP_PASSWORD")
 				result, err := backupSvc.Create(ctx, backup.BackupOptions{
 					CustomFilename: "caspaste-hourly",

@@ -65,17 +65,18 @@ startup now also registers `backup_daily` (02:00, enabled per
 `server.backup.hourly_enabled`) as scheduler tasks using the same
 `backup.Service`.
 
-## [ ] backup_daily disk-space pre-check (`backup.skipped_disk_full`)
-Read: AI.md PART 19 § "ALWAYS check free space" and PART 22
-Spec requires checking free space (< 2x last backup size, or disk usage
-> 90%) before a *scheduled* backup and skipping with a distinct
-`backup.skipped_disk_full` status if insufficient. `backup.Service.Create`
-does not currently perform this check — `diskTotalBytes` exists
-(src/backup/diskusage_unix.go / _windows.go) but is unexported and
-nothing computes free space or wires a skip path. Needs: an exported
-free-space helper, a `Skipped` result/status distinguishable from
-`Failed` in scheduler history, and the backup_daily task handler (in
-main(), src/server/caspaste.go) calling it before `backupSvc.Create`.
+## [x] backup_daily disk-space pre-check (`backup.skipped_disk_full`)
+Read: AI.md PART 22 § "Backup Creation Flow (backup_daily task at 02:00)" step 2
+Added `diskFreeBytes` (src/backup/diskusage_unix.go / _windows.go,
+Bavail-based on Unix, GetDiskFreeSpaceEx free-available on Windows) and
+`backup.Service.CheckDiskSpace()` (src/backup/backup.go), which returns
+skip=true with a reason when disk usage exceeds the 90% threshold or free
+space is under 2x the most recent backup's size. Both `backup_daily` and
+`backup_hourly` scheduler task handlers (src/server/caspaste.go) call it
+before `backupSvc.Create` and log `backup.skipped_disk_full` via
+`log.Warn` + return nil (skip, not failure) when triggered. Not wired
+into manual/CLI-triggered backups (`performBackup`) — the spec text
+scopes this check to "a scheduled backup" only.
 
 ## [ ] GeoIP country-blocking middleware not implemented
 Read: AI.md PART 20 and PART 6 (middleware order)

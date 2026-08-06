@@ -95,6 +95,52 @@ func (s *Service) SetCompliance(enabled bool) {
 	s.compliance = enabled
 }
 
+// diskFullThresholdPct is the disk-usage percentage above which a scheduled
+// backup is skipped, per AI.md PART 22 backup_daily step 2 (default 90%).
+const diskFullThresholdPct = 90.0
+
+// CheckDiskSpace evaluates whether there is enough free space to safely run
+// a *scheduled* backup, per AI.md PART 22 backup_daily step 2: skip if free
+// space is less than 2x the size of the most recent backup, OR disk usage
+// exceeds 90%. Manual (CLI/API-triggered) backups never call this — only
+// the backup_daily / backup_hourly scheduler tasks do. A true skip return
+// is not an error; the caller should log backup.skipped_disk_full and abort
+// without attempting Create.
+func (s *Service) CheckDiskSpace() (skip bool, reason string, err error) {
+	total, err := diskTotalBytes(s.backupDir)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to stat backup disk: %w", err)
+	}
+	free, err := diskFreeBytes(s.backupDir)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to stat backup disk free space: %w", err)
+	}
+
+	if total > 0 {
+		usedPct := float64(total-free) / float64(total) * 100
+		if usedPct > diskFullThresholdPct {
+			return true, fmt.Sprintf("disk usage %.1f%% exceeds %.0f%% threshold (free %s of %s)",
+				usedPct, diskFullThresholdPct, FormatBytes(int64(free)), FormatBytes(int64(total))), nil
+		}
+	}
+
+	backups, err := s.retention.ListBackups()
+	if err != nil {
+		return false, "", fmt.Errorf("failed to list existing backups: %w", err)
+	}
+	if len(backups) > 0 {
+		// ListBackups returns newest first.
+		lastSize := backups[0].Size
+		needed := lastSize * 2
+		if int64(free) < needed {
+			return true, fmt.Sprintf("free space %s is less than 2x last backup size (%s needed)",
+				FormatBytes(int64(free)), FormatBytes(needed)), nil
+		}
+	}
+
+	return false, "", nil
+}
+
 // Create creates a new backup
 func (s *Service) Create(ctx context.Context, opts BackupOptions) (*BackupResult, error) {
 	// Check compliance requirements
