@@ -88,7 +88,7 @@ func (data *Data) handleNewPaste(rw http.ResponseWriter, req *http.Request) erro
 		CSRFToken:          GetCSRFToken(req, 32),
 		UnreadCount:        0,
 		Notifications:      nil,
-		ShowLogin:     data.ShowLogin,
+		ShowLogin:          data.ShowLogin,
 		Translate:          data.Locales.findLocale(req).translate,
 	}
 

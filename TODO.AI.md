@@ -145,15 +145,15 @@ No `cluster` or `cache` package exists. Single-instance mode only;
 global scheduler tasks are unimplemented. Required before multi-node
 deployment is possible per spec.
 
-## [ ] Repo-wide gofmt drift predates this session's changes
+## [x] Repo-wide gofmt drift predates this session's changes
 Read: AI.md PART 26 (Go formatting via `gofmt`)
-`gofmt -l ./src ./cmd` flags ~75 files across admin/, apiv1/, storage/,
-web/, etc. (leading blank lines before file-header comments, trailing
-whitespace/indent inconsistencies) — confirmed NOT introduced by this
-session's edits (only src/server/caspaste.go and src/config/yaml.go were
-touched and reformatted, both now gofmt-clean). Needs a dedicated
-formatting pass across the full `src/` tree, reviewed as its own change
-so it doesn't get bundled into unrelated commits.
+`gofmt -l ./src` flagged 80 files across admin/, apiv1/, storage/, web/,
+etc. (leading blank lines before file-header comments, trailing
+whitespace/indent inconsistencies). Fixed via a dedicated `gofmt -w
+./src` pass (no logic changes), reviewed as its own standalone commit
+per this item's own instruction. `gofmt -l ./src` now clean; `go build
+./...`, `go vet ./...`, and `go test -cover ./...` all verified clean
+afterward in Docker.
 
 ## [ ] Multi-user (PART 34), Organizations (PART 35), Custom Domains (PART 36) unimplemented
 Read: AI.md PART 34, 35, 36

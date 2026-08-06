@@ -27,11 +27,11 @@ type Config struct {
 
 // Spec represents the OpenAPI 3.0 specification
 type Spec struct {
-	OpenAPI string                 `json:"openapi"`
-	Info    Info                   `json:"info"`
-	Servers []Server               `json:"servers"`
-	Paths   map[string]PathItem    `json:"paths"`
-	Tags    []Tag                  `json:"tags"`
+	OpenAPI    string              `json:"openapi"`
+	Info       Info                `json:"info"`
+	Servers    []Server            `json:"servers"`
+	Paths      map[string]PathItem `json:"paths"`
+	Tags       []Tag               `json:"tags"`
 	Components Components          `json:"components,omitempty"`
 }
 
@@ -80,13 +80,13 @@ type PathItem struct {
 
 // Operation represents an operation
 type Operation struct {
-	Tags        []string              `json:"tags,omitempty"`
-	Summary     string                `json:"summary,omitempty"`
-	Description string                `json:"description,omitempty"`
-	OperationID string                `json:"operationId,omitempty"`
-	Parameters  []Parameter           `json:"parameters,omitempty"`
-	RequestBody *RequestBody          `json:"requestBody,omitempty"`
-	Responses   map[string]Response   `json:"responses"`
+	Tags        []string            `json:"tags,omitempty"`
+	Summary     string              `json:"summary,omitempty"`
+	Description string              `json:"description,omitempty"`
+	OperationID string              `json:"operationId,omitempty"`
+	Parameters  []Parameter         `json:"parameters,omitempty"`
+	RequestBody *RequestBody        `json:"requestBody,omitempty"`
+	Responses   map[string]Response `json:"responses"`
 }
 
 // Parameter represents a parameter
@@ -100,9 +100,9 @@ type Parameter struct {
 
 // RequestBody represents a request body
 type RequestBody struct {
-	Description string             `json:"description,omitempty"`
-	Required    bool               `json:"required,omitempty"`
-	Content     map[string]Media   `json:"content"`
+	Description string           `json:"description,omitempty"`
+	Required    bool             `json:"required,omitempty"`
+	Content     map[string]Media `json:"content"`
 }
 
 // Media represents media type content

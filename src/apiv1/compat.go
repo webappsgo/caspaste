@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -277,9 +276,9 @@ func (data *Data) handlePastebinCompat(rw http.ResponseWriter, req *http.Request
 	private := req.PostFormValue("api_paste_private")
 
 	paste := storage.Paste{
-		Title:     title,
-		Body:      lineend.UnknownToUnix(body),
-		Syntax:    normalizeSyntax(syntax, data.Lexers),
+		Title:  title,
+		Body:   lineend.UnknownToUnix(body),
+		Syntax: normalizeSyntax(syntax, data.Lexers),
 		// Pastebin.com uses 0=public, 1=unlisted, 2=private (both 1 and 2 are private)
 		IsPrivate: validation.IsTruthy(private) || private == "2",
 	}
@@ -879,4 +878,3 @@ func (data *Data) hastebinGet(rw http.ResponseWriter, req *http.Request) error {
 	rw.Write([]byte("\n"))
 	return nil
 }
-

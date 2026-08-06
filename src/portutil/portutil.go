@@ -48,8 +48,9 @@ func IsPortAvailable(port int) bool {
 
 // ParsePorts parses port configuration string
 // Formats supported:
-//   "8080"        → httpPort=8080, httpsPort=0
-//   "8080,64453"  → httpPort=8080, httpsPort=64453
+//
+//	"8080"        → httpPort=8080, httpsPort=0
+//	"8080,64453"  → httpPort=8080, httpsPort=64453
 func ParsePorts(portStr string) (httpPort, httpsPort int, err error) {
 	if portStr == "" {
 		return 0, 0, fmt.Errorf("port string is empty")

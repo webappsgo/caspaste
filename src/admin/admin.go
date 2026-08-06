@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -9,30 +8,31 @@
 // API mount:   /api/{version}/server/{admin_path}/
 //
 // Route hierarchy (relative to strip-prefix base):
-//   /                               Dashboard
-//   /login                          Login page + form POST
-//   /logout                         Logout (GET clears session)
-//   /{admin_username}/profile        Admin self-management
-//   /{admin_username}/preferences    Admin preferences
-//   /{admin_username}/notifications  Admin notifications
-//   /config/setup                   First-run setup wizard
-//   /config/settings                Server settings
-//   /config/ssl                     SSL/TLS management
-//   /config/email                   Email / SMTP settings
-//   /config/scheduler               Scheduled task viewer
-//   /config/logs                    Server log viewer
-//   /config/logs/audit              Audit log viewer
-//   /config/backup                  Backup & restore
-//   /config/updates                 Update management
-//   /config/info                    Server info
-//   /config/metrics                 Metrics dashboard
-//   /config/network/tor             Tor hidden service
-//   /config/network/geoip           GeoIP settings
-//   /config/security/auth           Authentication overview
-//   /config/security/auth/oidc      OIDC provider management
-//   /config/security/auth/ldap      LDAP provider management
-//   /config/security/tokens         API token management
-//   /config/security/firewall       Firewall rules
+//
+//	/                               Dashboard
+//	/login                          Login page + form POST
+//	/logout                         Logout (GET clears session)
+//	/{admin_username}/profile        Admin self-management
+//	/{admin_username}/preferences    Admin preferences
+//	/{admin_username}/notifications  Admin notifications
+//	/config/setup                   First-run setup wizard
+//	/config/settings                Server settings
+//	/config/ssl                     SSL/TLS management
+//	/config/email                   Email / SMTP settings
+//	/config/scheduler               Scheduled task viewer
+//	/config/logs                    Server log viewer
+//	/config/logs/audit              Audit log viewer
+//	/config/backup                  Backup & restore
+//	/config/updates                 Update management
+//	/config/info                    Server info
+//	/config/metrics                 Metrics dashboard
+//	/config/network/tor             Tor hidden service
+//	/config/network/geoip           GeoIP settings
+//	/config/security/auth           Authentication overview
+//	/config/security/auth/oidc      OIDC provider management
+//	/config/security/auth/ldap      LDAP provider management
+//	/config/security/tokens         API token management
+//	/config/security/firewall       Firewall rules
 package admin
 
 import (

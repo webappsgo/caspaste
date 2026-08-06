@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -1007,37 +1006,37 @@ func handleHealth() {
 // extToSyntax maps file extensions to syntax names
 func extToSyntax(ext string) string {
 	mapping := map[string]string{
-		"py":    "python",
-		"js":    "javascript",
-		"ts":    "typescript",
-		"go":    "go",
-		"rs":    "rust",
-		"rb":    "ruby",
-		"php":   "php",
-		"java":  "java",
-		"c":     "c",
-		"cpp":   "cpp",
-		"h":     "c",
-		"hpp":   "cpp",
-		"cs":    "csharp",
-		"sh":    "bash",
-		"bash":  "bash",
-		"zsh":   "bash",
-		"ps1":   "powershell",
-		"sql":   "sql",
-		"json":  "json",
-		"yaml":  "yaml",
-		"yml":   "yaml",
-		"xml":   "xml",
-		"html":  "html",
-		"css":   "css",
-		"scss":  "scss",
-		"md":    "markdown",
-		"txt":   "plaintext",
-		"log":   "plaintext",
-		"conf":  "ini",
-		"ini":   "ini",
-		"toml":  "toml",
+		"py":         "python",
+		"js":         "javascript",
+		"ts":         "typescript",
+		"go":         "go",
+		"rs":         "rust",
+		"rb":         "ruby",
+		"php":        "php",
+		"java":       "java",
+		"c":          "c",
+		"cpp":        "cpp",
+		"h":          "c",
+		"hpp":        "cpp",
+		"cs":         "csharp",
+		"sh":         "bash",
+		"bash":       "bash",
+		"zsh":        "bash",
+		"ps1":        "powershell",
+		"sql":        "sql",
+		"json":       "json",
+		"yaml":       "yaml",
+		"yml":        "yaml",
+		"xml":        "xml",
+		"html":       "html",
+		"css":        "css",
+		"scss":       "scss",
+		"md":         "markdown",
+		"txt":        "plaintext",
+		"log":        "plaintext",
+		"conf":       "ini",
+		"ini":        "ini",
+		"toml":       "toml",
 		"dockerfile": "docker",
 		"makefile":   "makefile",
 	}
@@ -1047,4 +1046,3 @@ func extToSyntax(ext string) string {
 	}
 	return ""
 }
-

@@ -20,12 +20,12 @@ var startTime = time.Now()
 
 // healthzTmplData is the data struct passed to healthz.tmpl
 type healthzTmplData struct {
-	Status     string
-	Version    string
-	GoVersion  string
-	Uptime     string
-	Mode       string
-	Timestamp  string
+	Status      string
+	Version     string
+	GoVersion   string
+	Uptime      string
+	Mode        string
+	Timestamp   string
 	BuildCommit string
 	BuildDate   string
 	DBStatus    string

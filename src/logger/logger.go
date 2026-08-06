@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -74,18 +73,18 @@ type Logger struct {
 	TimeFormat string
 	Format     LogFormat
 	Level      LogLevel
-	
+
 	// File writers - always write regardless of level
 	serverFile io.Writer
 	errorFile  io.Writer
 	accessFile io.Writer
 	debugFile  io.Writer
-	
+
 	// Console writers - filtered by level
-	stdout     io.Writer
-	stderr     io.Writer
-	
-	debugMode  bool
+	stdout io.Writer
+	stderr io.Writer
+
+	debugMode bool
 }
 
 func New(timeFormat string) Logger {
@@ -99,8 +98,8 @@ func New(timeFormat string) Logger {
 			Server: "text",
 			Debug:  "text",
 		},
-		stdout:     os.Stdout,
-		stderr:     os.Stderr,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
 	}
 }
 
@@ -159,7 +158,7 @@ func (l *Logger) Debug(msg string) {
 	if !l.debugMode || l.debugFile == nil {
 		return
 	}
-	
+
 	if l.Format.Debug == "json" {
 		entry := map[string]interface{}{
 			"time":    time.Now().Format(time.RFC3339),
@@ -203,12 +202,12 @@ func (cfg Logger) Info(msg string) {
 	} else {
 		output = fmt.Sprintf("%s [INFO]    %s", time.Now().Format(cfg.TimeFormat), msg)
 	}
-	
+
 	// Always write to file
 	if cfg.serverFile != nil {
 		fmt.Fprintln(cfg.serverFile, output)
 	}
-	
+
 	// Only write to stdout if level permits (info level)
 	if cfg.Level <= LogLevelInfo && cfg.stdout != nil {
 		fmt.Fprintln(cfg.stdout, output)
@@ -229,12 +228,12 @@ func (cfg Logger) Warn(msg string) {
 	} else {
 		output = fmt.Sprintf("%s [WARN]    %s", time.Now().Format(cfg.TimeFormat), msg)
 	}
-	
+
 	// Always write to file
 	if cfg.serverFile != nil {
 		fmt.Fprintln(cfg.serverFile, output)
 	}
-	
+
 	// Only write to stdout if level permits (warn or lower)
 	if cfg.Level <= LogLevelWarn && cfg.stdout != nil {
 		fmt.Fprintln(cfg.stdout, output)
@@ -256,12 +255,12 @@ func (cfg Logger) Error(e error) {
 	} else {
 		output = fmt.Sprintf("%s [ERROR]   %s%s", time.Now().Format(cfg.TimeFormat), getTrace(), e.Error())
 	}
-	
+
 	// Always write to file
 	if cfg.errorFile != nil {
 		fmt.Fprintln(cfg.errorFile, output)
 	}
-	
+
 	// Always write errors to stderr (errors always shown)
 	if cfg.stderr != nil {
 		fmt.Fprintln(cfg.stderr, output)
@@ -280,7 +279,7 @@ func (cfg Logger) HttpRequest(req *http.Request, code int) {
 	if userAgent == "" {
 		userAgent = "-"
 	}
-	
+
 	// Write to access.log file - HTTP request logs
 	if cfg.accessFile != nil {
 		switch cfg.Format.Access {
@@ -297,19 +296,19 @@ func (cfg Logger) HttpRequest(req *http.Request, code int) {
 			}
 			data, _ := json.Marshal(entry)
 			fmt.Fprintln(cfg.accessFile, string(data))
-			
+
 		case "nginx":
 			// Nginx Combined Log Format
 			timestamp := time.Now().Format("02/Jan/2006:15:04:05 -0700")
 			fmt.Fprintf(cfg.accessFile, "%s - - [%s] \"%s %s %s\" %d 0 \"%s\" \"%s\"\n",
 				clientIP, timestamp, method, path, req.Proto, code, referer, userAgent)
-			
+
 		case "text":
 			// Simple text format
 			timestamp := time.Now().Format(cfg.TimeFormat)
 			fmt.Fprintf(cfg.accessFile, "%s %s %s %s %d %s\n",
 				timestamp, clientIP, method, path, code, userAgent)
-			
+
 		// "apache" or unspecified
 		default:
 			// Apache Combined Log Format (default)

@@ -85,7 +85,7 @@ func (data *Data) handleDocsAPIv1(rw http.ResponseWriter, req *http.Request) err
 		CSRFToken:       data.buildCSRFToken(req),
 		UnreadCount:     0,
 		Notifications:   nil,
-		ShowLogin:     data.ShowLogin,
+		ShowLogin:       data.ShowLogin,
 		Translate:       data.Locales.findLocale(req).translate,
 		Highlight:       data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 	})

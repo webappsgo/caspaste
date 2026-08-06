@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -23,8 +22,8 @@ import (
 // TOTP constants
 const (
 	// seconds
-	DefaultPeriod     = 30
-	DefaultDigits     = 6
+	DefaultPeriod = 30
+	DefaultDigits = 6
 	// bytes
 	DefaultSecretSize = 20
 )

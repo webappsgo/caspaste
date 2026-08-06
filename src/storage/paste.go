@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -28,9 +27,9 @@ const (
 
 type Paste struct {
 	// Ignored when creating
-	ID         string `json:"id"`
-	Title      string `json:"title"`
-	Body       string `json:"body"`
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
 	// Ignored when creating
 	CreateTime int64  `json:"createTime"`
 	DeleteTime int64  `json:"deleteTime"`

@@ -29,12 +29,12 @@ const (
 
 // Config holds GeoIP configuration
 type Config struct {
-	Enabled       bool
-	Dir           string
-	DenyCountries []string
-	ASNEnabled    bool
+	Enabled        bool
+	Dir            string
+	DenyCountries  []string
+	ASNEnabled     bool
 	CountryEnabled bool
-	CityEnabled   bool
+	CityEnabled    bool
 }
 
 // DefaultConfig returns the default GeoIP configuration
@@ -51,18 +51,18 @@ func DefaultConfig() *Config {
 
 // Result represents a GeoIP lookup result
 type Result struct {
-	IP          string `json:"ip"`
-	CountryCode string `json:"country_code,omitempty"`
-	Country     string `json:"country,omitempty"`
-	City        string `json:"city,omitempty"`
-	Region      string `json:"region,omitempty"`
-	PostalCode  string `json:"postal_code,omitempty"`
+	IP          string  `json:"ip"`
+	CountryCode string  `json:"country_code,omitempty"`
+	Country     string  `json:"country,omitempty"`
+	City        string  `json:"city,omitempty"`
+	Region      string  `json:"region,omitempty"`
+	PostalCode  string  `json:"postal_code,omitempty"`
 	Latitude    float64 `json:"latitude,omitempty"`
 	Longitude   float64 `json:"longitude,omitempty"`
-	Timezone    string `json:"timezone,omitempty"`
-	ASN         uint   `json:"asn,omitempty"`
-	ASNOrg      string `json:"asn_org,omitempty"`
-	Blocked     bool   `json:"blocked"`
+	Timezone    string  `json:"timezone,omitempty"`
+	ASN         uint    `json:"asn,omitempty"`
+	ASNOrg      string  `json:"asn_org,omitempty"`
+	Blocked     bool    `json:"blocked"`
 }
 
 // MMDB record types for deserialization
@@ -386,12 +386,12 @@ func (c *Client) GetConfig() map[string]interface{} {
 	defer c.mu.RUnlock()
 
 	return map[string]interface{}{
-		"enabled":        c.enabled,
-		"dir":            c.config.Dir,
-		"deny_countries": c.config.DenyCountries,
-		"asn_enabled":    c.config.ASNEnabled,
+		"enabled":         c.enabled,
+		"dir":             c.config.Dir,
+		"deny_countries":  c.config.DenyCountries,
+		"asn_enabled":     c.config.ASNEnabled,
 		"country_enabled": c.config.CountryEnabled,
-		"city_enabled":   c.config.CityEnabled,
-		"last_update":    c.lastUpdate,
+		"city_enabled":    c.config.CityEnabled,
+		"last_update":     c.lastUpdate,
 	}
 }

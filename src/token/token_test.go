@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -488,7 +487,7 @@ func TestValidateAdminToken_NotFound(t *testing.T) {
 
 func TestAdminToken_Roles(t *testing.T) {
 	roles := []struct {
-		role      string
+		role       string
 		wantGlobal bool
 		wantRead   bool
 	}{

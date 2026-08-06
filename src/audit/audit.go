@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -24,12 +23,12 @@ import (
 // Event types per AI.md PART 11
 const (
 	// Authentication events
-	EventAdminLogin        = "admin.login"
-	EventAdminLogout       = "admin.logout"
-	EventAdminLoginFailed  = "admin.login_failed"
-	EventUserLogin         = "user.login"
-	EventUserLogout        = "user.logout"
-	EventUserLoginFailed   = "user.login_failed"
+	EventAdminLogin       = "admin.login"
+	EventAdminLogout      = "admin.logout"
+	EventAdminLoginFailed = "admin.login_failed"
+	EventUserLogin        = "user.login"
+	EventUserLogout       = "user.logout"
+	EventUserLoginFailed  = "user.login_failed"
 
 	// Security events
 	EventRateLimitExceeded = "security.rate_limit_exceeded"
@@ -39,18 +38,18 @@ const (
 	EventIPBlocked         = "security.ip_blocked"
 
 	// Server events
-	EventServerStarted     = "server.started"
-	EventServerStopped     = "server.stopped"
-	EventMaintenanceEnter  = "server.maintenance_entered"
-	EventMaintenanceExit   = "server.maintenance_exited"
+	EventServerStarted    = "server.started"
+	EventServerStopped    = "server.stopped"
+	EventMaintenanceEnter = "server.maintenance_entered"
+	EventMaintenanceExit  = "server.maintenance_exited"
 
 	// Backup events
-	EventBackupCreated     = "backup.created"
-	EventBackupRestored    = "backup.restored"
-	EventBackupFailed      = "backup.failed"
+	EventBackupCreated  = "backup.created"
+	EventBackupRestored = "backup.restored"
+	EventBackupFailed   = "backup.failed"
 
 	// Config events
-	EventConfigUpdated     = "config.updated"
+	EventConfigUpdated = "config.updated"
 )
 
 // Entry represents a single audit log entry per AI.md PART 11

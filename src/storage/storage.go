@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -31,7 +30,7 @@ var (
 )
 
 type DB struct {
-	pool       *sql.DB
+	pool *sql.DB
 	// SQLite backup/cache when using postgres/mysql
 	backupPool *sql.DB
 	driver     string
@@ -796,18 +795,18 @@ func InitDB(driverName string, dataSourceName string) error {
 	} else {
 		// PostgreSQL: supports IF NOT EXISTS; each statement must be separate
 		pgCols := []columnDef{
-			{"author",       "TEXT NOT NULL DEFAULT ''"},
+			{"author", "TEXT NOT NULL DEFAULT ''"},
 			{"author_email", "TEXT NOT NULL DEFAULT ''"},
-			{"author_url",   "TEXT NOT NULL DEFAULT ''"},
-			{"is_file",      "BOOL NOT NULL DEFAULT false"},
-			{"file_name",    "TEXT NOT NULL DEFAULT ''"},
-			{"mime_type",    "TEXT NOT NULL DEFAULT ''"},
-			{"is_editable",  "BOOL NOT NULL DEFAULT false"},
-			{"is_private",   "BOOL NOT NULL DEFAULT false"},
-			{"is_url",       "BOOL NOT NULL DEFAULT false"},
+			{"author_url", "TEXT NOT NULL DEFAULT ''"},
+			{"is_file", "BOOL NOT NULL DEFAULT false"},
+			{"file_name", "TEXT NOT NULL DEFAULT ''"},
+			{"mime_type", "TEXT NOT NULL DEFAULT ''"},
+			{"is_editable", "BOOL NOT NULL DEFAULT false"},
+			{"is_private", "BOOL NOT NULL DEFAULT false"},
+			{"is_url", "BOOL NOT NULL DEFAULT false"},
 			{"original_url", "TEXT NOT NULL DEFAULT ''"},
-			{"user_id",      "INTEGER"},
-			{"org_id",       "INTEGER"},
+			{"user_id", "INTEGER"},
+			{"org_id", "INTEGER"},
 		}
 		for _, col := range pgCols {
 			_, err = db.pool.ExecContext(ctx,

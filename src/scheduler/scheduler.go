@@ -33,23 +33,23 @@ const (
 
 // Task represents a scheduled task
 type Task struct {
-	ID           string
-	Name         string
-	Description  string
-	Schedule     string
-	Enabled      bool
-	Skippable    bool
-	RetryOnFail  bool
-	RetryDelay   time.Duration
-	Handler      func(ctx context.Context) error
-	LastRun      time.Time
-	NextRun      time.Time
-	LastStatus   TaskStatus
-	LastError    string
-	RunCount     int64
-	FailCount    int64
-	cronExpr     *CronExpr
-	mu           sync.RWMutex
+	ID          string
+	Name        string
+	Description string
+	Schedule    string
+	Enabled     bool
+	Skippable   bool
+	RetryOnFail bool
+	RetryDelay  time.Duration
+	Handler     func(ctx context.Context) error
+	LastRun     time.Time
+	NextRun     time.Time
+	LastStatus  TaskStatus
+	LastError   string
+	RunCount    int64
+	FailCount   int64
+	cronExpr    *CronExpr
+	mu          sync.RWMutex
 }
 
 // Config holds scheduler configuration
@@ -70,14 +70,14 @@ func DefaultConfig() *Config {
 
 // Scheduler manages scheduled tasks
 type Scheduler struct {
-	config    *Config
-	tasks     map[string]*Task
-	running   bool
-	ctx       context.Context
-	cancel    context.CancelFunc
-	mu        sync.RWMutex
-	wg        sync.WaitGroup
-	location  *time.Location
+	config   *Config
+	tasks    map[string]*Task
+	running  bool
+	ctx      context.Context
+	cancel   context.CancelFunc
+	mu       sync.RWMutex
+	wg       sync.WaitGroup
+	location *time.Location
 }
 
 // New creates a new scheduler

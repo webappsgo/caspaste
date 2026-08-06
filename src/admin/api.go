@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -53,19 +52,19 @@ func (p *Panel) apiGetSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	c := p.cfg.AppCfg
 	jsonOK(w, map[string]interface{}{
-		"title":           c.ServerTitle,
-		"fqdn":            c.FQDN,
-		"admin_name":      c.AdminName,
-		"admin_mail":      c.AdminMail,
-		"title_max_len":   c.TitleMaxLen,
-		"body_max_len":    c.BodyMaxLen,
-		"max_lifetime":    c.MaxLifeTime,
-		"public":          c.Public,
-		"api_version":     c.APIVersion,
-		"mode":            c.Mode,
-		"version":         c.Version,
-		"build_commit":    c.BuildCommit,
-		"build_date":      c.BuildDate,
+		"title":         c.ServerTitle,
+		"fqdn":          c.FQDN,
+		"admin_name":    c.AdminName,
+		"admin_mail":    c.AdminMail,
+		"title_max_len": c.TitleMaxLen,
+		"body_max_len":  c.BodyMaxLen,
+		"max_lifetime":  c.MaxLifeTime,
+		"public":        c.Public,
+		"api_version":   c.APIVersion,
+		"mode":          c.Mode,
+		"version":       c.Version,
+		"build_commit":  c.BuildCommit,
+		"build_date":    c.BuildDate,
 	})
 }
 
@@ -116,7 +115,7 @@ func (p *Panel) apiMetrics(w http.ResponseWriter, r *http.Request) {
 
 	jsonOK(w, map[string]interface{}{
 		"pastes": map[string]interface{}{
-			"total":  totalPastes,
+			"total":   totalPastes,
 			"last24h": recentPastes,
 		},
 		"admins":     adminCount,
@@ -377,7 +376,7 @@ func (p *Panel) apiInviteAdmin(w http.ResponseWriter, r *http.Request) {
 // apiTorInfo returns Tor hidden service status
 func (p *Panel) apiTorInfo(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]interface{}{
-		"enabled":      false,
+		"enabled":       false,
 		"onion_address": "",
 	})
 }

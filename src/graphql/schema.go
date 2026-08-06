@@ -9,9 +9,9 @@ package graphql
 
 // Schema represents the GraphQL schema
 type Schema struct {
-	types      map[string]*TypeDef
-	queryType  *TypeDef
-	mutType    *TypeDef
+	types     map[string]*TypeDef
+	queryType *TypeDef
+	mutType   *TypeDef
 }
 
 // TypeDef represents a GraphQL type definition

@@ -21,20 +21,20 @@ import (
 
 // Config holds SMTP configuration
 type Config struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	TLS      string
-	FromName string
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	TLS       string
+	FromName  string
 	FromEmail string
 }
 
 // Client handles email sending
 type Client struct {
-	config   *Config
-	enabled  bool
-	mu       sync.RWMutex
+	config  *Config
+	enabled bool
+	mu      sync.RWMutex
 }
 
 // NewClient creates a new email client
@@ -352,12 +352,12 @@ func (c *Client) GetConfig() map[string]interface{} {
 	defer c.mu.RUnlock()
 
 	return map[string]interface{}{
-		"host":      c.config.Host,
-		"port":      c.config.Port,
-		"username":  c.config.Username,
-		"tls":       c.config.TLS,
-		"from_name": c.config.FromName,
+		"host":       c.config.Host,
+		"port":       c.config.Port,
+		"username":   c.config.Username,
+		"tls":        c.config.TLS,
+		"from_name":  c.config.FromName,
 		"from_email": c.config.FromEmail,
-		"enabled":   c.enabled,
+		"enabled":    c.enabled,
 	}
 }

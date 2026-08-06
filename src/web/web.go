@@ -130,7 +130,6 @@ type Data struct {
 	// ShowLogin controls whether the login link appears in the nav.
 	// True when multi-user support is enabled (i.e., accounts exist to log into).
 	ShowLogin bool
-
 }
 
 // LoadContentWithOverride loads content from embedded FS or overrides from file

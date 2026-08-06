@@ -79,4 +79,3 @@ func IsMarkdownMimeType(mimeType string) bool {
 		mimeType == "text/x-markdown" ||
 		mimeType == "text/plain; charset=utf-8" && strings.Contains(mimeType, "markdown")
 }
-

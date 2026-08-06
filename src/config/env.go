@@ -265,7 +265,7 @@ func ApplyEnvironmentOverrides(cfg *YAMLConfig) {
 			cfg.Limits.RateLimit.GetPastes.Per1Hour = uint(num)
 		}
 	}
-	
+
 	// Rate limits - NEW pastes
 	if val := getEnv("NEW_PASTES_PER_5MIN"); val != "" {
 		if num, err := strconv.ParseUint(val, 10, 32); err == nil {

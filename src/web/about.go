@@ -67,7 +67,7 @@ func (data *Data) handleAbout(rw http.ResponseWriter, req *http.Request) error {
 		CSRFToken:        data.buildCSRFToken(req),
 		UnreadCount:      0,
 		Notifications:    nil,
-		ShowLogin:     data.ShowLogin,
+		ShowLogin:        data.ShowLogin,
 		Highlight:        data.Themes.findTheme(req, data.UiDefaultTheme).tryHighlight,
 		Translate:        data.Locales.findLocale(req).translate,
 	}

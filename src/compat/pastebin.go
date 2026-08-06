@@ -245,15 +245,15 @@ func pastebinExpiry(code string) int64 {
 	case "1D":
 		return now + 86400
 	case "1W":
-		return now + 7 * 86400
+		return now + 7*86400
 	case "2W":
-		return now + 14 * 86400
+		return now + 14*86400
 	case "1M":
-		return now + 30 * 86400
+		return now + 30*86400
 	case "6M":
-		return now + 180 * 86400
+		return now + 180*86400
 	case "1Y":
-		return now + 365 * 86400
+		return now + 365*86400
 	}
 	return 0
 }

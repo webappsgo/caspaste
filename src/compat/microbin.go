@@ -131,9 +131,9 @@ func (d *Data) microbinList(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	type mbItem struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-		Syntax string `json:"syntax_highlight"`
+		ID      string `json:"id"`
+		Title   string `json:"title"`
+		Syntax  string `json:"syntax_highlight"`
 		Created int64  `json:"created"`
 		Expires int64  `json:"expires"`
 	}

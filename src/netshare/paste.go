@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -152,7 +151,7 @@ func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem
 	if paste.Body == "" && !paste.IsURL {
 		return "", 0, 0, ErrBadRequest
 	}
-	
+
 	// For URL shortener, validate originalURL is provided
 	if paste.IsURL && paste.OriginalURL == "" {
 		return "", 0, 0, ErrBadRequest
@@ -264,27 +263,27 @@ func PasteAddFromForm(req *http.Request, db storage.DB, rateSys *RateLimitSystem
 
 		// Prevent data:, javascript:, vbscript:, file:, etc.
 		if strings.Contains(urlLower, "javascript:") ||
-		   strings.Contains(urlLower, "data:") ||
-		   strings.Contains(urlLower, "vbscript:") ||
-		   strings.Contains(urlLower, "file:") {
+			strings.Contains(urlLower, "data:") ||
+			strings.Contains(urlLower, "vbscript:") ||
+			strings.Contains(urlLower, "file:") {
 			return "", 0, 0, ErrBadRequest
 		}
 	}
-	
+
 	// Validate OriginalURL scheme for URL shortener
 	if paste.IsURL && paste.OriginalURL != "" {
 		urlLower := strings.ToLower(strings.TrimSpace(paste.OriginalURL))
-		
+
 		// Only allow http:// and https:// schemes
 		if !strings.HasPrefix(urlLower, "http://") && !strings.HasPrefix(urlLower, "https://") {
 			return "", 0, 0, ErrBadRequest
 		}
-		
+
 		// Prevent data:, javascript:, vbscript:, file:, etc.
 		if strings.Contains(urlLower, "javascript:") ||
-		   strings.Contains(urlLower, "data:") ||
-		   strings.Contains(urlLower, "vbscript:") ||
-		   strings.Contains(urlLower, "file:") {
+			strings.Contains(urlLower, "data:") ||
+			strings.Contains(urlLower, "vbscript:") ||
+			strings.Contains(urlLower, "file:") {
 			return "", 0, 0, ErrBadRequest
 		}
 	}

@@ -39,7 +39,7 @@ type AppModel struct {
 	// View-specific data
 	pasteList  []PasteItem
 	pasteInput *Input
-	titleInput   *Input
+	titleInput *Input
 }
 
 // MenuItem represents a menu item

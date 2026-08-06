@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -17,25 +16,25 @@ type BruteForceProtection struct {
 	mu       sync.RWMutex
 	attempts map[string]*loginAttempts
 
-	maxAttempts    int
-	lockoutTime    time.Duration
-	cleanupPeriod  time.Duration
-	lastCleanup    time.Time
+	maxAttempts   int
+	lockoutTime   time.Duration
+	cleanupPeriod time.Duration
+	lastCleanup   time.Time
 }
 
 type loginAttempts struct {
-	count     int
+	count       int
 	lockedUntil time.Time
 }
 
 // NewBruteForceProtection creates a new brute force protection system
 func NewBruteForceProtection(maxAttempts int, lockoutTime time.Duration) *BruteForceProtection {
 	bfp := &BruteForceProtection{
-		attempts:       make(map[string]*loginAttempts),
-		maxAttempts:    maxAttempts,
-		lockoutTime:    lockoutTime,
-		cleanupPeriod:  10 * time.Minute,
-		lastCleanup:    time.Now(),
+		attempts:      make(map[string]*loginAttempts),
+		maxAttempts:   maxAttempts,
+		lockoutTime:   lockoutTime,
+		cleanupPeriod: 10 * time.Minute,
+		lastCleanup:   time.Now(),
 	}
 
 	// Start background cleanup goroutine

@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -47,29 +46,29 @@ var (
 
 // Token represents an API token
 type Token struct {
-	ID          int64   `json:"id"`
-	OwnerID     int64   `json:"owner_id,omitempty"`
-	OrgID       int64   `json:"org_id,omitempty"`
-	CreatedBy   int64   `json:"created_by,omitempty"`
-	Name        string  `json:"name"`
-	TokenPrefix string  `json:"token_prefix"`
-	TokenHash   string  `json:"-"`
-	Scopes      string  `json:"scopes,omitempty"`
-	LastUsedAt  *int64  `json:"last_used_at,omitempty"`
-	ExpiresAt   *int64  `json:"expires_at,omitempty"`
-	CreatedAt   int64   `json:"created_at"`
+	ID          int64  `json:"id"`
+	OwnerID     int64  `json:"owner_id,omitempty"`
+	OrgID       int64  `json:"org_id,omitempty"`
+	CreatedBy   int64  `json:"created_by,omitempty"`
+	Name        string `json:"name"`
+	TokenPrefix string `json:"token_prefix"`
+	TokenHash   string `json:"-"`
+	Scopes      string `json:"scopes,omitempty"`
+	LastUsedAt  *int64 `json:"last_used_at,omitempty"`
+	ExpiresAt   *int64 `json:"expires_at,omitempty"`
+	CreatedAt   int64  `json:"created_at"`
 }
 
 // TokenInfo contains information about a validated token
 type TokenInfo struct {
 	// "user", "org", "admin"
-	Type    string
+	Type string
 	// User ID for user tokens, Org ID for org tokens
 	OwnerID int64
 	// User ID (for org tokens, this is the user who created it)
-	UserID  int64
-	Scopes    []string
-	Token     *Token
+	UserID int64
+	Scopes []string
+	Token  *Token
 }
 
 // Service provides token operations
@@ -358,10 +357,10 @@ func (s *Service) validateAdminToken(tokenHash string) (*TokenInfo, error) {
 		UserID:  adminID,
 		Scopes:  scopes,
 		Token: &Token{
-			ID:       adminID,
-			OwnerID:  adminID,
-			Name:     username,
-			Scopes:   strings.Join(scopes, ","),
+			ID:      adminID,
+			OwnerID: adminID,
+			Name:    username,
+			Scopes:  strings.Join(scopes, ","),
 		},
 	}, nil
 }
