@@ -105,12 +105,44 @@ DB-responsiveness check consistent with PART 10's `PingContext` pattern.
 ## [ ] ssl_renewal, log_rotation, blocklist_update, cve_update scheduler tasks missing
 Read: AI.md PART 19 § "Built-in Tasks (Required)"
 Only paste_cleanup, session_cleanup, token_cleanup, healthcheck_self,
-backup_daily, backup_hourly, and geoip_update are registered in main().
-Still missing: `ssl_renewal` (needs the ACME/cert-renewal implementation
-from PART 15 to call into), `log_rotation` (src/logger has no rotation
-support to invoke), `blocklist_update`/`cve_update` (no backing
-service/download logic exists for either). `update_check` also appears
-unregistered — verify against src/updater/update.go.
+backup_daily, backup_hourly, geoip_update, and update_check (see separate
+entry below) are registered in main(). Still missing: `ssl_renewal` (needs
+the ACME/cert-renewal implementation from PART 15 to call into),
+`log_rotation` (src/logger has no rotation support to invoke),
+`blocklist_update`/`cve_update` (no backing service/download logic exists
+for either).
+
+## [x] update_check scheduler task was unregistered; --update branch didn't persist
+Read: AI.md PART 23 (line 36186)
+Three related bugs fixed together (same feature area): (1) `update_check`
+was never registered as a scheduler task — added (src/server/caspaste.go),
+daily 06:00, skippable, reads `server.update.{branch,auto_install,
+defer_days}`; notify-only by default, runs the full DoUpdate+restart flow
+when `auto_install: true`. (2) `src/updater/update.go` had no defer_days
+awareness at all — added `Release.PublishedAt` and a new
+`CheckForUpdateEligible(ctx, cfg, deferDays)` that fetches the full
+releases list, filters by branch/eligibility (`published_at` cutoff), and
+selects the newest eligible release newer than the running version; manual
+`--update check`/`--update yes` still call the original `CheckForUpdate`
+and correctly ignore defer_days per spec ("an explicit operator action
+overrides the defer window"). (3) `--update branch {name}` only printed
+"not persisted" instead of writing to config, directly contradicting
+PART 23's "the config is the single source of truth" rule — now loads/
+saves `server.update.branch` via a new `Update` section in
+src/config/yaml.go (defaults: branch=stable, auto_install=false,
+defer_days=0), and `--update check`/`--update yes` now read the persisted
+branch instead of hardcoding "stable". Cluster-mode node-by-node
+auto-install rollout is N/A until cluster mode (PART 10) is implemented.
+
+## [ ] "Update available" admin banner / Notification Center not implemented
+Read: AI.md PART 23 § "Surfacing rules"
+The `update_check` task currently only logs `update_available: vX -> vY`
+server-side. PART 23 requires this to surface as a banner + Notification
+Center entry on `/server/{admin_path}/*` (Server Admins only, fires once
+per version, dismiss suppresses only that version) plus an off-by-default
+`update_available` email event. No notification system/admin banner
+mechanism exists in this project yet — needs its own pass once the admin
+panel notification infrastructure exists.
 
 ## [ ] cluster_heartbeat / cluster mode (PART 10) and cache drivers (PART 9) not implemented
 Read: AI.md PART 9, PART 10

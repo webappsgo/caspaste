@@ -415,6 +415,17 @@ type YAMLConfig struct {
 		// Allow only these ISO country codes; if set, deny_countries is ignored
 		AllowCountries []string `yaml:"allow_countries"`
 	} `yaml:"geoip"`
+
+	// Self-update per AI.md PART 23
+	Update struct {
+		// Release channel: stable | beta | daily (also settable via --update branch)
+		Branch string `yaml:"branch"`
+		// Auto-install updates found by the update_check task (default: false)
+		AutoInstall bool `yaml:"auto_install"`
+		// Defer window in days (0-365): a release is only eligible once it
+		// is this many days old; 0 = immediately
+		DeferDays int `yaml:"defer_days"`
+	} `yaml:"update"`
 }
 
 // LoadYAMLConfig loads configuration from YAML file
@@ -828,6 +839,14 @@ func GenerateDefaultYAMLConfig(path string) error {
 	defaultConfig.GeoIP.Enabled = false
 	defaultConfig.GeoIP.DenyCountries = []string{}
 	defaultConfig.GeoIP.AllowCountries = []string{}
+
+	// ============================================================================
+	// UPDATE CONFIGURATION
+	// ============================================================================
+	// Stable channel, notify-only, no defer window by default per AI.md PART 23
+	defaultConfig.Update.Branch = "stable"
+	defaultConfig.Update.AutoInstall = false
+	defaultConfig.Update.DeferDays = 0
 
 	// Write to file
 	data, err := yaml.Marshal(defaultConfig)

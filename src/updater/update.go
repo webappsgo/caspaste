@@ -1,4 +1,3 @@
-
 // This file is part of CasPaste.
 
 // CasPaste is free software released under the MIT License.
@@ -50,12 +49,13 @@ func DefaultConfig(version string) Config {
 
 // Release represents a GitHub release
 type Release struct {
-	TagName    string  `json:"tag_name"`
-	Name       string  `json:"name"`
-	Prerelease bool    `json:"prerelease"`
-	Draft      bool    `json:"draft"`
-	Assets     []Asset `json:"assets"`
-	Body       string  `json:"body"`
+	TagName     string    `json:"tag_name"`
+	Name        string    `json:"name"`
+	Prerelease  bool      `json:"prerelease"`
+	Draft       bool      `json:"draft"`
+	Assets      []Asset   `json:"assets"`
+	Body        string    `json:"body"`
+	PublishedAt time.Time `json:"published_at"`
 }
 
 // Asset represents a release asset
@@ -147,6 +147,72 @@ func CheckForUpdate(ctx context.Context, cfg Config) (*UpdateResult, error) {
 			result.Release = &r
 			return result, nil
 		}
+	}
+
+	return result, nil
+}
+
+// CheckForUpdateEligible checks GitHub releases for updates per AI.md
+// PART 23 "Defer Semantics" — a release is only eligible once it is at
+// least deferDays old (GitHub Releases published_at, UTC). It selects the
+// newest eligible release newer than the running version.
+//
+// This is used ONLY by the scheduled update_check task. Manual
+// "--update check"/"--update yes" calls must always call CheckForUpdate
+// directly and ignore defer_days entirely — an explicit operator action
+// overrides the defer window.
+func CheckForUpdateEligible(ctx context.Context, cfg Config, deferDays int) (*UpdateResult, error) {
+	result := &UpdateResult{CurrentVersion: cfg.CurrentVersion}
+
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", cfg.GithubOwner, cfg.GithubRepo)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", fmt.Sprintf("%s/%s", cfg.BinaryName, cfg.CurrentVersion))
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for updates: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// HTTP 404 means no updates available (already current)
+	if resp.StatusCode == 404 {
+		return result, nil
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitHub API error: %d", resp.StatusCode)
+	}
+
+	var releases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// GitHub returns releases newest-first, so the first eligible match
+	// in list order is the newest eligible release.
+	cutoff := time.Now().UTC().AddDate(0, 0, -deferDays)
+	for _, r := range releases {
+		if r.Draft {
+			continue
+		}
+		if !matchesBranch(r, cfg.Branch) {
+			continue
+		}
+		if normalizeVersion(r.TagName) == normalizeVersion(cfg.CurrentVersion) {
+			continue
+		}
+		if deferDays > 0 && r.PublishedAt.After(cutoff) {
+			continue
+		}
+		release := r
+		result.Available = true
+		result.NewVersion = r.TagName
+		result.Release = &release
+		return result, nil
 	}
 
 	return result, nil

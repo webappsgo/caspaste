@@ -432,8 +432,24 @@ func hasArg(arg string) bool {
 	return false
 }
 
+// resolveUpdateConfigPath finds the server.yml path to read/write
+// server.update.* settings, mirroring the resolution order used by the
+// --maintenance and --status handlers.
+func resolveUpdateConfigPath(flagConfigDir string) string {
+	if flagConfigDir != "" {
+		return flagConfigDir + "/server.yml"
+	}
+	if _, err := os.Stat("/etc/webappsgo/caspaste/server.yml"); err == nil {
+		return "/etc/webappsgo/caspaste/server.yml"
+	}
+	if _, err := os.Stat("/config/server.yml"); err == nil {
+		return "/config/server.yml"
+	}
+	return getDefaultConfigDir() + "/server.yml"
+}
+
 // handleUpdateCommand processes --update flag commands per AI.md PART 23
-func handleUpdateCommand(command, currentVersion string) {
+func handleUpdateCommand(command, currentVersion, flagConfigDir string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -452,14 +468,22 @@ func handleUpdateCommand(command, currentVersion string) {
 		os.Exit(0)
 	}
 
+	// Per AI.md PART 23: "the config is the single source of truth; there
+	// is no separate CLI-side state" — the branch always comes from
+	// server.yml, defaulting to "stable" if no config exists yet.
+	configPath := resolveUpdateConfigPath(flagConfigDir)
+	branch := "stable"
+	if yamlCfg, err := config.LoadYAMLConfig(configPath); err == nil && yamlCfg.Update.Branch != "" {
+		branch = yamlCfg.Update.Branch
+	}
+
 	// Configuration for updates
 	cfg := updater.Config{
 		CurrentVersion: currentVersion,
-		// Default branch
-		Branch:      "stable",
-		GithubOwner: "webappsgo",
-		GithubRepo:  "caspaste",
-		BinaryName:  "caspaste",
+		Branch:         branch,
+		GithubOwner:    "webappsgo",
+		GithubRepo:     "caspaste",
+		BinaryName:     "caspaste",
 	}
 
 	switch cmd {
@@ -515,11 +539,21 @@ func handleUpdateCommand(command, currentVersion string) {
 			fmt.Fprintln(os.Stderr, "Usage: caspaste --update branch {stable|beta|daily}")
 			os.Exit(1)
 		}
-		branch := strings.ToLower(parts[1])
-		switch branch {
+		newBranch := strings.ToLower(parts[1])
+		switch newBranch {
 		case "stable", "beta", "daily":
-			fmt.Printf("Update branch set to: %s\n", branch)
-			fmt.Println("Note: Branch preference is not persisted (use config file for persistence)")
+			yamlCfg, err := config.LoadYAMLConfig(configPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error loading config at %s: %v\n", configPath, err)
+				os.Exit(1)
+			}
+			yamlCfg.Update.Branch = newBranch
+			if err := config.SaveYAMLConfig(configPath, yamlCfg); err != nil {
+				fmt.Fprintf(os.Stderr, "Error saving config: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Update branch set to: %s\n", newBranch)
+			fmt.Printf("Saved to %s\n", configPath)
 			os.Exit(0)
 		default:
 			fmt.Fprintf(os.Stderr, "Error: invalid branch '%s'\n", branch)
@@ -1837,7 +1871,7 @@ func main() {
 
 	// Handle --update command per AI.md PART 23
 	if *flagUpdate != "" || hasArg("--update") {
-		handleUpdateCommand(*flagUpdate, Version)
+		handleUpdateCommand(*flagUpdate, Version, *flagConfigDir)
 		return
 	}
 
@@ -2695,6 +2729,55 @@ func main() {
 			},
 		})
 	}
+
+	// Add update_check task per AI.md PART 19/23 — daily channel check,
+	// filtered by defer_days; notify-only unless auto_install is set.
+	sched.AddTask(&scheduler.Task{
+		ID:          "update_check",
+		Name:        "Update Check",
+		Description: "Check GitHub releases for an eligible update",
+		Schedule:    "0 6 * * *",
+		Enabled:     true,
+		Skippable:   true,
+		Handler: func(ctx context.Context) error {
+			branch := yamlCfg.Update.Branch
+			if branch == "" {
+				branch = "stable"
+			}
+			updCfg := updater.Config{
+				CurrentVersion: Version,
+				Branch:         branch,
+				GithubOwner:    "webappsgo",
+				GithubRepo:     "caspaste",
+				BinaryName:     "caspaste",
+			}
+			result, err := updater.CheckForUpdateEligible(ctx, updCfg, yamlCfg.Update.DeferDays)
+			if err != nil {
+				log.Error(errors.New("Update check: " + err.Error()))
+				return err
+			}
+			if result == nil || !result.Available {
+				return nil
+			}
+			log.Info("update_available: " + Version + " -> " + result.NewVersion)
+			if !yamlCfg.Update.AutoInstall {
+				return nil
+			}
+			// auto_install: true — run the full update flow now, per AI.md
+			// PART 23 "runs the full --update yes flow during the task run".
+			if err := updater.DoUpdate(ctx, updCfg, result.Release); err != nil {
+				log.Error(errors.New("Update auto-install failed: " + err.Error()))
+				return err
+			}
+			log.Info("Update auto-installed: " + Version + " -> " + result.NewVersion + ", restarting")
+			if err := updater.RestartService("caspaste"); err != nil {
+				if err := updater.RestartSelf(); err != nil {
+					log.Error(errors.New("Update auto-install: restart failed: " + err.Error()))
+				}
+			}
+			return nil
+		},
+	})
 
 	// Wire scheduler health check into apiv1Data now that sched is ready
 	apiv1Data.SchedulerStatus = func() string {
