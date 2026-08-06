@@ -2583,9 +2583,10 @@ func main() {
 		Enabled:     true,
 		Skippable:   false,
 		Handler: func(ctx context.Context) error {
-			// Simple health check - verify database is responsive
-			_, err := db.PasteDeleteExpired()
-			return err
+			// Per AI.md PART 19: verify application health without
+			// mutating data — PasteDeleteExpired is a separate task
+			// (paste_cleanup) and must not be reused here.
+			return db.Pool().PingContext(ctx)
 		},
 	})
 

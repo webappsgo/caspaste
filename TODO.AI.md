@@ -94,6 +94,14 @@ Allowlist, Blocklist, RateLimit, and GeoIP middleware all need to be
 built and inserted in spec order — this is a substantial standalone
 feature, not a small follow-up.
 
+## [x] healthcheck_self task was mutating data instead of checking health
+Read: AI.md PART 19 (line 33460, 33643)
+`healthcheck_self` (every 5m) previously called `db.PasteDeleteExpired()`
+and returned its error — a destructive write duplicating the separate
+`paste_cleanup` task, not an actual health verification. Changed to
+`db.Pool().PingContext(ctx)` (src/server/caspaste.go), a non-mutating
+DB-responsiveness check consistent with PART 10's `PingContext` pattern.
+
 ## [ ] ssl_renewal, log_rotation, blocklist_update, cve_update scheduler tasks missing
 Read: AI.md PART 19 § "Built-in Tasks (Required)"
 Only paste_cleanup, session_cleanup, token_cleanup, healthcheck_self,
