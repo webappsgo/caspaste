@@ -11,8 +11,11 @@ func diskTotalBytes(path string) (uint64, error) {
 	if err := unix.Statfs(path, &stat); err != nil {
 		return 0, err
 	}
-	// #nosec G115 -- Bsize/Blocks are platform-defined unsigned block counts
-	return stat.Blocks * uint64(stat.Bsize), nil
+	// #nosec G115 -- Bsize/Blocks are platform-defined block counts; Blocks
+	// is int64 on some platforms (e.g. freebsd/arm64) and uint64 on others,
+	// so both operands are explicitly converted rather than relying on
+	// untyped-constant promotion.
+	return uint64(stat.Blocks) * uint64(stat.Bsize), nil
 }
 
 // diskFreeBytes returns the space available to an unprivileged process on
@@ -23,6 +26,9 @@ func diskFreeBytes(path string) (uint64, error) {
 	if err := unix.Statfs(path, &stat); err != nil {
 		return 0, err
 	}
-	// #nosec G115 -- Bsize/Bavail are platform-defined unsigned block counts
-	return stat.Bavail * uint64(stat.Bsize), nil
+	// #nosec G115 -- Bsize/Bavail are platform-defined block counts; Bavail
+	// is int64 on some platforms (e.g. freebsd/arm64) and uint64 on others,
+	// so both operands are explicitly converted rather than relying on
+	// untyped-constant promotion.
+	return uint64(stat.Bavail) * uint64(stat.Bsize), nil
 }
