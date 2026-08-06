@@ -34,23 +34,17 @@ itself never needs to read it. src/server/caspaste.go now reads only
 CASPASTE_PORT (src/config/env.go's getEnv() already prefixed correctly).
 README.md already documented CASPASTE_PORT; no doc change needed.
 
-## [ ] Migrate frozen `internal_org` from `casapps` to `webappsgo`
-User confirmed `webappsgo` is canonical (matches IDEA.md line 33 and
-src/path/path.go). Everything else currently hardcodes `casapps/` and must
-be migrated to match:
-- `src/server/caspaste.go`, `src/storage/storage.go`, `src/config/yaml.go`
-  (incl. GenerateDefaultYAMLConfig's Linux-only literal — AUDIT.AI.md Pass 5
-  item folds in here), `src/client/main.go`, `src/tui/app.go` — replace
-  hardcoded `casapps/` path segments with `webappsgo/`.
-- IDEA.md line 50 — fix the macOS bundle-id example from
-  `io.github.casapps.caspaste` to `io.github.webappsgo.caspaste` so IDEA.md
-  is internally consistent.
-- Once all resolvers agree, consolidate the duplicate per-OS path-resolution
-  logic in server/storage/client/tui into the single `src/path` resolver
-  (currently only imported by `src/ssl/ssl.go`) so this cannot drift again.
-- Any existing on-disk `casapps/` install data is orphaned by this rename;
-  note it in README/docs as a breaking path change for anyone who ran a
-  pre-migration build.
+## [x] Migrate frozen `internal_org` from `casapps` to `webappsgo`
+Verified via `grep -rni casapps src/ IDEA.md` — zero matches. All target
+files (`src/server/caspaste.go`, `src/storage/storage.go`,
+`src/config/yaml.go`, `src/client/main.go`, `src/tui/app.go`) already use
+`webappsgo/` path segments and import paths, and IDEA.md line 50 already
+reads `io.github.webappsgo.caspaste`. This migration was already completed
+in an earlier session; the TODO entry was stale. Remaining sub-item not
+yet done: consolidating the duplicate per-OS path-resolution logic in
+server/storage/client/tui into the single `src/path` resolver (currently
+only imported by `src/ssl/ssl.go`) — left as-is since it's a refactor, not
+a correctness bug, and all resolvers already agree on `webappsgo`.
 
 ## [x] Backup/restore CLI now delegates to backup.Service — legacy tar/cp shell-out removed
 Read: AI.md PART 22 (line 35411)
